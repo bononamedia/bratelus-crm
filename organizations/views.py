@@ -218,7 +218,15 @@ def admin_console_view(request):
 
     if request.method == 'POST':
         action = request.POST.get('action')
-        if action != 'invite_member' and not user_can_manage_setup(request.user, active_org):
+        people_actions = {
+            'invite_member',
+            'update_member_access',
+            'create_skill',
+            'delete_skill',
+            'assign_worker_skill',
+            'delete_worker_skill',
+        }
+        if action not in people_actions and not user_can_manage_setup(request.user, active_org):
             raise PermissionDenied('Only workspace administrators can change company setup.')
 
         if action == 'create_custom_field':
@@ -458,8 +466,14 @@ def admin_console_view(request):
                 id=request.POST.get('member_id'),
             ).select_related('user').first()
             role = request.POST.get('role', '')
+            can_manage_setup = user_can_manage_setup(request.user, active_org)
             if not member or role not in dict(WorkspaceMember.ROLE_CHOICES):
                 messages.error(request, 'Choose a valid workspace member and role.')
+            elif not can_manage_setup and (
+                member.role not in {'employee', 'field_worker'}
+                or role not in {'employee', 'field_worker'}
+            ):
+                raise PermissionDenied('Managers can edit only employee and field-work accounts.')
             elif member.role == 'admin' and role != 'admin' and not WorkspaceMember.objects.filter(
                 workspace=active_org,
                 role='admin',
@@ -467,14 +481,38 @@ def admin_console_view(request):
             ).exclude(id=member.id).exists():
                 messages.error(request, 'A workspace must keep at least one administrator.')
             else:
+                email = request.POST.get('email', '').strip().lower()
+                User = get_user_model()
+                email_in_use = email and User.objects.filter(email__iexact=email).exclude(id=member.user_id).exists()
+                if not email or '@' not in email:
+                    messages.error(request, 'Enter a valid employee email address.')
+                    return redirect('admin_console')
+                if email_in_use:
+                    messages.error(request, 'That email address belongs to another user.')
+                    return redirect('admin_console')
+
+                member.user.first_name = request.POST.get('first_name', '').strip()
+                member.user.last_name = request.POST.get('last_name', '').strip()
+                member.user.email = email
+                member.user.save(update_fields=['first_name', 'last_name', 'email'])
                 member.role = role
                 member.can_view_billing = (
-                    role == 'manager' and request.POST.get('can_view_billing') == 'yes'
+                    can_manage_setup
+                    and role == 'manager'
+                    and request.POST.get('can_view_billing') == 'yes'
                 )
                 member.save(update_fields=['role', 'can_view_billing'])
-                WorkerProfile.objects.filter(user=member.user).update(
-                    is_admin=role in {'admin', 'manager'},
+                worker, _ = WorkerProfile.objects.get_or_create(user=member.user)
+                worker.workspaces.add(active_org)
+                employment_type = request.POST.get('employment_type', '')
+                worker.phone = request.POST.get('phone', '').strip()
+                worker.employment_type = (
+                    employment_type
+                    if employment_type in dict(WorkerProfile.EMPLOYMENT_TYPE_CHOICES)
+                    else ''
                 )
+                worker.is_admin = role in {'admin', 'manager'}
+                worker.save(update_fields=['phone', 'employment_type', 'is_admin'])
                 messages.success(request, f'Access updated for {member.user.email or member.user.username}.')
 
         return redirect('admin_console')
@@ -496,7 +534,10 @@ def admin_console_view(request):
         worker__workspaces=active_org,
         skill__workspace=active_org,
     ).select_related('worker__user', 'skill').order_by('worker__user__username', 'skill__name')
-    members = WorkspaceMember.objects.filter(workspace=active_org).select_related('user').order_by('user__username')
+    members = WorkspaceMember.objects.filter(workspace=active_org).select_related(
+        'user',
+        'user__workerprofile',
+    ).order_by('user__username')
 
     from finance.models import SubscriptionPlan, WorkspaceSubscription
     from finance.pricing import monthly_price

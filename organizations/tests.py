@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from finance.models import SeatPricingTier, SubscriptionPlan, WorkspaceSubscription
-from organizations.models import WorkerProfile, Workspace, WorkspaceMember
+from organizations.models import Skill, WorkerProfile, Workspace, WorkspaceMember
 from organizations.permissions import (
     user_can_export_data,
     user_can_manage_people,
@@ -114,6 +114,56 @@ class WorkspaceRoleTests(TestCase):
             'confirm_price': 'yes',
         })
         self.assertEqual(promotion.status_code, 403)
+
+    def test_manager_can_manage_skills_and_edit_employees(self):
+        manager = self.member('manager')
+        employee = self.member('employee')
+        member = WorkspaceMember.objects.get(workspace=self.workspace, user=employee)
+        profile = WorkerProfile.objects.create(user=employee)
+        profile.workspaces.add(self.workspace)
+        self.client.force_login(manager)
+
+        skill_response = self.client.post(reverse('admin_console'), {
+            'action': 'create_skill',
+            'name': 'Floor Care',
+            'description': 'Commercial floor service',
+        })
+        self.assertRedirects(skill_response, reverse('admin_console'))
+        self.assertTrue(Skill.objects.filter(workspace=self.workspace, name='Floor Care').exists())
+
+        edit_response = self.client.post(reverse('admin_console'), {
+            'action': 'update_member_access',
+            'member_id': member.id,
+            'first_name': 'Edited',
+            'last_name': 'Employee',
+            'email': 'edited-employee@example.com',
+            'phone': '555-222-3333',
+            'employment_type': 'w2',
+            'role': 'field_worker',
+        })
+        self.assertRedirects(edit_response, reverse('admin_console'))
+        member.refresh_from_db()
+        employee.refresh_from_db()
+        profile.refresh_from_db()
+        self.assertEqual(member.role, 'field_worker')
+        self.assertEqual(employee.get_full_name(), 'Edited Employee')
+        self.assertEqual(profile.phone, '555-222-3333')
+        self.assertEqual(profile.employment_type, 'w2')
+
+    def test_manager_cannot_edit_an_administrator(self):
+        manager = self.member('manager')
+        admin = self.member('admin')
+        member = WorkspaceMember.objects.get(workspace=self.workspace, user=admin)
+        self.client.force_login(manager)
+        response = self.client.post(reverse('admin_console'), {
+            'action': 'update_member_access',
+            'member_id': member.id,
+            'first_name': 'Not',
+            'last_name': 'Allowed',
+            'email': admin.email,
+            'role': 'admin',
+        })
+        self.assertEqual(response.status_code, 403)
 
     def test_field_worker_can_update_only_their_profile(self):
         worker_user = self.member('field_worker')

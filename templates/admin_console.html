@@ -494,12 +494,27 @@
                                 <div class="font-semibold text-gray-950">{{ member.user.get_full_name|default:member.user.username }}</div>
                                 <div class="text-xs text-gray-500">{{ member.user.email|default:"No email" }}</div>
                             </td>
-                            {% if is_workspace_admin %}
-                            <td colspan="3" class="px-4 py-2"><form method="post" class="flex min-w-[440px] items-center gap-3">{% csrf_token %}<input type="hidden" name="action" value="update_member_access"><input type="hidden" name="member_id" value="{{ member.id }}"><select name="role" class="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm">{% for value, label in member_role_choices %}<option value="{{ value }}" {% if member.role == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select><label class="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" name="can_view_billing" value="yes" {% if member.can_view_billing %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-blue-600"> Billing</label><button class="ml-auto rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Save</button></form></td>
-                            {% else %}
-                            <td class="px-4 py-3 text-gray-600">{{ member.get_role_display }}</td><td class="px-4 py-3 text-gray-600">{% if member.can_view_billing %}Allowed{% else %}-{% endif %}</td><td></td>
-                            {% endif %}
+                            <td class="px-4 py-3 text-gray-600">{{ member.get_role_display }}</td>
+                            <td class="px-4 py-3 text-gray-600">{% if member.can_view_billing %}Allowed{% else %}-{% endif %}</td>
+                            <td class="px-4 py-3 text-right">{% if is_workspace_admin or member.role == 'employee' or member.role == 'field_worker' %}<button type="button" onclick="document.getElementById('member-editor-{{ member.id }}').classList.toggle('hidden')" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-50">Edit</button>{% endif %}</td>
                         </tr>
+                        {% if is_workspace_admin or member.role == 'employee' or member.role == 'field_worker' %}
+                        <tr id="member-editor-{{ member.id }}" class="hidden bg-gray-50/70">
+                            <td colspan="4" class="px-4 py-4">
+                                <form method="post" class="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                                    {% csrf_token %}<input type="hidden" name="action" value="update_member_access"><input type="hidden" name="member_id" value="{{ member.id }}">
+                                    <label class="text-xs font-semibold text-gray-600">First name<input name="first_name" value="{{ member.user.first_name }}" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-950"></label>
+                                    <label class="text-xs font-semibold text-gray-600">Last name<input name="last_name" value="{{ member.user.last_name }}" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-950"></label>
+                                    <label class="text-xs font-semibold text-gray-600 sm:col-span-2">Email<input name="email" type="email" required value="{{ member.user.email }}" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-950"></label>
+                                    <label class="text-xs font-semibold text-gray-600">Phone<input name="phone" value="{{ member.user.workerprofile.phone }}" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-950"></label>
+                                    <label class="text-xs font-semibold text-gray-600">Employment<select name="employment_type" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-950"><option value="">Not set</option>{% for value, label in employment_type_choices %}<option value="{{ value }}" {% if member.user.workerprofile.employment_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
+                                    <label class="text-xs font-semibold text-gray-600">Access role<select name="role" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm font-normal text-gray-950">{% for value, label in member_role_choices %}{% if is_workspace_admin or value == 'employee' or value == 'field_worker' %}<option value="{{ value }}" {% if member.role == value %}selected{% endif %}>{{ label }}</option>{% endif %}{% endfor %}</select></label>
+                                    {% if is_workspace_admin %}<label class="flex items-center gap-2 self-end pb-2 text-sm text-gray-600"><input type="checkbox" name="can_view_billing" value="yes" {% if member.can_view_billing %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-blue-600"> Allow manager billing access</label>{% endif %}
+                                    <div class="flex items-end justify-end sm:col-span-2 xl:col-span-4"><button class="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Save employee</button></div>
+                                </form>
+                            </td>
+                        </tr>
+                        {% endif %}
                         {% empty %}
                         <tr><td colspan="4" class="px-4 py-8 text-center text-gray-400">No workspace members.</td></tr>
                         {% endfor %}
