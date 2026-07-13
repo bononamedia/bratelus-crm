@@ -12,7 +12,7 @@
             </div>
         </div>
         {% if worker_profile %}
-        <div class="flex flex-wrap gap-2"><a href="{% url 'field_operations' %}" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Open field app</a><a href="#profile" class="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100">
+        <div class="flex flex-wrap gap-2"><button type="button" onclick="enrollPasskey()" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50">Set up Face ID</button><a href="{% url 'field_operations' %}" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Open field app</a><a href="#profile" class="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100">
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4L16.5 3.5z"></path></svg>
             Edit profile
         </a></div>
@@ -81,4 +81,21 @@
     </div>
     {% endif %}
 </div>
+<script>
+function passkeyB64ToBuffer(value) { const base64 = value.replace(/-/g, '+').replace(/_/g, '/'); const raw = atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')); return Uint8Array.from(raw, c => c.charCodeAt(0)); }
+function passkeyBufferToB64(value) { return btoa(String.fromCharCode(...new Uint8Array(value))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function passkeyCreateOptions(options) { options.challenge = passkeyB64ToBuffer(options.challenge); options.user.id = passkeyB64ToBuffer(options.user.id); (options.excludeCredentials || []).forEach(item => item.id = passkeyB64ToBuffer(item.id)); return options; }
+function passkeyRegistrationJSON(credential) { return { id: credential.id, rawId: passkeyBufferToB64(credential.rawId), type: credential.type, response: { attestationObject: passkeyBufferToB64(credential.response.attestationObject), clientDataJSON: passkeyBufferToB64(credential.response.clientDataJSON), transports: credential.response.getTransports ? credential.response.getTransports() : [] } }; }
+function profileCSRF() { return document.querySelector('[name=csrfmiddlewaretoken]').value; }
+async function enrollPasskey() {
+    if (!window.PublicKeyCredential) { alert('This browser does not support passkeys. Update Safari and try again.'); return; }
+    try {
+        const optionsResponse = await fetch('/api/passkeys/register/options/', {method: 'POST', headers: {'X-CSRFToken': profileCSRF()}});
+        const options = await optionsResponse.json(); if (!optionsResponse.ok) throw new Error(options.error);
+        const credential = await navigator.credentials.create({publicKey: passkeyCreateOptions(options)});
+        const verifyResponse = await fetch('/api/passkeys/register/verify/', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': profileCSRF()}, body: JSON.stringify(passkeyRegistrationJSON(credential))});
+        const result = await verifyResponse.json(); if (!verifyResponse.ok) throw new Error(result.error); alert(result.message);
+    } catch (err) { alert(err.message || 'Face ID setup was cancelled.'); }
+}
+</script>
 {% endblock %}

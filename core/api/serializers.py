@@ -136,6 +136,8 @@ class JobSerializer(serializers.ModelSerializer):
     zone_name = serializers.CharField(source='service_zone.name', read_only=True)
     tasks = serializers.ListField(child=serializers.DictField(), write_only=True, required=False)
     task_items = serializers.SerializerMethodField()
+    open_issue_count = serializers.SerializerMethodField()
+    latest_issue = serializers.SerializerMethodField()
 
     class Meta:
         model = Job
@@ -148,8 +150,25 @@ class JobSerializer(serializers.ModelSerializer):
             'zone_name', 'blocked_by', 'custom_data', 'completion_mode',
             'require_location', 'arrival_radius_meters', 'require_closeout_confirmation',
             'closeout_instruction', 'tasks', 'task_items', 'completion_contact',
-            'completion_notification_method', 'completion_message_override'
+            'completion_notification_method', 'completion_message_override',
+            'open_issue_count', 'latest_issue'
         ]
+
+    def get_open_issue_count(self, obj):
+        return obj.issues.exclude(status='resolved').count()
+
+    def get_latest_issue(self, obj):
+        issue = obj.issues.exclude(status='resolved').select_related('worker__user').first()
+        if not issue:
+            return None
+        return {
+            'id': issue.id,
+            'title': issue.title,
+            'priority': issue.priority,
+            'status': issue.status,
+            'worker': issue.worker.user.get_full_name() or issue.worker.user.username,
+            'created_at': issue.created_at,
+        }
 
     def get_task_items(self, obj):
         return [

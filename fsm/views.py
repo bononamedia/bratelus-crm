@@ -16,7 +16,7 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 
 # Local Models & Tasks
-from .models import FieldEvent, FieldShift, Job, JobTask, JobEvidence, JobAssignment
+from .models import FieldEvent, FieldShift, Job, JobTask, JobEvidence, JobAssignment, JobIssue, JobIssueMedia
 from .tasks import send_completion_notifications, translate_field_note, verify_photo_evidence
 from .translation import note_needs_translation
 from .tasks import calculate_distance
@@ -148,6 +148,7 @@ def field_job_view(request, job_id):
         'job': assignment.job,
         'tasks': assignment.job.tasks.prefetch_related('evidence').all(),
         'events': assignment.job.field_events.filter(worker=worker)[:30],
+        'issues': assignment.job.issues.filter(worker=worker).prefetch_related('media')[:20],
         'active_shift': _active_shift(worker, active_org),
     })
 
@@ -259,6 +260,111 @@ class FieldShiftView(APIView):
             _record_field_event(worker, workspace, 'shift_ended', location)
             return Response({'message': 'Field shift ended.'})
         return Response({'error': 'Choose start or end.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class FieldIssueReportView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+
+    @transaction.atomic
+    def post(self, request, job_id):
+        workspace, worker = _worker_for_request(request)
+        location = _location_from_request(request.data)
+        if not worker:
+            return Response({'error': 'Field-work profile required.'}, status=status.HTTP_403_FORBIDDEN)
+        if not location:
+            return Response({'error': 'Location is required to report a problem.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not _active_shift(worker, workspace):
+            return Response({'error': 'Check in before reporting a field problem.'}, status=status.HTTP_400_BAD_REQUEST)
+        assignment = get_object_or_404(
+            JobAssignment.objects.select_related('job'),
+            worker=worker,
+            job_id=job_id,
+            job__organization=workspace,
+        )
+        title = request.data.get('title', '').strip()
+        description = request.data.get('description', '').strip()
+        transcript = request.data.get('voice_transcript', '').strip()
+        priority = request.data.get('priority', 'normal')
+        if not title:
+            return Response({'error': 'Problem title is required.'}, status=status.HTTP_400_BAD_REQUEST)
+        if not description and not transcript:
+            return Response({'error': 'Add a description or voice transcript.'}, status=status.HTTP_400_BAD_REQUEST)
+        if priority not in dict(JobIssue.PRIORITY_CHOICES):
+            priority = 'normal'
+
+        media_files = request.FILES.getlist('media')
+        if len(media_files) > 10:
+            return Response({'error': 'Attach no more than 10 files per report.'}, status=status.HTTP_400_BAD_REQUEST)
+        validated_media = []
+        for upload in media_files:
+            content_type = (getattr(upload, 'content_type', '') or '').lower()
+            if upload.size > 100 * 1024 * 1024:
+                return Response({'error': f'{upload.name} is larger than 100 MB.'}, status=status.HTTP_400_BAD_REQUEST)
+            if content_type.startswith('image/'):
+                media_type = 'photo'
+            elif content_type.startswith('video/'):
+                media_type = 'video'
+            elif content_type.startswith('audio/'):
+                media_type = 'audio'
+            else:
+                return Response({'error': f'{upload.name} is not a supported photo, video, or audio file.'}, status=status.HTTP_400_BAD_REQUEST)
+            validated_media.append((upload, media_type))
+
+        lat, lng, accuracy = location
+        issue = JobIssue.objects.create(
+            workspace=workspace,
+            job=assignment.job,
+            worker=worker,
+            assignment=assignment,
+            title=title[:180],
+            description=description,
+            voice_transcript=transcript,
+            priority=priority,
+            lat=lat,
+            lng=lng,
+            accuracy=accuracy,
+        )
+        for upload, media_type in validated_media:
+            JobIssueMedia.objects.create(issue=issue, file=upload, media_type=media_type)
+
+        _record_field_event(
+            worker,
+            workspace,
+            'problem_reported',
+            location,
+            job=assignment.job,
+            note=title,
+        )
+        return Response({
+            'message': 'Problem reported to dispatch.',
+            'issue_id': issue.id,
+            'account_id': assignment.job.account_id,
+            'property_id': assignment.job.property_id,
+        }, status=status.HTTP_201_CREATED)
+
+
+class FieldIssueStatusView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request, issue_id):
+        workspace = getattr(request, 'active_organization', None)
+        if not user_can_manage_workspace(request.user, workspace):
+            return Response({'error': 'Manager access required.'}, status=status.HTTP_403_FORBIDDEN)
+        issue = get_object_or_404(JobIssue, id=issue_id, workspace=workspace)
+        new_status = request.data.get('status')
+        if new_status not in {'acknowledged', 'resolved'}:
+            return Response({'error': 'Choose acknowledged or resolved.'}, status=status.HTTP_400_BAD_REQUEST)
+        issue.status = new_status
+        if new_status == 'acknowledged':
+            issue.acknowledged_at = timezone.now()
+            update_fields = ['status', 'acknowledged_at']
+        else:
+            issue.resolved_at = timezone.now()
+            issue.resolution_notes = request.data.get('resolution_notes', '').strip()
+            update_fields = ['status', 'resolved_at', 'resolution_notes']
+        issue.save(update_fields=update_fields)
+        return Response({'message': f'Problem marked {new_status}.', 'status': issue.status})
 
 
 class FieldJobActionView(APIView):

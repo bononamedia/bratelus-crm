@@ -23,6 +23,8 @@ from fsm.views import (
     TrackLocationPingView,
     LiveFleetLocationsView,
     FieldJobActionView,
+    FieldIssueReportView,
+    FieldIssueStatusView,
     FieldShiftView,
     field_job_view,
     field_operations_view,
@@ -35,6 +37,10 @@ from finance.views import finance_overview_view
 from finance.billing_views import billing_overview_view, create_billing_portal_view, create_checkout_session_view, stripe_webhook_view
 from organizations.models import Workspace
 from organizations.views import admin_console_view, create_workspace_view, employee_profile_view, signup_view
+from organizations.passkeys import (
+    passkey_authentication_options, passkey_authentication_verify,
+    passkey_registration_options, passkey_registration_verify,
+)
 from workforce.views import workforce_view
 
 
@@ -126,4 +132,10 @@ urlpatterns = [
     path('api/mobile/track-location/', TrackLocationPingView.as_view(), name='api_track_location'),
     path('api/mobile/shift/', FieldShiftView.as_view(), name='api_field_shift'),
     path('api/mobile/jobs/<int:job_id>/action/', FieldJobActionView.as_view(), name='api_field_job_action'),
+    path('api/mobile/jobs/<int:job_id>/report-problem/', FieldIssueReportView.as_view(), name='api_field_report_problem'),
+    path('api/field-issues/<int:issue_id>/status/', FieldIssueStatusView.as_view(), name='api_field_issue_status'),
+    path('api/passkeys/register/options/', passkey_registration_options, name='passkey_register_options'),
+    path('api/passkeys/register/verify/', passkey_registration_verify, name='passkey_register_verify'),
+    path('api/passkeys/login/options/', passkey_authentication_options, name='passkey_login_options'),
+    path('api/passkeys/login/verify/', passkey_authentication_verify, name='passkey_login_verify'),
 ]

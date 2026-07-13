@@ -8,7 +8,7 @@ from django.urls import reverse
 from crm.models.contacts import Account, Contact, Property
 from organizations.models import WorkerProfile, Workspace, WorkspaceMember
 
-from .models import CompletionNotificationDelivery, FieldEvent, FieldShift, Job, JobAssignment, JobTask
+from .models import CompletionNotificationDelivery, FieldEvent, FieldShift, Job, JobAssignment, JobIssue, JobTask
 from .tasks import send_completion_notifications
 from .translation import translate_note_to_english
 
@@ -82,6 +82,7 @@ class FieldWorkflowTests(TestCase):
         job_page = self.client.get(reverse('field_job', args=[self.job.id]))
         self.assertEqual(job_page.status_code, 200)
         self.assertContains(job_page, 'Check in')
+        self.assertContains(job_page, 'Report a problem')
         FieldShift.objects.create(
             worker=self.worker,
             workspace=self.workspace,
@@ -122,6 +123,37 @@ class FieldWorkflowTests(TestCase):
         )
         self.assertEqual(response.status_code, 400)
         self.assertFalse(FieldShift.objects.exists())
+
+    def test_worker_can_report_location_linked_job_problem(self):
+        self.start_shift()
+        response = self.client.post(
+            reverse('api_field_report_problem', args=[self.job.id]),
+            data={
+                **self.location,
+                'title': 'Water leak near sink',
+                'description': 'Stopped work and moved supplies away.',
+                'voice_transcript': 'Hay agua debajo del fregadero.',
+                'priority': 'safety',
+            },
+        )
+        self.assertEqual(response.status_code, 201)
+        issue = JobIssue.objects.get()
+        self.assertEqual(issue.job, self.job)
+        self.assertEqual(issue.job.account, self.account)
+        self.assertEqual(issue.job.property, self.property)
+        self.assertEqual(issue.worker, self.worker)
+        self.assertEqual(issue.priority, 'safety')
+        self.assertEqual(float(issue.lat), self.location['latitude'])
+        self.assertTrue(FieldEvent.objects.filter(job=self.job, event_type='problem_reported').exists())
+
+    def test_problem_report_requires_active_shift_and_location(self):
+        url = reverse('api_field_report_problem', args=[self.job.id])
+        no_shift = self.client.post(url, data={**self.location, 'title': 'Issue', 'description': 'Details'})
+        self.assertEqual(no_shift.status_code, 400)
+        self.start_shift()
+        no_location = self.client.post(url, data={'title': 'Issue', 'description': 'Details'})
+        self.assertEqual(no_location.status_code, 400)
+        self.assertFalse(JobIssue.objects.exists())
 
     @patch.dict('os.environ', {}, clear=True)
     def test_spanish_note_is_preserved_when_translation_provider_is_pending(self):

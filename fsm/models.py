@@ -240,6 +240,7 @@ class FieldEvent(models.Model):
         ('task_completed', 'Task completed'),
         ('note_added', 'Note added'),
         ('evidence_added', 'Evidence added'),
+        ('problem_reported', 'Problem reported'),
         ('closeout_confirmed', 'Closeout confirmed'),
         ('job_completed', 'Job completed'),
     ]
@@ -307,3 +308,51 @@ class CompletionNotificationDelivery(models.Model):
         constraints = [
             models.UniqueConstraint(fields=('job', 'channel'), name='fsm_unique_completion_delivery_channel'),
         ]
+
+
+class JobIssue(models.Model):
+    STATUS_CHOICES = [
+        ('open', 'Open'),
+        ('acknowledged', 'Acknowledged'),
+        ('resolved', 'Resolved'),
+    ]
+    PRIORITY_CHOICES = [
+        ('normal', 'Normal'),
+        ('urgent', 'Urgent'),
+        ('safety', 'Safety issue'),
+    ]
+
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='job_issues')
+    job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='issues')
+    worker = models.ForeignKey(WorkerProfile, on_delete=models.PROTECT, related_name='reported_job_issues')
+    assignment = models.ForeignKey(JobAssignment, on_delete=models.SET_NULL, null=True, blank=True, related_name='issues')
+    title = models.CharField(max_length=180)
+    description = models.TextField(blank=True)
+    voice_transcript = models.TextField(blank=True)
+    priority = models.CharField(max_length=20, choices=PRIORITY_CHOICES, default='normal')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='open')
+    lat = models.DecimalField(max_digits=9, decimal_places=6)
+    lng = models.DecimalField(max_digits=9, decimal_places=6)
+    accuracy = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+    acknowledged_at = models.DateTimeField(null=True, blank=True)
+    resolved_at = models.DateTimeField(null=True, blank=True)
+    resolution_notes = models.TextField(blank=True)
+
+    class Meta:
+        ordering = ('-created_at',)
+
+    def __str__(self):
+        return f'Job #{self.job_id}: {self.title}'
+
+
+class JobIssueMedia(models.Model):
+    MEDIA_TYPE_CHOICES = [
+        ('photo', 'Photo'),
+        ('video', 'Video'),
+        ('audio', 'Audio'),
+    ]
+    issue = models.ForeignKey(JobIssue, on_delete=models.CASCADE, related_name='media')
+    file = models.FileField(upload_to='job_issues/%Y/%m/%d/')
+    media_type = models.CharField(max_length=10, choices=MEDIA_TYPE_CHOICES)
+    uploaded_at = models.DateTimeField(auto_now_add=True)

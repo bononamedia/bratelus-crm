@@ -45,6 +45,23 @@ class WorkspaceMember(models.Model):
         return f"{self.user.username} - {self.workspace.name} ({self.role})"
 
 
+class UserPasskeyCredential(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='passkey_credentials')
+    credential_id = models.BinaryField(unique=True)
+    public_key = models.BinaryField()
+    sign_count = models.PositiveBigIntegerField(default=0)
+    transports = models.JSONField(default=list, blank=True)
+    device_type = models.CharField(max_length=40, blank=True)
+    backed_up = models.BooleanField(default=False)
+    name = models.CharField(max_length=100, default='Face ID passkey')
+    created_at = models.DateTimeField(auto_now_add=True)
+    last_used_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'workspaces_userpasskeycredential'
+        ordering = ('-created_at',)
+
+
 # ---------------------------------------------------------
 # WORKSPACE CHANNELS (EMAIL / DOMAIN SETUP)
 # ---------------------------------------------------------

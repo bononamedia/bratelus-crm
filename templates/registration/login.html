@@ -47,7 +47,32 @@
             <input type="hidden" name="next" value="{{ next }}">
         </form>
 
+        <div class="my-6 flex items-center gap-3"><span class="h-px flex-1 bg-gray-200"></span><span class="text-xs font-medium uppercase text-gray-400">Field team</span><span class="h-px flex-1 bg-gray-200"></span></div>
+        <button type="button" onclick="signInWithPasskey()" class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50">
+            <svg class="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11a3 3 0 100-6 3 3 0 000 6zm0 0v10m-4-4h8M5 11a7 7 0 1114 0"/></svg>
+            Sign in with Face ID / passkey
+        </button>
+        <p id="passkey-error" class="mt-3 hidden text-center text-sm text-red-600"></p>
+
     </div>
 
+<script>
+function b64ToBuffer(value) { const base64 = value.replace(/-/g, '+').replace(/_/g, '/'); const raw = atob(base64.padEnd(Math.ceil(base64.length / 4) * 4, '=')); return Uint8Array.from(raw, c => c.charCodeAt(0)); }
+function bufferToB64(value) { return btoa(String.fromCharCode(...new Uint8Array(value))).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, ''); }
+function publicKeyFromJSON(options) { options.challenge = b64ToBuffer(options.challenge); (options.allowCredentials || []).forEach(item => item.id = b64ToBuffer(item.id)); return options; }
+function credentialToJSON(credential) { return { id: credential.id, rawId: bufferToB64(credential.rawId), type: credential.type, response: { authenticatorData: bufferToB64(credential.response.authenticatorData), clientDataJSON: bufferToB64(credential.response.clientDataJSON), signature: bufferToB64(credential.response.signature), userHandle: credential.response.userHandle ? bufferToB64(credential.response.userHandle) : null } }; }
+async function signInWithPasskey() {
+    const error = document.getElementById('passkey-error'); error.classList.add('hidden');
+    const username = document.getElementById('username').value.trim();
+    if (!username) { error.textContent = 'Enter your username or email first.'; error.classList.remove('hidden'); return; }
+    try {
+        const optionsResponse = await fetch('/api/passkeys/login/options/', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value}, body: JSON.stringify({username})});
+        const options = await optionsResponse.json(); if (!optionsResponse.ok) throw new Error(options.error);
+        const credential = await navigator.credentials.get({publicKey: publicKeyFromJSON(options)});
+        const verifyResponse = await fetch('/api/passkeys/login/verify/', {method: 'POST', headers: {'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value}, body: JSON.stringify(credentialToJSON(credential))});
+        const result = await verifyResponse.json(); if (!verifyResponse.ok) throw new Error(result.error); window.location.href = result.redirect;
+    } catch (err) { error.textContent = err.message || 'Face ID sign-in was cancelled.'; error.classList.remove('hidden'); }
+}
+</script>
 </body>
 </html>

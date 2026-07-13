@@ -471,6 +471,12 @@
                 Locked (Wait on #${escapeHtml(job.blocked_by)})
             </div>` : '';
 
+        const problemBadge = job.open_issue_count ?
+            `<div class="mt-2 flex items-start gap-2 rounded border border-red-200 bg-red-50 px-2 py-1.5 text-xs text-red-800" title="Reported by ${escapeHtml(job.latest_issue?.worker || 'field worker')}">
+                <span class="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-red-600 font-bold text-white">!</span>
+                <span class="min-w-0"><strong>${job.open_issue_count} open problem${job.open_issue_count === 1 ? '' : 's'}</strong><span class="block truncate text-red-700">${escapeHtml(job.latest_issue?.title || 'Field issue reported')}</span></span>
+            </div>` : '';
+
         const addressStr = escapeHtml(job.property_address || job.location_address || 'No location set');
         const unitStr = job.property_unit ? `<span class="font-bold text-gray-800 ml-1 px-1 bg-gray-100 rounded">Unit ${escapeHtml(job.property_unit)}</span>` : '';
 
@@ -499,6 +505,7 @@
                     ${zoneTag}
                 </div>
                 ${blockWarning}
+                ${problemBadge}
                 ${workerText}
                 <div class="mt-3 pt-2 border-t border-gray-50 flex justify-between items-center gap-2">
                     <button onclick="openAssignmentPanel(${job.id})" class="inline-flex items-center gap-1.5 text-xs font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded px-2 py-1 hover:bg-blue-100 transition-colors" title="Assign crew">

@@ -180,3 +180,6 @@ SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
 STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
+
+PASSKEY_RP_ID = os.environ.get('PASSKEY_RP_ID', 'app.bratelus.com')
+PASSKEY_ORIGIN = os.environ.get('PASSKEY_ORIGIN', 'https://app.bratelus.com')

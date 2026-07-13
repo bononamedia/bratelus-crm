@@ -11,6 +11,10 @@
         {% if job.property.gate_code %}<div class="mt-3 border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm text-amber-900"><strong>Access:</strong> {{ job.property.gate_code }}</div>{% endif %}
     </header>
 
+    <button type="button" onclick="openProblemReporter()" class="mt-4 flex min-h-12 w-full items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-3 font-semibold text-white shadow-sm hover:bg-red-700">
+        <span class="text-lg" aria-hidden="true">!</span><span>Report a problem</span>
+    </button>
+
     <section class="py-5">
         <h2 class="text-xs font-semibold uppercase tracking-wide text-gray-500">Current step</h2>
         <div class="mt-3 border border-gray-200 bg-white p-4 shadow-sm">
@@ -48,14 +52,35 @@
     </section>
     {% endif %}
 
-    <section class="border-t border-gray-200 py-5"><h2 class="font-semibold text-gray-950">Activity</h2><div class="mt-3 space-y-3">{% for event in events %}<div class="flex gap-3 text-sm"><span class="mt-2 h-2 w-2 shrink-0 rounded-full bg-blue-500"></span><div><p class="font-medium text-gray-800">{{ event.get_event_type_display }}</p><p class="text-xs text-gray-500">{{ event.occurred_at|date:"M j, g:i A" }}</p>{% if event.note_original %}<p class="mt-1 text-gray-700">{{ event.note_english|default:event.note_original }}</p>{% endif %}</div></div>{% empty %}<p class="text-sm text-gray-500">No field activity yet.</p>{% endfor %}</div></section>
+    {% if issues %}<section class="border-t border-red-100 py-5"><h2 class="font-semibold text-red-900">Reported problems</h2><div class="mt-3 divide-y divide-red-100 border-y border-red-100">{% for issue in issues %}<article class="py-3"><div class="flex items-start justify-between gap-3"><div><p class="font-semibold text-gray-950">{{ issue.title }}</p><p class="mt-1 text-sm text-gray-600">{{ issue.description|default:issue.voice_transcript }}</p></div><span class="rounded-full px-2 py-1 text-xs font-semibold {% if issue.status == 'resolved' %}bg-emerald-50 text-emerald-700{% else %}bg-red-50 text-red-700{% endif %}">{{ issue.get_status_display }}</span></div><p class="mt-2 text-xs text-gray-500">{{ issue.created_at|date:"M j, g:i A" }} · {{ issue.media.count }} attachment{{ issue.media.count|pluralize }}</p></article>{% endfor %}</div></section>{% endif %}
+
+    <section class="border-t border-gray-200 py-5"><h2 class="font-semibold text-gray-950">Activity</h2><div class="mt-3 space-y-3">{% for event in events %}<div class="flex gap-3 text-sm"><span class="mt-2 h-2 w-2 shrink-0 rounded-full {% if event.event_type == 'problem_reported' %}bg-red-500{% else %}bg-blue-500{% endif %}"></span><div><p class="font-medium text-gray-800">{{ event.get_event_type_display }}</p><p class="text-xs text-gray-500">{{ event.occurred_at|date:"M j, g:i A" }}</p>{% if event.note_original %}<p class="mt-1 text-gray-700">{{ event.note_english|default:event.note_original }}</p>{% endif %}</div></div>{% empty %}<p class="text-sm text-gray-500">No field activity yet.</p>{% endfor %}</div></section>
 </div>
 
 <div id="busy" class="fixed inset-0 z-[90] hidden items-center justify-center bg-white/80"><div class="rounded-lg bg-gray-950 px-5 py-3 text-sm font-semibold text-white">Saving...</div></div>
 
+<div id="problem-reporter" class="fixed inset-0 z-[85] hidden bg-gray-950/60">
+    <section class="absolute inset-x-0 bottom-0 max-h-[92dvh] overflow-y-auto rounded-t-lg bg-white sm:inset-y-8 sm:left-1/2 sm:bottom-auto sm:max-w-xl sm:-translate-x-1/2 sm:rounded-lg">
+        <div class="sticky top-0 flex items-center justify-between border-b border-gray-200 bg-white px-5 py-4"><div><p class="text-xs font-semibold uppercase tracking-wide text-red-600">Job #{{ job.id }}</p><h2 class="text-xl font-semibold text-gray-950">Report a problem</h2></div><button type="button" onclick="closeProblemReporter()" class="h-10 w-10 text-2xl text-gray-500" aria-label="Close">×</button></div>
+        <form id="problem-form" class="space-y-4 p-5" onsubmit="submitProblem(event)">
+            <label class="block text-sm font-semibold text-gray-700">Problem title<input id="problem-title" required maxlength="180" placeholder="What happened?" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base"></label>
+            <label class="block text-sm font-semibold text-gray-700">Priority<select id="problem-priority" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-base"><option value="normal">Normal</option><option value="urgent">Urgent</option><option value="safety">Safety issue</option></select></label>
+            <label class="block text-sm font-semibold text-gray-700">Description<textarea id="problem-description" rows="4" placeholder="Describe the problem and what you need" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-base"></textarea></label>
+            <div class="border border-violet-200 bg-violet-50 p-4"><div class="flex items-center justify-between gap-3"><div><p class="text-sm font-semibold text-violet-950">Voice report</p><p id="voice-status" class="mt-1 text-xs text-violet-700">Record audio and create a transcript when Safari supports it.</p></div><button id="voice-button" type="button" onclick="toggleVoiceRecording()" class="min-h-11 shrink-0 rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white">Record</button></div><textarea id="problem-transcript" rows="3" placeholder="Voice transcript will appear here and can be edited" class="mt-3 w-full rounded-lg border border-violet-200 bg-white px-3 py-2 text-sm"></textarea></div>
+            <label class="block text-sm font-semibold text-gray-700">Photos and video<input id="problem-media" type="file" accept="image/*,video/*" capture="environment" multiple class="mt-2 block w-full text-sm text-gray-600 file:mr-3 file:rounded-lg file:border-0 file:bg-gray-100 file:px-4 file:py-2.5 file:font-semibold file:text-gray-700"></label>
+            <p class="text-xs leading-5 text-gray-500">The report includes your current GPS position, worker identity, job, account, and property. Up to 10 files, 100 MB each.</p>
+            <button class="min-h-12 w-full rounded-lg bg-red-600 px-4 py-3 font-semibold text-white">Send problem to dispatch</button>
+        </form>
+    </section>
+</div>
+
 <script>
 let fieldLocation = null;
 let watchId = null;
+let voiceRecorder = null;
+let voiceChunks = [];
+let voiceBlob = null;
+let speechRecognition = null;
 function csrfToken() { return document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || ''; }
 function busy(show) { document.getElementById('busy').classList.toggle('hidden', !show); document.getElementById('busy').classList.toggle('flex', show); }
 function locate() {
@@ -80,6 +105,42 @@ async function uploadEvidence(taskId, input) {
     busy(true);
     const body=new FormData(); body.append('job_id','{{ job.id }}'); body.append('task_id',taskId); body.append('evidence',file); body.append('latitude',fieldLocation.latitude); body.append('longitude',fieldLocation.longitude); body.append('accuracy',fieldLocation.accuracy);
     try { const response=await fetch('{% url "api_upload_evidence" %}',{method:'POST',headers:{'X-CSRFToken':csrfToken()},body}); const data=await response.json(); if(!response.ok) return alert(data.error||'Upload failed.'); window.location.reload(); } finally { busy(false); }
+}
+function openProblemReporter() {
+    if (!fieldLocation) return alert('Waiting for GPS. Allow Location in Safari and try again.');
+    document.getElementById('problem-reporter').classList.remove('hidden');
+    document.body.classList.add('overflow-hidden');
+}
+function closeProblemReporter() {
+    document.getElementById('problem-reporter').classList.add('hidden');
+    document.body.classList.remove('overflow-hidden');
+}
+async function toggleVoiceRecording() {
+    const button=document.getElementById('voice-button');
+    if (voiceRecorder && voiceRecorder.state === 'recording') { voiceRecorder.stop(); if(speechRecognition) speechRecognition.stop(); button.textContent='Record again'; return; }
+    try {
+        const stream=await navigator.mediaDevices.getUserMedia({audio:true});
+        voiceChunks=[]; voiceBlob=null;
+        voiceRecorder=new MediaRecorder(stream);
+        voiceRecorder.ondataavailable=e=>{if(e.data.size) voiceChunks.push(e.data)};
+        voiceRecorder.onstop=()=>{voiceBlob=new Blob(voiceChunks,{type:voiceRecorder.mimeType||'audio/mp4'}); stream.getTracks().forEach(track=>track.stop()); document.getElementById('voice-status').textContent='Audio recorded and ready to upload.';};
+        const Recognition=window.SpeechRecognition||window.webkitSpeechRecognition;
+        if(Recognition){speechRecognition=new Recognition(); speechRecognition.continuous=true; speechRecognition.interimResults=true; speechRecognition.lang=navigator.language||'en-US'; speechRecognition.onresult=e=>{let text='';for(let i=0;i<e.results.length;i++)text+=e.results[i][0].transcript+' ';document.getElementById('problem-transcript').value=text.trim();}; speechRecognition.start();}
+        voiceRecorder.start(); button.textContent='Stop'; document.getElementById('voice-status').textContent='Recording. Speak clearly, then tap Stop.';
+    } catch(error) { alert('Microphone permission is required to record a voice report. You can still type the description.'); }
+}
+async function submitProblem(event) {
+    event.preventDefault();
+    if(!fieldLocation) return alert('Location is required to send this report.');
+    const title=document.getElementById('problem-title').value.trim();
+    const description=document.getElementById('problem-description').value.trim();
+    const transcript=document.getElementById('problem-transcript').value.trim();
+    if(!description&&!transcript) return alert('Add a description or voice report.');
+    const body=new FormData(); body.append('title',title); body.append('priority',document.getElementById('problem-priority').value); body.append('description',description); body.append('voice_transcript',transcript); body.append('latitude',fieldLocation.latitude); body.append('longitude',fieldLocation.longitude); body.append('accuracy',fieldLocation.accuracy);
+    Array.from(document.getElementById('problem-media').files).forEach(file=>body.append('media',file));
+    if(voiceBlob) body.append('media',voiceBlob,voiceBlob.type.includes('mp4')?'voice-report.m4a':'voice-report.webm');
+    busy(true);
+    try { const response=await fetch('{% url "api_field_report_problem" job.id %}',{method:'POST',headers:{'X-CSRFToken':csrfToken()},body}); const data=await response.json(); if(!response.ok)return alert(data.error||'Unable to report the problem.'); alert('Problem sent to dispatch.'); window.location.reload(); } finally {busy(false);}
 }
 locate();
 setInterval(() => { if(fieldLocation) fetch('{% url "api_track_location" %}',{method:'POST',headers:{'Content-Type':'application/json','X-CSRFToken':csrfToken()},body:JSON.stringify(fieldLocation)}); },15000);
