@@ -88,6 +88,36 @@ class AccountlessContactApiTests(TestCase):
         )
         self.assertEqual(rejected.status_code, 400)
 
+    def test_contact_details_can_be_edited_without_changing_tenant_identity(self):
+        contact = Contact.objects.create(
+            organization=self.workspace,
+            first_name='Cheryl',
+            last_name='#NAME?',
+            phone='2099184395',
+            external_source='zoho',
+            external_id='zoho-123',
+        )
+        response = self.client.patch(
+            reverse('api-contact-detail', args=[contact.id]),
+            {
+                'last_name': 'Johnson',
+                'email': 'cheryl@example.com',
+                'phone': '209-918-4395',
+                'mailing_country': 'United States',
+                'status': 'Active',
+                'description': 'Corrected by the workspace administrator.',
+                'is_primary': True,
+            },
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200, response.content)
+        contact.refresh_from_db()
+        self.assertEqual(contact.last_name, 'Johnson')
+        self.assertEqual(contact.email, 'cheryl@example.com')
+        self.assertTrue(contact.is_primary)
+        self.assertEqual(contact.organization, self.workspace)
+        self.assertEqual(contact.external_id, 'zoho-123')
+
     def test_global_search_is_platform_admin_only_and_identifies_workspace(self):
         other = Workspace.objects.create(name='Other Brand', slug='other-brand')
         target = Contact.objects.create(

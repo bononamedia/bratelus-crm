@@ -109,7 +109,7 @@
             </button>
         </div>
     </div>
-    <div class="border-b border-gray-100 p-4">
+    <div id="record-type-selector" class="border-b border-gray-100 p-4">
         <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
             <button type="button" data-type="accounts" onclick="setRecordType('accounts')" class="record-type rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold text-gray-600">Account</button>
             <button type="button" data-type="contacts" onclick="setRecordType('contacts')" class="record-type rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold text-gray-600">Contact</button>
@@ -121,7 +121,7 @@
         <div id="record-form-fields" class="flex-1 space-y-4 overflow-y-auto p-5"></div>
         <div class="flex justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-4">
             <button type="button" onclick="closeRecordPanel()" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
-            <button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Save Record</button>
+            <button id="record-submit-button" type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Save Record</button>
         </div>
     </form>
 </aside>
@@ -185,6 +185,10 @@
                 </div>
             </div>
             <div class="flex flex-wrap gap-2">
+                <button id="detail-edit-button" type="button" onclick="editCurrentRecord()" class="hidden inline-flex items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100">
+                    <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 13H9v-2.828l6.586-6.586z"></path></svg>
+                    Edit contact
+                </button>
                 <button type="button" onclick="setDetailRelated('emails')" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Send Email</button>
                 <button type="button" onclick="setDetailRelated('twilio_sms')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">SMS / Call</button>
                 <a href="{% url 'admin_console' %}#custom-fields" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Customize</a>
@@ -231,6 +235,7 @@
         detailType: null,
         detailRecord: null,
         detailRelated: 'overview',
+        editingRecord: null,
     };
 
     const crmCustomFields = JSON.parse(document.getElementById('crm-custom-fields-data')?.textContent || '[]');
@@ -931,6 +936,7 @@
         document.getElementById('detail-subtitle').innerText = recordSubtitle(type, record);
         document.getElementById('detail-avatar').innerText = recordInitial(type, record);
         document.getElementById('detail-type-badge').innerText = detailTypeMeta[type]?.badge || 'CRM';
+        document.getElementById('detail-edit-button').classList.toggle('hidden', type !== 'contacts');
 
         renderRelatedNav();
         renderRelatedContent();
@@ -975,15 +981,55 @@
             </label>`;
     }
 
+    function textareaField(label, id, attrs = '') {
+        return `
+            <label class="block">
+                <span class="text-sm font-semibold text-gray-700">${label}</span>
+                <textarea id="${id}" ${attrs} class="mt-1 min-h-24 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"></textarea>
+            </label>`;
+    }
+
+    function setFormValue(id, value) {
+        const element = document.getElementById(id);
+        if (element) element.value = value ?? '';
+    }
+
+    function populateContactForm(contact) {
+        setFormValue('record-account', contact.account || '');
+        setFormValue('record-first-name', contact.first_name);
+        setFormValue('record-last-name', contact.last_name);
+        setFormValue('record-email', contact.email);
+        setFormValue('record-secondary-email', contact.secondary_email);
+        setFormValue('record-phone', contact.phone);
+        setFormValue('record-mobile', contact.mobile);
+        setFormValue('record-mailing-street', contact.mailing_street);
+        setFormValue('record-mailing-city', contact.mailing_city);
+        setFormValue('record-mailing-state', contact.mailing_state);
+        setFormValue('record-mailing-postal', contact.mailing_postal_code);
+        setFormValue('record-mailing-country', contact.mailing_country);
+        setFormValue('record-lead-source', contact.lead_source);
+        setFormValue('record-status', contact.status);
+        setFormValue('record-description', contact.description);
+        document.getElementById('record-is-primary').checked = Boolean(contact.is_primary);
+        document.getElementById('record-email-opt-out').checked = Boolean(contact.email_opt_out);
+        document.getElementById('record-sms-opt-out').checked = Boolean(contact.sms_opt_out);
+    }
+
     function renderRecordForm() {
         const fields = document.getElementById('record-form-fields');
         const title = document.getElementById('record-panel-title');
         const eyebrow = document.getElementById('record-panel-eyebrow');
+        const submitButton = document.getElementById('record-submit-button');
         const type = crmState.recordType;
+        const editing = crmState.editingRecord;
+        document.getElementById('record-type-selector').classList.toggle('hidden', Boolean(editing));
 
         updateTabStyles();
         eyebrow.innerText = type === 'accounts' ? 'CRM Account' : type === 'contacts' ? 'CRM Contact' : type === 'properties' ? 'CRM Property' : 'CRM Payment';
-        title.innerText = type === 'accounts' ? 'New Account' : type === 'contacts' ? 'New Contact' : type === 'properties' ? 'New Property' : 'New Payment Method';
+        title.innerText = editing
+            ? `Edit ${recordName(type, editing)}`
+            : type === 'accounts' ? 'New Account' : type === 'contacts' ? 'New Contact' : type === 'properties' ? 'New Property' : 'New Payment Method';
+        submitButton.innerText = editing ? 'Save Changes' : 'Save Record';
 
         if (type === 'accounts') {
             fields.innerHTML = `
@@ -1011,7 +1057,15 @@
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Phone', 'record-phone', 'placeholder="(555) 000-0000"')}${field('Mobile', 'record-mobile', 'placeholder="(555) 000-0000"')}</div>
                 ${field('Mailing Street', 'record-mailing-street')}
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Mailing City', 'record-mailing-city')}${field('Mailing State', 'record-mailing-state')}</div>
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Mailing ZIP', 'record-mailing-postal')}${field('Status', 'record-status')}</div>`;
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Mailing ZIP', 'record-mailing-postal')}${field('Mailing Country', 'record-mailing-country')}</div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Lead Source', 'record-lead-source')}${field('Status', 'record-status')}</div>
+                ${textareaField('Description / Notes', 'record-description')}
+                <div class="grid gap-2 sm:grid-cols-3">
+                    <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700"><input id="record-is-primary" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">Primary contact</label>
+                    <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700"><input id="record-email-opt-out" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">Email opt-out</label>
+                    <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700"><input id="record-sms-opt-out" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">SMS opt-out</label>
+                </div>`;
+            if (editing) populateContactForm(editing);
             return;
         }
 
@@ -1051,11 +1105,13 @@
     }
 
     function setRecordType(type) {
+        crmState.editingRecord = null;
         crmState.recordType = type;
         renderRecordForm();
     }
 
     function openRecordPanel(type = crmState.activeTab) {
+        crmState.editingRecord = null;
         crmState.recordType = type;
         renderRecordForm();
         document.getElementById('record-overlay').classList.remove('hidden');
@@ -1066,6 +1122,17 @@
         document.getElementById('record-panel').classList.add('translate-x-full');
         document.getElementById('record-overlay').classList.add('hidden');
         document.getElementById('record-form').reset();
+        crmState.editingRecord = null;
+        document.getElementById('record-type-selector').classList.remove('hidden');
+    }
+
+    function editCurrentRecord() {
+        if (crmState.detailType !== 'contacts' || !crmState.detailRecord) return;
+        crmState.recordType = 'contacts';
+        crmState.editingRecord = crmState.detailRecord;
+        renderRecordForm();
+        document.getElementById('record-overlay').classList.remove('hidden');
+        document.getElementById('record-panel').classList.remove('translate-x-full');
     }
 
     function payloadForType(type) {
@@ -1102,7 +1169,13 @@
                 mailing_city: document.getElementById('record-mailing-city').value,
                 mailing_state: document.getElementById('record-mailing-state').value,
                 mailing_postal_code: document.getElementById('record-mailing-postal').value,
+                mailing_country: document.getElementById('record-mailing-country').value,
+                lead_source: document.getElementById('record-lead-source').value,
                 status: document.getElementById('record-status').value,
+                description: document.getElementById('record-description').value,
+                is_primary: document.getElementById('record-is-primary').checked,
+                email_opt_out: document.getElementById('record-email-opt-out').checked,
+                sms_opt_out: document.getElementById('record-sms-opt-out').checked,
             };
         }
 
@@ -1244,9 +1317,13 @@
     document.getElementById('record-form').addEventListener('submit', async event => {
         event.preventDefault();
         const type = crmState.recordType;
+        const editing = crmState.editingRecord;
         try {
-            const response = await fetch(`/api/v1/${endpointForType(type)}/`, {
-                method: 'POST',
+            const endpoint = editing
+                ? `/api/v1/${endpointForType(type)}/${editing.id}/`
+                : `/api/v1/${endpointForType(type)}/`;
+            const response = await fetch(endpoint, {
+                method: editing ? 'PATCH' : 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                     'X-CSRFToken': getCookie('csrftoken'),
@@ -1257,6 +1334,16 @@
             if (!response.ok) {
                 const data = await response.json();
                 alert(`Could not save record: ${JSON.stringify(data)}`);
+                return;
+            }
+
+            const savedRecord = await response.json();
+            if (editing) {
+                const index = crmState[type].findIndex(record => String(record.id) === String(savedRecord.id));
+                if (index >= 0) crmState[type][index] = savedRecord;
+                closeRecordPanel();
+                renderCrmTable();
+                openRecordDetail(type, savedRecord.id);
                 return;
             }
 
