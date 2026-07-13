@@ -4,13 +4,13 @@ from django.shortcuts import redirect, render
 
 from fsm.models import JobAssignment
 from organizations.models import Skill, ServiceZone, WorkerProfile, WorkspaceMember
-from organizations.permissions import user_can_manage_workspace, worker_profile_for_workspace
+from organizations.permissions import user_can_manage_people, worker_profile_for_workspace
 
 
 @login_required
 def workforce_view(request):
     active_org = getattr(request, 'active_organization', None)
-    if not user_can_manage_workspace(request.user, active_org):
+    if not user_can_manage_people(request.user, active_org):
         if worker_profile_for_workspace(request.user, active_org):
             return redirect('employee_profile')
         raise PermissionDenied('Only workspace admins can access Workforce.')

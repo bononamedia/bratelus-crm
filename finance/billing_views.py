@@ -12,7 +12,7 @@ from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_POST
 
 from organizations.models import Workspace, WorkspaceMember
-from organizations.permissions import user_can_manage_workspace
+from organizations.permissions import user_can_view_billing, user_is_workspace_admin
 
 from .models import BillingEvent, PlatformInvoice, SubscriptionPlan, WorkspaceSubscription
 from .pricing import monthly_price, pricing_breakdown
@@ -45,7 +45,7 @@ def _subscription_for(workspace):
 @login_required
 def billing_overview_view(request):
     workspace = getattr(request, 'active_organization', None)
-    if not user_can_manage_workspace(request.user, workspace):
+    if not user_can_view_billing(request.user, workspace):
         raise PermissionDenied('Only workspace admins can manage platform billing.')
 
     subscription = _subscription_for(workspace)
@@ -78,7 +78,7 @@ def billing_overview_view(request):
 @require_POST
 def create_checkout_session_view(request):
     workspace = getattr(request, 'active_organization', None)
-    if not user_can_manage_workspace(request.user, workspace):
+    if not user_is_workspace_admin(request.user, workspace):
         raise PermissionDenied
     subscription = _subscription_for(workspace)
     if not subscription or not _stripe_ready(subscription.plan):
@@ -123,7 +123,7 @@ def create_checkout_session_view(request):
 @require_POST
 def create_billing_portal_view(request):
     workspace = getattr(request, 'active_organization', None)
-    if not user_can_manage_workspace(request.user, workspace):
+    if not user_is_workspace_admin(request.user, workspace):
         raise PermissionDenied
     subscription = _subscription_for(workspace)
     if not subscription or not subscription.stripe_customer_id or not settings.STRIPE_SECRET_KEY:

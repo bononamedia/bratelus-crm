@@ -65,6 +65,13 @@
                 Dashboard
             </a>
 
+            {% if active_worker_profile and can_manage_active_org %}
+            <a href="{% url 'employee_profile' %}" class="flex shrink-0 items-center rounded-lg border border-violet-400/15 bg-violet-400/10 px-3 py-2.5 text-sm font-medium text-slate-100 hover:bg-violet-400/15 transition-colors">
+                <span class="mr-3 flex h-8 w-8 items-center justify-center rounded-md bg-violet-400/15 text-violet-200"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 21a8 8 0 10-16 0m8-10a4 4 0 100-8 4 4 0 000 8z"></path></svg></span>
+                My Profile
+            </a>
+            {% endif %}
+
             {% if can_manage_active_org %}
             <div class="nav-module rounded-lg border border-sky-400/15 bg-sky-400/10" data-module="crm">
                 <button type="button" class="nav-module-toggle flex w-full items-center gap-3 px-3 py-2.5 text-left" data-module-toggle="crm" aria-expanded="false">
@@ -122,6 +129,7 @@
                 </div>
             </div>
 
+            {% if can_manage_people %}
             <div class="nav-module rounded-lg border border-violet-400/15 bg-violet-400/10" data-module="workforce">
                 <button type="button" class="nav-module-toggle flex w-full items-center gap-3 px-3 py-2.5 text-left" data-module-toggle="workforce" aria-expanded="false">
                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-400/15 text-violet-200">
@@ -135,12 +143,16 @@
                 </button>
                 <div class="nav-submenu hidden px-2 pb-2.5" data-module-panel="workforce">
                     <a href="{% url 'workforce' %}" class="nav-subitem">Employee Directory</a>
+                    <a href="{% url 'admin_console' %}#team" class="nav-subitem">Users & Roles</a>
+                    {% if can_manage_setup %}
                     <a href="{% url 'admin_console' %}#skills" class="nav-subitem">Skills & Zones</a>
+                    {% endif %}
                 {% if active_worker_profile %}
                     <a href="{% url 'employee_profile' %}" class="nav-subitem">My Work</a>
                 {% endif %}
                 </div>
             </div>
+            {% endif %}
 
             <div class="nav-module rounded-lg border border-rose-400/15 bg-rose-400/10" data-module="reports">
                 <button type="button" class="nav-module-toggle flex w-full items-center gap-3 px-3 py-2.5 text-left" data-module-toggle="reports" aria-expanded="false">
@@ -161,6 +173,7 @@
                 </div>
             </div>
 
+            {% if can_manage_setup %}
             <div class="nav-module rounded-lg border border-slate-300/15 bg-white/10" data-module="setup">
                 <button type="button" class="nav-module-toggle flex w-full items-center gap-3 px-3 py-2.5 text-left" data-module-toggle="setup" aria-expanded="false">
                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/10 text-slate-200">
@@ -180,6 +193,7 @@
                 {% endif %}
                 </div>
             </div>
+            {% endif %}
             {% elif active_worker_profile %}
             <div class="nav-module rounded-lg border border-sky-400/15 bg-sky-400/10" data-module="employee">
                 <button type="button" class="nav-module-toggle flex w-full items-center gap-3 px-3 py-2.5 text-left" data-module-toggle="employee" aria-expanded="false">
@@ -254,7 +268,7 @@
                         <div class="px-4 py-3 text-sm text-gray-500 italic text-center">No organizations assigned.</div>
                         {% endfor %}
                     </div>
-                    {% if can_manage_active_org %}
+                    {% if can_view_billing %}
                     <div class="py-1" role="none">
                         <p class="px-4 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wide text-gray-400">Bratelus account</p>
                         <a href="{% url 'billing_overview' %}" class="flex items-center px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100" role="menuitem">
@@ -264,11 +278,13 @@
                     </div>
                     {% endif %}
                     <div class="py-1 border-t border-gray-100" role="none">
+                        {% if is_workspace_admin or is_platform_admin %}
                         <a href="{% url 'workspace_create' %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" role="menuitem">
                             <span class="mr-2 text-lg leading-none text-gray-400">+</span>
                             Create Workspace
                         </a>
-                        {% if can_manage_active_org %}
+                        {% endif %}
+                        {% if can_manage_setup %}
                         <a href="{% url 'admin_console' %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" role="menuitem">
                             <svg class="mr-2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
                             Company Setup

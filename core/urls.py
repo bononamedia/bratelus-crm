@@ -57,11 +57,14 @@ def switch_organization_view(request):
         data = json.loads(request.body)
         org_id = data.get('org_id')
 
-        workspace = Workspace.objects.filter(
-            Q(members__user=request.user, members__is_active=True) |
-            Q(workers__user=request.user),
-            id=org_id,
-        ).distinct().first()
+        if request.user.is_superuser:
+            workspace = Workspace.objects.filter(id=org_id).first()
+        else:
+            workspace = Workspace.objects.filter(
+                Q(members__user=request.user, members__is_active=True) |
+                Q(workers__user=request.user),
+                id=org_id,
+            ).distinct().first()
 
         if not workspace:
             return JsonResponse({'status': 'error', 'message': 'Organization not found.'}, status=404)

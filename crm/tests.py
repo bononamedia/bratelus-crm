@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from crm.management.commands.import_zoho_contacts import fit_contact_field
-from crm.models.contacts import Account, Contact
+from crm.models.contacts import Account, Contact, Property
 from organizations.models import Workspace, WorkspaceMember
 
 
@@ -117,6 +117,74 @@ class AccountlessContactApiTests(TestCase):
         self.assertTrue(contact.is_primary)
         self.assertEqual(contact.organization, self.workspace)
         self.assertEqual(contact.external_id, 'zoho-123')
+
+    def test_contact_edit_panel_stacks_above_the_detail_panel(self):
+        response = self.client.get(reverse('contacts'))
+        self.assertContains(response, 'id="record-overlay" class="fixed inset-0 z-[75]')
+        self.assertContains(response, 'id="record-panel" class="fixed inset-y-0 right-0 z-[80]')
+        self.assertContains(response, 'id="detail-panel" class="fixed inset-y-0 right-0 z-50')
+        self.assertContains(response, "icon: 'notebook-pen'")
+        self.assertContains(response, "icon: 'calendar-clock'")
+        self.assertContains(response, 'window.lucide.createIcons()')
+
+    def test_accountless_contacts_can_be_organized_in_one_confirmed_action(self):
+        with_address = Contact.objects.create(
+            organization=self.workspace,
+            first_name='Happy Creek Construction',
+            last_name='Mr. Jordan',
+            email='office@example.com',
+            phone='8043472600',
+            mailing_street='415 Adamson St',
+            mailing_city='Richmond',
+            mailing_state='VA',
+            mailing_postal_code='23223',
+            mailing_country='United States',
+        )
+        without_address = Contact.objects.create(
+            organization=self.workspace,
+            first_name='Fabio',
+            last_name='Raimundo',
+        )
+        existing_account = Account.objects.create(organization=self.workspace, name='Existing')
+        existing_contact = Contact.objects.create(
+            organization=self.workspace,
+            account=existing_account,
+            first_name='Already',
+            last_name='Organized',
+        )
+        url = reverse('api-contact-create-missing-accounts')
+
+        preview = self.client.get(url)
+        self.assertEqual(preview.status_code, 200)
+        self.assertEqual(preview.json(), {
+            'contacts': 2,
+            'accounts': 2,
+            'properties': 1,
+            'without_address': 1,
+        })
+
+        unconfirmed = self.client.post(url, {}, content_type='application/json')
+        self.assertEqual(unconfirmed.status_code, 400)
+
+        created = self.client.post(url, {'confirm': True}, content_type='application/json')
+        self.assertEqual(created.status_code, 201, created.content)
+        self.assertEqual(created.json()['accounts'], 2)
+        self.assertEqual(created.json()['properties'], 1)
+
+        with_address.refresh_from_db()
+        without_address.refresh_from_db()
+        existing_contact.refresh_from_db()
+        self.assertEqual(with_address.account.name, 'Happy Creek Construction')
+        self.assertEqual(with_address.account.billing_city, 'Richmond')
+        self.assertEqual(without_address.account.name, 'Fabio')
+        self.assertEqual(existing_contact.account, existing_account)
+        property_record = Property.objects.get(account=with_address.account)
+        self.assertEqual(property_record.name, 'Happy Creek Construction')
+        self.assertEqual(property_record.address, '415 Adamson St, Richmond, VA, 23223, United States')
+
+        repeated = self.client.post(url, {'confirm': True}, content_type='application/json')
+        self.assertEqual(repeated.status_code, 201)
+        self.assertEqual(repeated.json()['accounts'], 0)
 
     def test_global_search_is_platform_admin_only_and_identifies_workspace(self):
         other = Workspace.objects.create(name='Other Brand', slug='other-brand')

@@ -8,10 +8,13 @@ class ActiveOrganizationMiddleware:
 
     def __call__(self, request):
         if request.user.is_authenticated:
-            user_workspaces = Workspace.objects.filter(
-                Q(members__user=request.user, members__is_active=True) |
-                Q(workers__user=request.user)
-            ).distinct()
+            if request.user.is_superuser:
+                user_workspaces = Workspace.objects.all()
+            else:
+                user_workspaces = Workspace.objects.filter(
+                    Q(members__user=request.user, members__is_active=True) |
+                    Q(workers__user=request.user)
+                ).distinct()
 
             active_org_id = request.session.get('active_org_id')
             active_org = None

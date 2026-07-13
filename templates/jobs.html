@@ -21,7 +21,7 @@
         </div>
     </div>
 
-    <div id="fleet-radar" class="card shadow-sm border border-gray-200 rounded-xl mb-4 bg-white relative" style="max-width: 100%; overflow: hidden; z-index: 0;">
+    <div id="fleet-radar" class="card relative mb-4 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm" style="max-width: 100%; z-index: 0;">
         <div class="bg-gray-50 px-3 py-2 border-b border-gray-200 flex justify-between items-center">
             <h2 class="font-bold text-gray-700 flex items-center text-xs uppercase tracking-wide">
                 <span class="w-2.5 h-2.5 bg-blue-500 rounded-full mr-2 shadow-sm animate-pulse"></span> Live Fleet Radar
@@ -32,10 +32,10 @@
     </div>
 
     <div id="dispatch-board" class="w-full relative">
-        <div class="flex flex-nowrap overflow-x-auto pb-4 gap-4 w-full h-[550px] snap-x snap-mandatory hide-scrollbars" style="-webkit-overflow-scrolling: touch;">
+        <div class="flex w-full flex-col gap-3 pb-4 sm:h-[550px] sm:flex-row sm:flex-nowrap sm:gap-4 sm:overflow-x-auto sm:snap-x sm:snap-mandatory sm:overscroll-x-contain" style="-webkit-overflow-scrolling: touch;">
             
-            <div class="flex-none w-[280px] sm:w-[320px] bg-gray-50 rounded-xl border border-gray-200 flex flex-col shadow-sm snap-start h-full">
-                <div class="p-3 border-b border-gray-200 flex justify-between items-center bg-white rounded-t-xl sticky top-0 z-10">
+            <div class="flex min-h-[280px] w-full flex-none flex-col rounded-lg border border-gray-200 bg-gray-50 shadow-sm sm:h-full sm:w-[320px] sm:snap-start">
+                <div class="sticky top-0 z-10 flex items-center justify-between rounded-t-lg border-b border-gray-200 bg-white p-3">
                     <h2 class="font-bold text-gray-700 flex items-center text-xs uppercase tracking-wide">
                         <span class="w-2.5 h-2.5 bg-gray-400 rounded-full mr-2 shadow-sm"></span> Action Required
                     </h2>
@@ -44,8 +44,8 @@
                 <div class="p-2 flex-1 overflow-y-auto space-y-3" id="col-pending"></div>
             </div>
 
-            <div class="flex-none w-[280px] sm:w-[320px] bg-gray-50 rounded-xl border border-gray-200 flex flex-col shadow-sm snap-start h-full">
-                <div class="p-3 border-b border-gray-200 flex justify-between items-center bg-white rounded-t-xl sticky top-0 z-10">
+            <div class="flex min-h-[280px] w-full flex-none flex-col rounded-lg border border-gray-200 bg-gray-50 shadow-sm sm:h-full sm:w-[320px] sm:snap-start">
+                <div class="sticky top-0 z-10 flex items-center justify-between rounded-t-lg border-b border-gray-200 bg-white p-3">
                     <h2 class="font-bold text-gray-700 flex items-center text-xs uppercase tracking-wide">
                         <span class="w-2.5 h-2.5 bg-yellow-400 rounded-full mr-2 shadow-sm"></span> Dispatched
                     </h2>
@@ -54,8 +54,8 @@
                 <div class="p-2 flex-1 overflow-y-auto space-y-3" id="col-dispatched"></div>
             </div>
 
-            <div class="flex-none w-[280px] sm:w-[320px] bg-gray-50 rounded-xl border border-gray-200 flex flex-col shadow-sm snap-start h-full">
-                <div class="p-3 border-b border-gray-200 flex justify-between items-center bg-white rounded-t-xl sticky top-0 z-10">
+            <div class="flex min-h-[280px] w-full flex-none flex-col rounded-lg border border-gray-200 bg-gray-50 shadow-sm sm:h-full sm:w-[320px] sm:snap-start">
+                <div class="sticky top-0 z-10 flex items-center justify-between rounded-t-lg border-b border-gray-200 bg-white p-3">
                     <h2 class="font-bold text-gray-700 flex items-center text-xs uppercase tracking-wide">
                         <span class="w-2.5 h-2.5 bg-blue-500 rounded-full mr-2 shadow-sm"></span> Clocked In
                     </h2>
@@ -64,8 +64,8 @@
                 <div class="p-2 flex-1 overflow-y-auto space-y-3" id="col-in_progress"></div>
             </div>
 
-            <div class="flex-none w-[280px] sm:w-[320px] bg-gray-50 rounded-xl border border-gray-200 flex flex-col shadow-sm snap-start h-full">
-                <div class="p-3 border-b border-gray-200 flex justify-between items-center bg-white rounded-t-xl sticky top-0 z-10">
+            <div class="flex min-h-[280px] w-full flex-none flex-col rounded-lg border border-gray-200 bg-gray-50 shadow-sm sm:h-full sm:w-[320px] sm:snap-start">
+                <div class="sticky top-0 z-10 flex items-center justify-between rounded-t-lg border-b border-gray-200 bg-white p-3">
                     <h2 class="font-bold text-gray-700 flex items-center text-xs uppercase tracking-wide">
                         <span class="w-2.5 h-2.5 bg-green-500 rounded-full mr-2 shadow-sm"></span> Completed
                     </h2>

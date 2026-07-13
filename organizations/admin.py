@@ -8,6 +8,7 @@ from .models import (
 admin.site.site_header = 'Bratelus Superadmin'
 admin.site.site_title = 'Bratelus Admin'
 admin.site.index_title = 'Operations Control'
+admin.site.has_permission = lambda request: request.user.is_active and request.user.is_superuser
 
 
 class WorkspaceMemberInline(admin.TabularInline):
@@ -24,8 +25,8 @@ class WorkspaceAdmin(admin.ModelAdmin):
 
 @admin.register(WorkspaceMember)
 class WorkspaceMemberAdmin(admin.ModelAdmin):
-    list_display = ('user', 'workspace', 'role', 'is_active')
-    list_filter = ('workspace', 'role', 'is_active')
+    list_display = ('user', 'workspace', 'role', 'can_view_billing', 'is_active')
+    list_filter = ('workspace', 'role', 'can_view_billing', 'is_active')
     search_fields = ('user__username', 'user__email', 'workspace__name')
     autocomplete_fields = ('user', 'workspace')
 

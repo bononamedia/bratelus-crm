@@ -3,7 +3,7 @@ from django.db.models import Q
 from .models import WorkerProfile, WorkspaceMember
 
 
-MANAGER_ROLES = ('admin', 'manager')
+OPERATIONAL_ROLES = ('admin', 'manager', 'employee')
 
 
 def workspace_membership_for_user(user, workspace):
@@ -31,15 +31,50 @@ def user_can_manage_workspace(user, workspace):
     if not user.is_authenticated or not workspace:
         return False
 
-    if user.is_staff or user.is_superuser:
+    if user.is_superuser:
         return True
 
     membership = workspace_membership_for_user(user, workspace)
-    if membership and membership.role in MANAGER_ROLES:
+    if membership and membership.role in OPERATIONAL_ROLES:
         return True
 
-    worker_profile = worker_profile_for_workspace(user, workspace)
-    return bool(worker_profile and worker_profile.is_admin)
+    return False
+
+
+def user_is_workspace_admin(user, workspace):
+    if not user.is_authenticated or not workspace:
+        return False
+    if user.is_superuser:
+        return True
+    membership = workspace_membership_for_user(user, workspace)
+    return bool(membership and membership.role == 'admin')
+
+
+def user_can_manage_people(user, workspace):
+    if user.is_superuser:
+        return True
+    membership = workspace_membership_for_user(user, workspace)
+    return bool(membership and membership.role in ('admin', 'manager'))
+
+
+def user_can_manage_setup(user, workspace):
+    return user_is_workspace_admin(user, workspace)
+
+
+def user_can_view_billing(user, workspace):
+    if user.is_superuser:
+        return True
+    membership = workspace_membership_for_user(user, workspace)
+    return bool(
+        membership and (
+            membership.role == 'admin' or
+            (membership.role == 'manager' and membership.can_view_billing)
+        )
+    )
+
+
+def user_can_export_data(user, workspace):
+    return user_is_workspace_admin(user, workspace)
 
 
 def workspace_role_label(user, workspace):
@@ -48,9 +83,6 @@ def workspace_role_label(user, workspace):
 
     if user.is_superuser:
         return 'Platform Superadmin'
-
-    if user.is_staff:
-        return 'Platform Staff'
 
     membership = workspace_membership_for_user(user, workspace)
     if membership:

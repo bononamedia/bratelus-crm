@@ -23,7 +23,12 @@ from .models import (
     WorkspaceMember,
     Workspace,
 )
-from .permissions import user_can_manage_workspace, worker_profile_for_workspace
+from .permissions import (
+    user_can_manage_people,
+    user_can_manage_setup,
+    user_is_workspace_admin,
+    worker_profile_for_workspace,
+)
 
 
 TARGET_MODEL_CHOICES = [
@@ -160,6 +165,12 @@ def signup_view(request):
 @login_required
 @transaction.atomic
 def create_workspace_view(request):
+    if not request.user.is_superuser and not WorkspaceMember.objects.filter(
+        user=request.user,
+        role='admin',
+        is_active=True,
+    ).exists():
+        raise PermissionDenied('Only account administrators can create workspaces.')
     if request.method == 'POST':
         name = request.POST.get('name', '').strip()
         billing_email = request.POST.get('billing_email', '').strip().lower()
@@ -202,11 +213,13 @@ def admin_console_view(request):
         messages.error(request, 'Select an organization before opening Company Setup.')
         return redirect('dashboard')
 
-    if not user_can_manage_workspace(request.user, active_org):
+    if not user_can_manage_people(request.user, active_org):
         raise PermissionDenied('You do not have permission to manage this organization.')
 
     if request.method == 'POST':
         action = request.POST.get('action')
+        if action != 'invite_member' and not user_can_manage_setup(request.user, active_org):
+            raise PermissionDenied('Only workspace administrators can change company setup.')
 
         if action == 'create_custom_field':
             label = request.POST.get('label', '').strip()
@@ -382,9 +395,13 @@ def admin_console_view(request):
             email = request.POST.get('email', '').strip().lower()
             first_name = request.POST.get('first_name', '').strip()
             last_name = request.POST.get('last_name', '').strip()
-            role = request.POST.get('role', 'worker')
+            if not user_can_manage_people(request.user, active_org):
+                raise PermissionDenied('Only admins and managers can add workspace users.')
+            role = request.POST.get('role', 'field_worker')
             if role not in dict(WorkspaceMember.ROLE_CHOICES):
-                role = 'worker'
+                role = 'field_worker'
+            if role in {'admin', 'manager'} and not user_can_manage_setup(request.user, active_org):
+                raise PermissionDenied('Only workspace administrators can create privileged users.')
             existing_member = WorkspaceMember.objects.filter(workspace=active_org, user__email__iexact=email).exists()
             if not email or '@' not in email:
                 messages.error(request, 'Enter a valid user email address.')
@@ -402,7 +419,15 @@ def admin_console_view(request):
                     user.set_unusable_password()
                     user.save()
                     created_user = True
-                WorkspaceMember.objects.create(workspace=active_org, user=user, role=role, is_active=True)
+                WorkspaceMember.objects.create(
+                    workspace=active_org,
+                    user=user,
+                    role=role,
+                    is_active=True,
+                    can_view_billing=(
+                        role == 'manager' and request.POST.get('can_view_billing') == 'yes'
+                    ),
+                )
                 worker, _ = WorkerProfile.objects.get_or_create(user=user)
                 worker.workspaces.add(active_org)
                 worker.is_admin = role in {'admin', 'manager'}
@@ -426,6 +451,31 @@ def admin_console_view(request):
                 if created_user:
                     message += ' Send the user a password-reset link so they can activate the account.'
                 messages.success(request, message)
+
+        elif action == 'update_member_access':
+            member = WorkspaceMember.objects.filter(
+                workspace=active_org,
+                id=request.POST.get('member_id'),
+            ).select_related('user').first()
+            role = request.POST.get('role', '')
+            if not member or role not in dict(WorkspaceMember.ROLE_CHOICES):
+                messages.error(request, 'Choose a valid workspace member and role.')
+            elif member.role == 'admin' and role != 'admin' and not WorkspaceMember.objects.filter(
+                workspace=active_org,
+                role='admin',
+                is_active=True,
+            ).exclude(id=member.id).exists():
+                messages.error(request, 'A workspace must keep at least one administrator.')
+            else:
+                member.role = role
+                member.can_view_billing = (
+                    role == 'manager' and request.POST.get('can_view_billing') == 'yes'
+                )
+                member.save(update_fields=['role', 'can_view_billing'])
+                WorkerProfile.objects.filter(user=member.user).update(
+                    is_admin=role in {'admin', 'manager'},
+                )
+                messages.success(request, f'Access updated for {member.user.email or member.user.username}.')
 
         return redirect('admin_console')
 
@@ -518,6 +568,34 @@ def employee_profile_view(request):
     active_org = getattr(request, 'active_organization', None)
     worker_profile = worker_profile_for_workspace(request.user, active_org)
 
+    if request.method == 'POST':
+        if not worker_profile:
+            raise PermissionDenied('No field profile is attached to this workspace.')
+        request.user.first_name = request.POST.get('first_name', '').strip()
+        request.user.last_name = request.POST.get('last_name', '').strip()
+        request.user.save(update_fields=['first_name', 'last_name'])
+        worker_profile.phone = request.POST.get('phone', '').strip()
+        employment_type = request.POST.get('employment_type', '').strip()
+        worker_profile.employment_type = (
+            employment_type
+            if employment_type in dict(WorkerProfile.EMPLOYMENT_TYPE_CHOICES)
+            else ''
+        )
+        worker_profile.home_street = request.POST.get('home_street', '').strip()
+        worker_profile.home_city = request.POST.get('home_city', '').strip()
+        worker_profile.home_state = request.POST.get('home_state', '').strip()
+        worker_profile.home_postal_code = request.POST.get('home_postal_code', '').strip()
+        worker_profile.home_country = request.POST.get('home_country', '').strip() or 'United States'
+        worker_profile.emergency_contact_name = request.POST.get('emergency_contact_name', '').strip()
+        worker_profile.emergency_contact_phone = request.POST.get('emergency_contact_phone', '').strip()
+        worker_profile.save(update_fields=[
+            'phone', 'employment_type', 'home_street', 'home_city', 'home_state',
+            'home_postal_code', 'home_country', 'emergency_contact_name',
+            'emergency_contact_phone',
+        ])
+        messages.success(request, 'Your employee profile has been updated.')
+        return redirect('employee_profile')
+
     assignments = JobAssignment.objects.none()
     if active_org and worker_profile:
         assignments = (
@@ -536,6 +614,7 @@ def employee_profile_view(request):
         'worker_profile': worker_profile,
         'open_assignments': open_assignments,
         'completed_assignments': completed_assignments,
+        'employment_type_choices': WorkerProfile.EMPLOYMENT_TYPE_CHOICES,
         'stats': {
             'open_jobs': open_assignments.count(),
             'completed_jobs': assignments.filter(job__status='completed').count(),

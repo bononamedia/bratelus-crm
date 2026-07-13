@@ -1,5 +1,6 @@
 import re
 
+from django.db import transaction
 from django.db.models import Q
 from rest_framework import viewsets
 from rest_framework.decorators import action
@@ -127,6 +128,92 @@ class ContactViewSet(BaseWorkspaceViewSet):
         if account and account.organization_id != active_org.id:
             raise ValidationError({'account': 'Account must belong to the active organization.'})
         serializer.save(organization=active_org)
+
+    @staticmethod
+    def _mailing_address(contact):
+        return ', '.join(filter(None, [
+            contact.mailing_street.strip(),
+            contact.mailing_city.strip(),
+            contact.mailing_state.strip(),
+            contact.mailing_postal_code.strip(),
+            contact.mailing_country.strip(),
+        ]))
+
+    @action(detail=False, methods=['get', 'post'], url_path='create-missing-accounts')
+    def create_missing_accounts(self, request):
+        active_org = getattr(request, 'active_organization', None)
+        if not user_can_manage_workspace(request.user, active_org):
+            raise PermissionDenied('Only workspace admins can organize imported contacts.')
+
+        accountless = Contact.objects.filter(organization=active_org, account__isnull=True)
+        address_filter = (
+            ~Q(mailing_street='') | ~Q(mailing_city='') | ~Q(mailing_state='') |
+            ~Q(mailing_postal_code='') | ~Q(mailing_country='')
+        )
+        preview = {
+            'contacts': accountless.count(),
+            'accounts': accountless.count(),
+            'properties': accountless.filter(address_filter).count(),
+            'without_address': accountless.exclude(address_filter).count(),
+        }
+        if request.method == 'GET':
+            return Response(preview)
+        if request.data.get('confirm') is not True:
+            raise ValidationError({'confirm': 'Confirm the bulk creation before continuing.'})
+
+        with transaction.atomic():
+            contacts = list(
+                Contact.objects.select_for_update()
+                .filter(organization=active_org, account__isnull=True)
+                .order_by('id')
+            )
+            accounts = []
+            for contact in contacts:
+                account_name = (
+                    contact.first_name.strip() or
+                    f'{contact.first_name} {contact.last_name}'.strip() or
+                    contact.email.strip() or
+                    f'Contact {contact.id}'
+                )
+                mailing_address = self._mailing_address(contact)
+                accounts.append(Account(
+                    organization=active_org,
+                    name=account_name,
+                    phone=contact.phone or contact.mobile,
+                    email=contact.email,
+                    billing_address=mailing_address,
+                    billing_street=contact.mailing_street,
+                    billing_city=contact.mailing_city,
+                    billing_state=contact.mailing_state,
+                    billing_postal_code=contact.mailing_postal_code,
+                    billing_country=contact.mailing_country or 'United States',
+                    shipping_street=contact.mailing_street,
+                    shipping_city=contact.mailing_city,
+                    shipping_state=contact.mailing_state,
+                    shipping_postal_code=contact.mailing_postal_code,
+                    shipping_country=contact.mailing_country,
+                ))
+            Account.objects.bulk_create(accounts, batch_size=500)
+
+            properties = []
+            for contact, account in zip(contacts, accounts):
+                contact.account = account
+                address = self._mailing_address(contact)
+                if address:
+                    properties.append(Property(
+                        account=account,
+                        name=account.name,
+                        address=address,
+                    ))
+            Contact.objects.bulk_update(contacts, ['account'], batch_size=500)
+            Property.objects.bulk_create(properties, batch_size=500)
+
+        return Response({
+            'contacts': len(contacts),
+            'accounts': len(accounts),
+            'properties': len(properties),
+            'without_address': len(contacts) - len(properties),
+        }, status=status.HTTP_201_CREATED)
 
     @action(detail=False, methods=['get'], url_path='global-search')
     def global_search(self, request):

@@ -53,6 +53,12 @@
                 <button type="button" data-tab="payment_methods" onclick="setCrmTab('payment_methods')" class="crm-tab flex-1 rounded-md px-3 py-2 text-sm font-bold text-gray-600 lg:flex-none">Payments</button>
             </div>
             <div class="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+                {% if can_manage_active_org %}
+                <button id="contact-cleanup-button" type="button" onclick="openContactCleanup()" class="hidden items-center justify-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-100">
+                    <i data-lucide="wand-sparkles" class="h-4 w-4"></i>
+                    Create missing accounts
+                </button>
+                {% endif %}
                 {% if is_platform_admin %}
                 <label class="sr-only" for="crm-search-scope">Search scope</label>
                 <select id="crm-search-scope" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
@@ -95,8 +101,8 @@
     </section>
 </div>
 
-<div id="record-overlay" class="fixed inset-0 z-40 hidden bg-gray-900 bg-opacity-50" onclick="closeRecordPanel()"></div>
-<aside id="record-panel" class="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300">
+<div id="record-overlay" class="fixed inset-0 z-[75] hidden bg-gray-900 bg-opacity-50" onclick="closeRecordPanel()"></div>
+<aside id="record-panel" class="fixed inset-y-0 right-0 z-[80] flex w-full max-w-lg translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300">
     <div class="border-b border-gray-200 bg-gray-50 px-5 py-4">
         <div class="flex items-start justify-between gap-4">
             <div>
@@ -159,6 +165,35 @@
     </div>
 </aside>
 
+<div id="contact-cleanup-modal" class="fixed inset-0 z-[90] hidden items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="contact-cleanup-title">
+    <div class="w-full max-w-lg rounded-lg border border-gray-200 bg-white shadow-2xl">
+        <div class="flex items-start justify-between border-b border-gray-200 px-5 py-4">
+            <div class="flex items-center gap-3">
+                <span class="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-50 text-amber-700"><i data-lucide="wand-sparkles" class="h-5 w-5"></i></span>
+                <div>
+                    <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Import cleanup</p>
+                    <h2 id="contact-cleanup-title" class="text-lg font-semibold text-gray-950">Create customer records</h2>
+                </div>
+            </div>
+            <button type="button" onclick="closeContactCleanup()" class="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label="Close import cleanup"><i data-lucide="x" class="h-5 w-5"></i></button>
+        </div>
+        <div class="space-y-4 p-5">
+            <p class="text-sm leading-6 text-gray-600">Each contact without an account will receive a new account named from its first-name field. A property will also be created when a mailing address is available.</p>
+            <div id="contact-cleanup-loading" class="rounded-lg bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">Checking imported contacts...</div>
+            <div id="contact-cleanup-preview" class="hidden grid grid-cols-2 gap-3">
+                <div class="rounded-lg border border-blue-100 bg-blue-50 p-3"><p class="text-xs font-semibold uppercase text-blue-700">Accounts</p><p id="cleanup-account-count" class="mt-1 text-2xl font-semibold text-blue-950">0</p></div>
+                <div class="rounded-lg border border-emerald-100 bg-emerald-50 p-3"><p class="text-xs font-semibold uppercase text-emerald-700">Properties</p><p id="cleanup-property-count" class="mt-1 text-2xl font-semibold text-emerald-950">0</p></div>
+                <div class="col-span-2 flex items-start gap-2 rounded-lg border border-amber-100 bg-amber-50 px-3 py-2.5 text-sm text-amber-900"><i data-lucide="map-pin-off" class="mt-0.5 h-4 w-4 shrink-0"></i><span><strong id="cleanup-no-address-count">0</strong> contacts have no mailing address and will receive an account without a property.</span></div>
+            </div>
+            <div id="contact-cleanup-error" class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"></div>
+        </div>
+        <div class="flex flex-col-reverse gap-2 border-t border-gray-200 bg-gray-50 px-5 py-4 sm:flex-row sm:justify-end">
+            <button type="button" onclick="closeContactCleanup()" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+            <button id="contact-cleanup-confirm" type="button" onclick="runContactCleanup()" disabled class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-40">Create accounts and properties</button>
+        </div>
+    </div>
+</div>
+
 <div id="detail-overlay" class="fixed inset-0 z-40 hidden bg-slate-950/40" onclick="closeRecordDetail()"></div>
 <aside id="detail-panel" class="fixed inset-y-0 right-0 z-50 flex w-full max-w-6xl translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300">
     <div class="border-b border-gray-200 bg-white px-5 py-4">
@@ -211,6 +246,7 @@
 </aside>
 
 {{ crm_custom_fields|json_script:"crm-custom-fields-data" }}
+<script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
 
 <script>
     const crmState = {
@@ -247,22 +283,22 @@
     };
 
     const relatedListDefinitions = [
-        { key: 'overview', label: 'Overview' },
-        { key: 'notes', label: 'Notes' },
-        { key: 'connected_records', label: 'Connected Records' },
-        { key: 'attachments', label: 'Attachments' },
-        { key: 'potentials', label: 'Potentials' },
-        { key: 'open_activities', label: 'Open Activities' },
-        { key: 'closed_activities', label: 'Closed Activities' },
-        { key: 'jobs', label: 'Jobs' },
-        { key: 'cases', label: 'Cases' },
-        { key: 'quotes', label: 'Quotes' },
-        { key: 'sales_orders', label: 'Sales Orders' },
-        { key: 'purchase_orders', label: 'Purchase Orders' },
-        { key: 'emails', label: 'Emails' },
-        { key: 'invoices', label: 'Invoices' },
-        { key: 'twilio_sms', label: 'SMS / Twilio' },
-        { key: 'timeline', label: 'Timeline' },
+        { key: 'overview', label: 'Overview', icon: 'layout-dashboard', tone: 'bg-blue-50 text-blue-600' },
+        { key: 'notes', label: 'Notes', icon: 'notebook-pen', tone: 'bg-amber-50 text-amber-600' },
+        { key: 'connected_records', label: 'Connected Records', icon: 'link-2', tone: 'bg-cyan-50 text-cyan-600' },
+        { key: 'attachments', label: 'Attachments', icon: 'paperclip', tone: 'bg-violet-50 text-violet-600' },
+        { key: 'potentials', label: 'Potentials', icon: 'trending-up', tone: 'bg-emerald-50 text-emerald-600' },
+        { key: 'open_activities', label: 'Open Activities', icon: 'calendar-clock', tone: 'bg-orange-50 text-orange-600' },
+        { key: 'closed_activities', label: 'Closed Activities', icon: 'calendar-check-2', tone: 'bg-green-50 text-green-600' },
+        { key: 'jobs', label: 'Jobs', icon: 'briefcase-business', tone: 'bg-blue-50 text-blue-600' },
+        { key: 'cases', label: 'Cases', icon: 'shield-check', tone: 'bg-rose-50 text-rose-600' },
+        { key: 'quotes', label: 'Quotes', icon: 'quote', tone: 'bg-indigo-50 text-indigo-600' },
+        { key: 'sales_orders', label: 'Sales Orders', icon: 'shopping-cart', tone: 'bg-emerald-50 text-emerald-600' },
+        { key: 'purchase_orders', label: 'Purchase Orders', icon: 'shopping-bag', tone: 'bg-yellow-50 text-yellow-700' },
+        { key: 'emails', label: 'Emails', icon: 'mail', tone: 'bg-sky-50 text-sky-600' },
+        { key: 'invoices', label: 'Invoices', icon: 'receipt-text', tone: 'bg-teal-50 text-teal-600' },
+        { key: 'twilio_sms', label: 'SMS / Twilio', icon: 'message-square-text', tone: 'bg-fuchsia-50 text-fuchsia-600' },
+        { key: 'timeline', label: 'Timeline', icon: 'history', tone: 'bg-slate-100 text-slate-600' },
     ];
 
     const tableHeads = {
@@ -417,6 +453,13 @@
             button.classList.toggle('bg-blue-50', active);
             button.classList.toggle('text-blue-700', active);
         });
+
+        const cleanupButton = document.getElementById('contact-cleanup-button');
+        if (cleanupButton) {
+            const visible = crmState.activeTab === 'contacts' && crmState.searchScope === 'workspace';
+            cleanupButton.classList.toggle('hidden', !visible);
+            cleanupButton.classList.toggle('inline-flex', visible);
+        }
     }
 
     function recordMatches(record) {
@@ -916,12 +959,16 @@
             const count = relatedCount(item.key, type, record);
             const active = crmState.detailRelated === item.key;
             return `
-                <button type="button" onclick="setDetailRelated('${item.key}')" class="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${active ? 'bg-blue-50 font-semibold text-blue-700' : 'text-gray-700 hover:bg-gray-50'}">
-                    <span class="truncate">${escapeHtml(item.label)}</span>
+                <button type="button" onclick="setDetailRelated('${item.key}')" class="flex w-full items-center justify-between gap-2 rounded-lg border px-2.5 py-2 text-left text-sm transition-colors ${active ? 'border-blue-100 bg-blue-50 font-semibold text-blue-700' : 'border-transparent text-gray-700 hover:border-gray-100 hover:bg-gray-50'}">
+                    <span class="flex min-w-0 items-center gap-3">
+                        <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${item.tone}"><i data-lucide="${item.icon}" class="h-4 w-4"></i></span>
+                        <span class="truncate">${escapeHtml(item.label)}</span>
+                    </span>
                     ${count ? `<span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">${count}</span>` : ''}
                 </button>`;
         }).join('') + `
-            <a href="{% url 'admin_console' %}#custom-fields" class="mt-2 flex w-full items-center rounded-lg px-3 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50 xl:mt-3">Add Related List</a>`;
+            <a href="{% url 'admin_console' %}#custom-fields" class="mt-2 flex w-full items-center gap-3 rounded-lg border border-dashed border-gray-200 px-2.5 py-2 text-sm font-semibold text-blue-600 hover:border-blue-200 hover:bg-blue-50 xl:mt-3"><span class="flex h-8 w-8 items-center justify-center rounded-md bg-blue-50"><i data-lucide="plus" class="h-4 w-4"></i></span>Add Related List</a>`;
+        if (window.lucide) window.lucide.createIcons();
     }
 
     function openRecordDetail(type, id) {
@@ -1290,6 +1337,66 @@
         }
     }
 
+    async function openContactCleanup() {
+        const modal = document.getElementById('contact-cleanup-modal');
+        const loading = document.getElementById('contact-cleanup-loading');
+        const preview = document.getElementById('contact-cleanup-preview');
+        const error = document.getElementById('contact-cleanup-error');
+        const confirm = document.getElementById('contact-cleanup-confirm');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        loading.classList.remove('hidden');
+        preview.classList.add('hidden');
+        error.classList.add('hidden');
+        confirm.disabled = true;
+        try {
+            const data = await fetchJson('/api/v1/contacts/create-missing-accounts/');
+            document.getElementById('cleanup-account-count').innerText = data.accounts;
+            document.getElementById('cleanup-property-count').innerText = data.properties;
+            document.getElementById('cleanup-no-address-count').innerText = data.without_address;
+            loading.classList.add('hidden');
+            preview.classList.remove('hidden');
+            confirm.disabled = data.accounts === 0;
+            confirm.innerText = data.accounts === 0 ? 'Everything is organized' : `Create ${data.accounts} accounts`;
+            if (window.lucide) window.lucide.createIcons();
+        } catch (requestError) {
+            loading.classList.add('hidden');
+            error.innerText = 'Could not preview the imported contacts. Please try again.';
+            error.classList.remove('hidden');
+        }
+    }
+
+    function closeContactCleanup() {
+        const modal = document.getElementById('contact-cleanup-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    async function runContactCleanup() {
+        const confirm = document.getElementById('contact-cleanup-confirm');
+        const error = document.getElementById('contact-cleanup-error');
+        confirm.disabled = true;
+        confirm.innerText = 'Creating records...';
+        error.classList.add('hidden');
+        try {
+            const response = await fetch('/api/v1/contacts/create-missing-accounts/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+                body: JSON.stringify({confirm: true}),
+            });
+            if (!response.ok) throw new Error(`Request failed: ${response.status}`);
+            const result = await response.json();
+            closeContactCleanup();
+            await loadCrmData();
+            alert(`Created ${result.accounts} accounts and ${result.properties} properties.`);
+        } catch (requestError) {
+            error.innerText = 'The records could not be created. No partial changes were saved.';
+            error.classList.remove('hidden');
+            confirm.disabled = false;
+            confirm.innerText = 'Try again';
+        }
+    }
+
     let crmSearchTimer;
     document.getElementById('crm-search').addEventListener('input', event => {
         crmState.search = event.target.value;
@@ -1311,6 +1418,7 @@
     document.getElementById('crm-search-scope')?.addEventListener('change', event => {
         crmState.searchScope = event.target.value;
         crmState.contactPagination.page = 1;
+        updateTabStyles();
         loadContacts();
     });
 
@@ -1359,6 +1467,7 @@
 
     document.addEventListener('DOMContentLoaded', () => {
         setCrmTab(crmState.activeTab);
+        if (window.lucide) window.lucide.createIcons();
         loadCrmData();
     });
 </script>

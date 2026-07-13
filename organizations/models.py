@@ -25,12 +25,18 @@ class Workspace(models.Model):
         return self.name
 
 class WorkspaceMember(models.Model):
-    ROLE_CHOICES = [('admin', 'Admin'), ('manager', 'Manager'), ('worker', 'Field Worker')]
+    ROLE_CHOICES = [
+        ('admin', 'Admin'),
+        ('manager', 'Manager'),
+        ('employee', 'Employee'),
+        ('field_worker', 'Field Work'),
+    ]
     
     workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='members')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='workspaces')
-    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='worker')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='field_worker')
     is_active = models.BooleanField(default=True)
+    can_view_billing = models.BooleanField(default=False)
 
     class Meta:
         db_table = 'workspaces_workspacemember'
@@ -113,12 +119,28 @@ class WorkspaceEmailConnection(models.Model):
 # THE WORKFORCE ENGINE
 # ---------------------------------------------------------
 class WorkerProfile(models.Model):
+    EMPLOYMENT_TYPE_CHOICES = [
+        ('1099', '1099 Contractor'),
+        ('w2', 'W-2 Employee'),
+        ('other', 'Other'),
+    ]
+
     user = models.OneToOneField(User, on_delete=models.CASCADE)
     # Changed to ManyToMany so a user can belong to multiple organizations!
     workspaces = models.ManyToManyField(Workspace, related_name='workers')
     
     phone = models.CharField(max_length=20, blank=True)
     is_admin = models.BooleanField(default=False)
+    employment_type = models.CharField(max_length=20, choices=EMPLOYMENT_TYPE_CHOICES, blank=True)
+    home_street = models.CharField(max_length=255, blank=True)
+    home_city = models.CharField(max_length=100, blank=True)
+    home_state = models.CharField(max_length=100, blank=True)
+    home_postal_code = models.CharField(max_length=20, blank=True)
+    home_country = models.CharField(max_length=100, blank=True, default='United States')
+    emergency_contact_name = models.CharField(max_length=150, blank=True)
+    emergency_contact_phone = models.CharField(max_length=30, blank=True)
+    current_balance = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    next_payment_date = models.DateField(null=True, blank=True)
 
     class Meta:
         db_table = 'workspaces_workerprofile'

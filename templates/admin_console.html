@@ -465,8 +465,9 @@
                         <input name="first_name" placeholder="First name" required class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
                         <input name="last_name" placeholder="Last name" required class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
                         <input name="email" type="email" placeholder="Work email" required class="rounded-lg border border-gray-300 px-3 py-2 text-sm lg:col-span-2">
-                        <select name="role" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">{% for value, label in member_role_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+                        <select name="role" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">{% for value, label in member_role_choices %}{% if is_workspace_admin or value == 'employee' or value == 'field_worker' %}<option value="{{ value }}">{{ label }}</option>{% endif %}{% endfor %}</select>
                     </div>
+                    {% if is_workspace_admin %}<label class="mt-3 flex items-start gap-2 text-sm text-gray-600"><input type="checkbox" name="can_view_billing" value="yes" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600"><span>Allow billing visibility when this user is assigned the Manager role.</span></label>{% endif %}
                     <div class="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
                         <label class="flex items-start gap-2 text-sm text-gray-600"><input type="checkbox" name="confirm_price" value="yes" required class="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600"><span>I confirm the estimated subscription changes from <strong>${{ current_monthly_price }}</strong> to <strong>${{ next_monthly_price }}</strong> per month.</span></label>
                         <button class="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Add User</button>
@@ -475,31 +476,35 @@
             </section>
             <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
                 <div class="border-b border-gray-200 px-4 py-3">
-                    <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Workers</h3>
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Workspace Members</h3>
                 </div>
-                <table class="w-full text-sm">
+                <div class="overflow-x-auto"><table class="w-full text-sm">
                     <thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
                         <tr>
-                            <th class="px-4 py-3 text-left">Worker</th>
-                            <th class="px-4 py-3 text-left">Phone</th>
-                            <th class="px-4 py-3 text-left">Admin</th>
+                            <th class="px-4 py-3 text-left">User</th>
+                            <th class="px-4 py-3 text-left">Role</th>
+                            <th class="px-4 py-3 text-left">Billing</th>
+                            <th class="px-4 py-3 text-right"></th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-gray-100">
-                        {% for worker in workers %}
+                        {% for member in members %}
                         <tr>
                             <td class="px-4 py-3">
-                                <div class="font-semibold text-gray-950">{{ worker.user.get_full_name|default:worker.user.username }}</div>
-                                <div class="text-xs text-gray-500">{{ worker.user.email|default:"No email" }}</div>
+                                <div class="font-semibold text-gray-950">{{ member.user.get_full_name|default:member.user.username }}</div>
+                                <div class="text-xs text-gray-500">{{ member.user.email|default:"No email" }}</div>
                             </td>
-                            <td class="px-4 py-3 text-gray-600">{{ worker.phone|default:"-" }}</td>
-                            <td class="px-4 py-3 text-gray-600">{% if worker.is_admin %}Yes{% else %}No{% endif %}</td>
+                            {% if is_workspace_admin %}
+                            <td colspan="3" class="px-4 py-2"><form method="post" class="flex min-w-[440px] items-center gap-3">{% csrf_token %}<input type="hidden" name="action" value="update_member_access"><input type="hidden" name="member_id" value="{{ member.id }}"><select name="role" class="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm">{% for value, label in member_role_choices %}<option value="{{ value }}" {% if member.role == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select><label class="flex items-center gap-2 text-sm text-gray-600"><input type="checkbox" name="can_view_billing" value="yes" {% if member.can_view_billing %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-blue-600"> Billing</label><button class="ml-auto rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Save</button></form></td>
+                            {% else %}
+                            <td class="px-4 py-3 text-gray-600">{{ member.get_role_display }}</td><td class="px-4 py-3 text-gray-600">{% if member.can_view_billing %}Allowed{% else %}-{% endif %}</td><td></td>
+                            {% endif %}
                         </tr>
                         {% empty %}
-                        <tr><td colspan="3" class="px-4 py-8 text-center text-gray-400">No workers attached.</td></tr>
+                        <tr><td colspan="4" class="px-4 py-8 text-center text-gray-400">No workspace members.</td></tr>
                         {% endfor %}
                     </tbody>
-                </table>
+                </table></div>
             </section>
 
             <section class="rounded-lg border border-gray-200 bg-white shadow-sm">

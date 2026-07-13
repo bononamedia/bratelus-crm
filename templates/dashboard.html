@@ -79,20 +79,24 @@
 
         <section class="rounded-lg border border-gray-200 bg-white shadow-sm">
             <div class="border-b border-gray-200 px-4 py-3">
-                <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Access Model</h2>
+                <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Workspace Access</h2>
             </div>
             <div class="space-y-3 p-4 text-sm text-gray-600">
                 <div class="flex items-start gap-3">
-                    <span class="mt-1 h-2 w-2 rounded-full bg-blue-600"></span>
-                    <p><strong class="text-gray-900">Superadmin</strong> manages the whole platform through Django admin.</p>
-                </div>
-                <div class="flex items-start gap-3">
                     <span class="mt-1 h-2 w-2 rounded-full bg-emerald-500"></span>
-                    <p><strong class="text-gray-900">Company Admin</strong> manages CRM, dispatch, team setup, skills, zones, and fields.</p>
+                    <p><strong class="text-gray-900">Admin</strong> owns billing, workspaces, users, and company configuration.</p>
                 </div>
                 <div class="flex items-start gap-3">
                     <span class="mt-1 h-2 w-2 rounded-full bg-amber-400"></span>
-                    <p><strong class="text-gray-900">Employee</strong> sees assigned jobs and their own field profile.</p>
+                    <p><strong class="text-gray-900">Manager</strong> runs operations and users without exports or setup changes.</p>
+                </div>
+                <div class="flex items-start gap-3">
+                    <span class="mt-1 h-2 w-2 rounded-full bg-blue-500"></span>
+                    <p><strong class="text-gray-900">Employee</strong> works with CRM records, dispatch, and assignments.</p>
+                </div>
+                <div class="flex items-start gap-3">
+                    <span class="mt-1 h-2 w-2 rounded-full bg-violet-500"></span>
+                    <p><strong class="text-gray-900">Field Work</strong> sees only their profile, jobs, history, and pay balance.</p>
                 </div>
             </div>
         </section>
