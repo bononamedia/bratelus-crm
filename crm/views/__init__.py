@@ -4,6 +4,7 @@ from django.core.exceptions import PermissionDenied
 from django.shortcuts import redirect
 from fsm.models import Job
 from organizations.models import CustomField
+from organizations.models import Workspace
 from organizations.permissions import user_can_manage_workspace, worker_profile_for_workspace
 from crm.models.contacts import Account, Contact, PaymentMethod, Property
 
@@ -59,6 +60,18 @@ def crm_accounts_view(request, section='accounts'):
                 'is_required': field.is_required,
             }
             for field in custom_fields
+        ],
+        'crm_duplicate_workspaces': [
+            {'id': str(workspace.id), 'name': workspace.name}
+            for workspace in (
+                Workspace.objects.exclude(id=getattr(active_org, 'id', None)).order_by('name')
+                if request.user.is_superuser
+                else Workspace.objects.filter(
+                    members__user=request.user,
+                    members__is_active=True,
+                    members__role__in=('admin', 'manager', 'employee'),
+                ).exclude(id=getattr(active_org, 'id', None)).distinct().order_by('name')
+            )
         ],
     }
     return render(request, 'crm_accounts.html', context)

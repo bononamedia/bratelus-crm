@@ -2,6 +2,7 @@ import re
 
 from django.db import transaction
 from django.db.models import Q
+from django.utils.text import slugify
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
@@ -17,9 +18,10 @@ from .serializers import (
     PropertySerializer,
     WorkerSerializer,
 )
-from organizations.models import WorkerProfile
+from organizations.models import WorkerProfile, Workspace
 from organizations.permissions import user_can_manage_workspace
 from crm.models.contacts import Account, Contact, PaymentMethod, Property
+from crm.services.contacts import duplicate_account_bundle, duplicate_contact
 from fsm.models import Job, JobAssignment
 
 
@@ -89,6 +91,24 @@ class AccountViewSet(BaseWorkspaceViewSet):
         # Auto-attach the organization that the user currently has selected in the UI
         serializer.save(organization=self.request.active_organization)
 
+    @action(detail=True, methods=['post'], url_path='duplicate-to-workspace')
+    def duplicate_to_workspace(self, request, pk=None):
+        source = self.get_object()
+        target_query = Workspace.objects.exclude(id=source.organization_id)
+        if not request.user.is_superuser:
+            target_query = target_query.filter(
+                members__user=request.user,
+                members__is_active=True,
+                members__role__in=('admin', 'manager', 'employee'),
+            ).distinct()
+        target = target_query.filter(id=request.data.get('workspace_id')).first()
+        if not target:
+            raise ValidationError({'workspace_id': 'Choose a workspace you can access.'})
+        account, created, copied = duplicate_account_bundle(source, target)
+        payload = self.get_serializer(account).data
+        payload.update({'created': created, 'copied': copied})
+        return Response(payload, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
 
 class ContactViewSet(BaseWorkspaceViewSet):
     queryset = Contact.objects.all()
@@ -128,6 +148,127 @@ class ContactViewSet(BaseWorkspaceViewSet):
         if account and account.organization_id != active_org.id:
             raise ValidationError({'account': 'Account must belong to the active organization.'})
         serializer.save(organization=active_org)
+
+    def _available_target_workspaces(self):
+        source = getattr(self.request, 'active_organization', None)
+        if self.request.user.is_superuser:
+            return Workspace.objects.exclude(id=getattr(source, 'id', None)).order_by('name')
+        return Workspace.objects.filter(
+            members__user=self.request.user,
+            members__is_active=True,
+            members__role__in=('admin', 'manager', 'employee'),
+        ).exclude(id=getattr(source, 'id', None)).distinct().order_by('name')
+
+    @action(detail=True, methods=['post'], url_path='duplicate-to-workspace')
+    def duplicate_to_workspace(self, request, pk=None):
+        source = self.get_object()
+        target = self._available_target_workspaces().filter(
+            id=request.data.get('workspace_id'),
+        ).first()
+        if not target:
+            raise ValidationError({'workspace_id': 'Choose a workspace you can access.'})
+        copy, created = duplicate_contact(source, target)
+        payload = self.get_serializer(copy).data
+        payload['created'] = created
+        return Response(payload, status=status.HTTP_201_CREATED if created else status.HTTP_200_OK)
+
+    @staticmethod
+    def _workspace_match(label, workspaces):
+        normalized = slugify(label or '')
+        if not normalized:
+            return None
+        exact = [
+            workspace for workspace in workspaces
+            if normalized in {slugify(workspace.name), workspace.slug}
+        ]
+        if len(exact) == 1:
+            return exact[0]
+        prefix = [
+            workspace for workspace in workspaces
+            if slugify(workspace.name).startswith(normalized) or normalized.startswith(slugify(workspace.name))
+        ]
+        return prefix[0] if len(prefix) == 1 else None
+
+    def _workspace_distribution(self):
+        source_workspace = getattr(self.request, 'active_organization', None)
+        workspaces = list(Workspace.objects.all().order_by('name'))
+        groups = {}
+        blank = same_workspace = unknown = 0
+        unknown_labels = set()
+        contacts = Contact.objects.filter(organization=source_workspace).select_related('organization')
+        for contact in contacts.iterator(chunk_size=500):
+            label = str(
+                ((contact.custom_data or {}).get('zoho_fields') or {}).get('Workspace') or ''
+            ).strip()
+            if not label:
+                blank += 1
+                continue
+            target = self._workspace_match(label, workspaces)
+            if not target:
+                unknown += 1
+                unknown_labels.add(label)
+                continue
+            if target.id == source_workspace.id:
+                same_workspace += 1
+                continue
+            group = groups.setdefault(target.id, {
+                'workspace': target,
+                'source_label': label,
+                'contacts': [],
+            })
+            group['contacts'].append(contact)
+        return {
+            'groups': groups,
+            'blank': blank,
+            'same_workspace': same_workspace,
+            'unknown': unknown,
+            'unknown_labels': sorted(unknown_labels),
+        }
+
+    @action(detail=False, methods=['get', 'post'], url_path='reconcile-workspaces')
+    def reconcile_workspaces(self, request):
+        if not request.user.is_superuser:
+            raise PermissionDenied('Only the Bratelus platform owner can distribute cross-workspace imports.')
+        distribution = self._workspace_distribution()
+        preview_groups = [
+            {
+                'workspace_id': str(group['workspace'].id),
+                'workspace_name': group['workspace'].name,
+                'source_label': group['source_label'],
+                'contacts': len(group['contacts']),
+            }
+            for group in distribution['groups'].values()
+        ]
+        preview = {
+            'to_duplicate': sum(group['contacts'] for group in preview_groups),
+            'same_workspace': distribution['same_workspace'],
+            'blank_workspace': distribution['blank'],
+            'unknown_workspace': distribution['unknown'],
+            'unknown_labels': distribution['unknown_labels'],
+            'groups': preview_groups,
+        }
+        if request.method == 'GET':
+            return Response(preview)
+        if request.data.get('confirm') is not True:
+            raise ValidationError({'confirm': 'Confirm the workspace distribution before continuing.'})
+        if distribution['unknown']:
+            raise ValidationError({
+                'workspace': 'Create or rename the unresolved workspaces before distributing contacts.',
+                'unknown_labels': distribution['unknown_labels'],
+            })
+
+        created = existing = 0
+        with transaction.atomic():
+            Workspace.objects.select_for_update().filter(
+                id__in=distribution['groups'].keys(),
+            ).count()
+            for group in distribution['groups'].values():
+                for source in group['contacts']:
+                    _, was_created = duplicate_contact(source, group['workspace'])
+                    created += int(was_created)
+                    existing += int(not was_created)
+        preview.update({'created': created, 'already_existed': existing})
+        return Response(preview, status=status.HTTP_201_CREATED)
 
     @staticmethod
     def _mailing_address(contact):

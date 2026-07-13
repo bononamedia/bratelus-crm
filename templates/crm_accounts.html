@@ -60,6 +60,12 @@
                 </button>
                 {% endif %}
                 {% if is_platform_admin %}
+                <button id="workspace-distribution-button" type="button" onclick="openWorkspaceDistribution()" class="hidden items-center justify-center gap-2 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-800 hover:bg-violet-100">
+                    <i data-lucide="layers-3" class="h-4 w-4"></i>
+                    Distribute imports
+                </button>
+                {% endif %}
+                {% if is_platform_admin %}
                 <label class="sr-only" for="crm-search-scope">Search scope</label>
                 <select id="crm-search-scope" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
                     <option value="workspace">This workspace</option>
@@ -194,6 +200,31 @@
     </div>
 </div>
 
+<div id="workspace-copy-modal" class="fixed inset-0 z-[95] hidden items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="workspace-copy-title">
+    <div class="w-full max-w-md rounded-lg border border-gray-200 bg-white shadow-2xl">
+        <div class="flex items-start justify-between border-b border-gray-200 px-5 py-4">
+            <div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-50 text-violet-700"><i data-lucide="copy-plus" class="h-5 w-5"></i></span><div><p class="text-xs font-semibold uppercase tracking-wide text-violet-700">Cross-workspace copy</p><h2 id="workspace-copy-title" class="text-lg font-semibold text-gray-950">Duplicate record</h2></div></div>
+            <button type="button" onclick="closeWorkspaceCopy()" class="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100" aria-label="Close"><i data-lucide="x" class="h-5 w-5"></i></button>
+        </div>
+        <div class="space-y-4 p-5">
+            <p id="workspace-copy-description" class="text-sm leading-6 text-gray-600"></p>
+            <label class="block text-sm font-semibold text-gray-700" for="workspace-copy-target">Destination workspace</label>
+            <select id="workspace-copy-target" class="w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100"></select>
+            <div id="workspace-copy-note" class="rounded-lg border border-violet-100 bg-violet-50 px-3 py-2.5 text-sm text-violet-900"></div>
+            <div id="workspace-copy-error" class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"></div>
+        </div>
+        <div class="flex justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-4"><button type="button" onclick="closeWorkspaceCopy()" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700">Cancel</button><button id="workspace-copy-confirm" type="button" onclick="runWorkspaceCopy()" class="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700">Duplicate</button></div>
+    </div>
+</div>
+
+<div id="workspace-distribution-modal" class="fixed inset-0 z-[95] hidden items-center justify-center bg-slate-950/50 p-4" role="dialog" aria-modal="true" aria-labelledby="workspace-distribution-title">
+    <div class="w-full max-w-lg rounded-lg border border-gray-200 bg-white shadow-2xl">
+        <div class="flex items-start justify-between border-b border-gray-200 px-5 py-4"><div class="flex items-center gap-3"><span class="flex h-10 w-10 items-center justify-center rounded-lg bg-violet-50 text-violet-700"><i data-lucide="layers-3" class="h-5 w-5"></i></span><div><p class="text-xs font-semibold uppercase tracking-wide text-violet-700">Zoho workspace repair</p><h2 id="workspace-distribution-title" class="text-lg font-semibold text-gray-950">Distribute imported contacts</h2></div></div><button type="button" onclick="closeWorkspaceDistribution()" class="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100" aria-label="Close"><i data-lucide="x" class="h-5 w-5"></i></button></div>
+        <div class="space-y-4 p-5"><p class="text-sm leading-6 text-gray-600">The original contacts stay in this workspace. Repeat-safe copies are created from each contact's saved Zoho Workspace value.</p><div id="workspace-distribution-loading" class="rounded-lg bg-gray-50 px-4 py-8 text-center text-sm text-gray-500">Reading workspace metadata...</div><div id="workspace-distribution-preview" class="hidden space-y-2"></div><div id="workspace-distribution-warning" class="hidden rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900"></div><div id="workspace-distribution-error" class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"></div></div>
+        <div class="flex justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-4"><button type="button" onclick="closeWorkspaceDistribution()" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700">Cancel</button><button id="workspace-distribution-confirm" type="button" onclick="runWorkspaceDistribution()" disabled class="rounded-lg bg-violet-600 px-4 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-40">Distribute contacts</button></div>
+    </div>
+</div>
+
 <div id="detail-overlay" class="fixed inset-0 z-40 hidden bg-slate-950/40" onclick="closeRecordDetail()"></div>
 <aside id="detail-panel" class="fixed inset-y-0 right-0 z-50 flex w-full max-w-6xl translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300">
     <div class="border-b border-gray-200 bg-white px-5 py-4">
@@ -224,6 +255,10 @@
                     <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 13H9v-2.828l6.586-6.586z"></path></svg>
                     Edit contact
                 </button>
+                <button id="detail-duplicate-button" type="button" onclick="openWorkspaceCopy()" class="hidden inline-flex items-center justify-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-100">
+                    <i data-lucide="copy-plus" class="h-4 w-4"></i>
+                    <span id="detail-duplicate-label">Duplicate</span>
+                </button>
                 <button type="button" onclick="setDetailRelated('emails')" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Send Email</button>
                 <button type="button" onclick="setDetailRelated('twilio_sms')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">SMS / Call</button>
                 <a href="{% url 'admin_console' %}#custom-fields" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Customize</a>
@@ -246,6 +281,7 @@
 </aside>
 
 {{ crm_custom_fields|json_script:"crm-custom-fields-data" }}
+{{ crm_duplicate_workspaces|json_script:"crm-duplicate-workspaces-data" }}
 <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js"></script>
 
 <script>
@@ -275,6 +311,7 @@
     };
 
     const crmCustomFields = JSON.parse(document.getElementById('crm-custom-fields-data')?.textContent || '[]');
+    const crmDuplicateWorkspaces = JSON.parse(document.getElementById('crm-duplicate-workspaces-data')?.textContent || '[]');
     const detailTypeMeta = {
         accounts: { singular: 'account', label: 'Account', badge: 'CRM Account' },
         contacts: { singular: 'contact', label: 'Contact', badge: 'CRM Contact' },
@@ -459,6 +496,12 @@
             const visible = crmState.activeTab === 'contacts' && crmState.searchScope === 'workspace';
             cleanupButton.classList.toggle('hidden', !visible);
             cleanupButton.classList.toggle('inline-flex', visible);
+        }
+        const distributionButton = document.getElementById('workspace-distribution-button');
+        if (distributionButton) {
+            const visible = crmState.activeTab === 'contacts' && crmState.searchScope === 'workspace';
+            distributionButton.classList.toggle('hidden', !visible);
+            distributionButton.classList.toggle('inline-flex', visible);
         }
     }
 
@@ -984,6 +1027,10 @@
         document.getElementById('detail-avatar').innerText = recordInitial(type, record);
         document.getElementById('detail-type-badge').innerText = detailTypeMeta[type]?.badge || 'CRM';
         document.getElementById('detail-edit-button').classList.toggle('hidden', type !== 'contacts');
+        const duplicateButton = document.getElementById('detail-duplicate-button');
+        const canDuplicate = ['accounts', 'contacts'].includes(type) && crmDuplicateWorkspaces.length > 0;
+        duplicateButton.classList.toggle('hidden', !canDuplicate);
+        document.getElementById('detail-duplicate-label').innerText = type === 'accounts' ? 'Copy workspace' : 'Duplicate';
 
         renderRelatedNav();
         renderRelatedContent();
@@ -1391,6 +1438,129 @@
             alert(`Created ${result.accounts} accounts and ${result.properties} properties.`);
         } catch (requestError) {
             error.innerText = 'The records could not be created. No partial changes were saved.';
+            error.classList.remove('hidden');
+            confirm.disabled = false;
+            confirm.innerText = 'Try again';
+        }
+    }
+
+    function openWorkspaceCopy() {
+        const record = crmState.detailRecord;
+        const type = crmState.detailType;
+        if (!record || !['accounts', 'contacts'].includes(type) || !crmDuplicateWorkspaces.length) return;
+        document.getElementById('workspace-copy-title').innerText = type === 'accounts' ? 'Copy account bundle' : 'Duplicate contact';
+        document.getElementById('workspace-copy-description').innerText = type === 'accounts'
+            ? `Copy ${recordName(type, record)} and its contacts, properties, and payment-method details to another workspace.`
+            : `Create a separate copy of ${recordName(type, record)} in another workspace.`;
+        document.getElementById('workspace-copy-note').innerText = type === 'accounts'
+            ? 'Payment processor tokens are not copied. Masked card details are retained for safe reconnection.'
+            : 'The original contact stays here. Repeating the same copy will return the existing destination record.';
+        document.getElementById('workspace-copy-target').innerHTML = crmDuplicateWorkspaces
+            .map(workspace => `<option value="${workspace.id}">${escapeHtml(workspace.name)}</option>`)
+            .join('');
+        document.getElementById('workspace-copy-error').classList.add('hidden');
+        document.getElementById('workspace-copy-confirm').disabled = false;
+        document.getElementById('workspace-copy-confirm').innerText = type === 'accounts' ? 'Copy account bundle' : 'Duplicate contact';
+        const modal = document.getElementById('workspace-copy-modal');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        if (window.lucide) window.lucide.createIcons();
+    }
+
+    function closeWorkspaceCopy() {
+        const modal = document.getElementById('workspace-copy-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    async function runWorkspaceCopy() {
+        const type = crmState.detailType;
+        const record = crmState.detailRecord;
+        const target = document.getElementById('workspace-copy-target');
+        const confirm = document.getElementById('workspace-copy-confirm');
+        const error = document.getElementById('workspace-copy-error');
+        confirm.disabled = true;
+        confirm.innerText = 'Copying...';
+        error.classList.add('hidden');
+        try {
+            const response = await fetch(`/api/v1/${type}/${record.id}/duplicate-to-workspace/`, {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+                body: JSON.stringify({workspace_id: target.value}),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.workspace_id?.[0] || 'Could not copy this record.');
+            const destinationName = target.options[target.selectedIndex].text;
+            closeWorkspaceCopy();
+            if (type === 'accounts') {
+                alert(`${result.created ? 'Copied' : 'Already available in'} ${destinationName}: ${result.copied.contacts} contacts, ${result.copied.properties} properties, and ${result.copied.payment_methods} payment methods.`);
+            } else {
+                alert(result.created ? `Contact copied to ${destinationName}.` : `This contact already exists in ${destinationName}.`);
+            }
+        } catch (requestError) {
+            error.innerText = requestError.message;
+            error.classList.remove('hidden');
+            confirm.disabled = false;
+            confirm.innerText = 'Try again';
+        }
+    }
+
+    async function openWorkspaceDistribution() {
+        const modal = document.getElementById('workspace-distribution-modal');
+        const loading = document.getElementById('workspace-distribution-loading');
+        const preview = document.getElementById('workspace-distribution-preview');
+        const warning = document.getElementById('workspace-distribution-warning');
+        const error = document.getElementById('workspace-distribution-error');
+        const confirm = document.getElementById('workspace-distribution-confirm');
+        modal.classList.remove('hidden');
+        modal.classList.add('flex');
+        loading.classList.remove('hidden');
+        preview.classList.add('hidden');
+        warning.classList.add('hidden');
+        error.classList.add('hidden');
+        confirm.disabled = true;
+        try {
+            const data = await fetchJson('/api/v1/contacts/reconcile-workspaces/');
+            preview.innerHTML = data.groups.map(group => `<div class="flex items-center justify-between rounded-lg border border-gray-200 px-3 py-2.5"><div><strong class="block text-sm text-gray-900">${escapeHtml(group.workspace_name)}</strong><span class="text-xs text-gray-500">Zoho: ${escapeHtml(group.source_label)}</span></div><span class="rounded-full bg-violet-50 px-2.5 py-1 text-sm font-semibold text-violet-700">${group.contacts}</span></div>`).join('') + `<div class="grid grid-cols-2 gap-2 pt-2 text-xs text-gray-600"><div class="rounded-md bg-gray-50 p-2">Stay here: <strong>${data.same_workspace}</strong></div><div class="rounded-md bg-gray-50 p-2">Blank Workspace: <strong>${data.blank_workspace}</strong></div></div>`;
+            if (data.unknown_workspace) {
+                warning.innerText = `${data.unknown_workspace} contacts use unresolved workspace labels: ${data.unknown_labels.join(', ')}.`;
+                warning.classList.remove('hidden');
+            }
+            loading.classList.add('hidden');
+            preview.classList.remove('hidden');
+            confirm.disabled = data.to_duplicate === 0 || data.unknown_workspace > 0;
+            confirm.innerText = data.to_duplicate ? `Duplicate ${data.to_duplicate} contacts` : 'Everything is distributed';
+        } catch (requestError) {
+            loading.classList.add('hidden');
+            error.innerText = 'Could not read the saved Zoho workspace values.';
+            error.classList.remove('hidden');
+        }
+    }
+
+    function closeWorkspaceDistribution() {
+        const modal = document.getElementById('workspace-distribution-modal');
+        modal.classList.add('hidden');
+        modal.classList.remove('flex');
+    }
+
+    async function runWorkspaceDistribution() {
+        const confirm = document.getElementById('workspace-distribution-confirm');
+        const error = document.getElementById('workspace-distribution-error');
+        confirm.disabled = true;
+        confirm.innerText = 'Distributing contacts...';
+        error.classList.add('hidden');
+        try {
+            const response = await fetch('/api/v1/contacts/reconcile-workspaces/', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+                body: JSON.stringify({confirm: true}),
+            });
+            const result = await response.json();
+            if (!response.ok) throw new Error(result.workspace || 'Could not distribute contacts.');
+            closeWorkspaceDistribution();
+            alert(`Created ${result.created} workspace contact copies. ${result.already_existed} were already present.`);
+        } catch (requestError) {
+            error.innerText = requestError.message;
             error.classList.remove('hidden');
             confirm.disabled = false;
             confirm.innerText = 'Try again';

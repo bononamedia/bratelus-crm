@@ -3,7 +3,7 @@ from django.test import TestCase
 from django.urls import reverse
 
 from crm.management.commands.import_zoho_contacts import fit_contact_field
-from crm.models.contacts import Account, Contact, Property
+from crm.models.contacts import Account, Contact, PaymentMethod, Property
 from organizations.models import Workspace, WorkspaceMember
 
 
@@ -207,6 +207,159 @@ class AccountlessContactApiTests(TestCase):
         self.assertEqual(response.json()['count'], 1)
         self.assertEqual(response.json()['results'][0]['id'], target.id)
         self.assertEqual(response.json()['results'][0]['workspace_name'], 'Other Brand')
+
+    def test_contact_can_be_duplicated_to_an_accessible_workspace_once(self):
+        target = Workspace.objects.create(name='Second Brand', slug='second-brand')
+        WorkspaceMember.objects.create(workspace=target, user=self.user, role='manager')
+        source = Contact.objects.create(
+            organization=self.workspace,
+            first_name='Shared',
+            last_name='Customer',
+            email='shared@example.com',
+            external_source='zoho',
+            external_id='zcrm-shared-1',
+            custom_data={'zoho_fields': {'Workspace': 'Second Brand'}},
+        )
+        url = reverse('api-contact-duplicate-to-workspace', args=[source.id])
+
+        created = self.client.post(
+            url,
+            {'workspace_id': str(target.id)},
+            content_type='application/json',
+        )
+        self.assertEqual(created.status_code, 201, created.content)
+        self.assertTrue(created.json()['created'])
+        copy = Contact.objects.get(organization=target)
+        self.assertEqual(copy.email, source.email)
+        self.assertIsNone(copy.account)
+        self.assertEqual(copy.custom_data['duplication']['source_contact_id'], source.id)
+
+        repeated = self.client.post(
+            url,
+            {'workspace_id': str(target.id)},
+            content_type='application/json',
+        )
+        self.assertEqual(repeated.status_code, 200)
+        self.assertFalse(repeated.json()['created'])
+        self.assertEqual(Contact.objects.filter(organization=target).count(), 1)
+
+    def test_platform_owner_can_reconcile_zoho_workspace_metadata(self):
+        elaine = Workspace.objects.create(name="Elaine's House Cleaning", slug='elaines-house-cleaning')
+        extra = Workspace.objects.create(name='Extra Help Pros', slug='extra-help-pros')
+        elite = Workspace.objects.create(name='Elite Maids VA', slug='elite-maids-va')
+        labels = [
+            ('Perfect Cleaning', self.workspace),
+            ("Elaine's House Cleaning", elaine),
+            ('Extra Help', extra),
+            ('Extra Help Pros', extra),
+            ('Elite Maids', elite),
+            ('', None),
+        ]
+        self.workspace.name = 'Perfect Cleaning'
+        self.workspace.save(update_fields=['name'])
+        for index, (label, _) in enumerate(labels):
+            Contact.objects.create(
+                organization=self.workspace,
+                first_name=f'Imported {index}',
+                last_name='Contact',
+                external_source='zoho',
+                external_id=f'zcrm-{index}',
+                custom_data={'zoho_fields': {'Workspace': label}},
+            )
+        url = reverse('api-contact-reconcile-workspaces')
+        denied = self.client.get(url)
+        self.assertEqual(denied.status_code, 403)
+
+        owner = User.objects.create_superuser('platform-owner@example.com', password='StrongPass123!')
+        self.client.force_login(owner)
+        session = self.client.session
+        session['active_org_id'] = str(self.workspace.id)
+        session.save()
+
+        preview = self.client.get(url)
+        self.assertEqual(preview.status_code, 200, preview.content)
+        self.assertEqual(preview.json()['to_duplicate'], 4)
+        self.assertEqual(preview.json()['same_workspace'], 1)
+        self.assertEqual(preview.json()['blank_workspace'], 1)
+        self.assertEqual(preview.json()['unknown_workspace'], 0)
+
+        created = self.client.post(url, {'confirm': True}, content_type='application/json')
+        self.assertEqual(created.status_code, 201, created.content)
+        self.assertEqual(created.json()['created'], 4)
+        self.assertEqual(Contact.objects.filter(organization=elaine).count(), 1)
+        self.assertEqual(Contact.objects.filter(organization=extra).count(), 2)
+        self.assertEqual(Contact.objects.filter(organization=elite).count(), 1)
+
+        repeated = self.client.post(url, {'confirm': True}, content_type='application/json')
+        self.assertEqual(repeated.status_code, 201)
+        self.assertEqual(repeated.json()['created'], 0)
+        self.assertEqual(repeated.json()['already_existed'], 4)
+
+    def test_account_bundle_can_be_copied_to_another_workspace_once(self):
+        target = Workspace.objects.create(name='Target Brand', slug='target-brand')
+        WorkspaceMember.objects.create(workspace=target, user=self.user, role='admin')
+        session = self.client.session
+        session['active_org_id'] = str(self.workspace.id)
+        session.save()
+        account = Account.objects.create(
+            organization=self.workspace,
+            name='Bundled Customer',
+            email='customer@example.com',
+            billing_city='Richmond',
+        )
+        Contact.objects.create(
+            organization=self.workspace,
+            account=account,
+            first_name='Bundle',
+            last_name='Contact',
+            external_source='zoho',
+            external_id='bundle-contact-1',
+        )
+        source_property = Property.objects.create(
+            account=account,
+            name='Main Home',
+            address='10 Main St, Richmond, VA',
+            location_lat='37.540000',
+            location_lng='-77.430000',
+        )
+        PaymentMethod.objects.create(
+            account=account,
+            assigned_property=source_property,
+            is_default=True,
+            card_type='Visa',
+            last_four='4242',
+            expiration_date='12/2030',
+            processor_token='must-not-cross-workspaces',
+        )
+        url = reverse('api-account-duplicate-to-workspace', args=[account.id])
+        response = self.client.post(
+            url,
+            {'workspace_id': str(target.id)},
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(response.json()['copied'], {
+            'contacts': 1,
+            'properties': 1,
+            'payment_methods': 1,
+        })
+        copied = Account.objects.get(organization=target)
+        self.assertEqual(copied.name, account.name)
+        self.assertEqual(copied.contacts.count(), 1)
+        self.assertEqual(copied.properties.count(), 1)
+        copied_method = copied.payment_methods.get()
+        self.assertEqual(copied_method.last_four, '4242')
+        self.assertEqual(copied_method.processor_token, '')
+        self.assertEqual(copied_method.assigned_property.account, copied)
+
+        repeated = self.client.post(
+            url,
+            {'workspace_id': str(target.id)},
+            content_type='application/json',
+        )
+        self.assertEqual(repeated.status_code, 200)
+        self.assertFalse(repeated.json()['created'])
+        self.assertEqual(Account.objects.filter(organization=target).count(), 1)
 
     def test_zoho_import_values_are_bounded_by_the_destination_field(self):
         self.assertEqual(len(fit_contact_field('phone', '1' * 80)), 50)
