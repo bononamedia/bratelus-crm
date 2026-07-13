@@ -33,6 +33,7 @@
 
         .nav-module {
             overflow: hidden;
+            flex: 0 0 auto;
         }
 
         .nav-module-toggle:focus-visible,
@@ -42,15 +43,22 @@
         }
     </style>
 </head>
-<body class="bg-gray-50 text-gray-900 font-sans antialiased pb-16 md:pb-0 md:pl-72 flex flex-col min-h-screen">
+<body class="bg-gray-50 text-gray-900 font-sans antialiased pb-16 md:pb-0 md:pl-72 flex flex-col min-h-screen overflow-x-hidden">
 
-    <aside class="hidden md:flex flex-col w-72 h-screen px-4 py-6 bg-slate-950 text-white fixed top-0 left-0 z-40 shadow-lg">
+    <div id="mobile-sidebar-backdrop" class="fixed inset-0 z-40 hidden bg-slate-950/55 backdrop-blur-sm md:hidden" onclick="closeMobileSidebar()"></div>
+
+    <aside id="app-sidebar" class="fixed left-0 top-0 z-50 flex h-dvh w-[min(18rem,calc(100vw-3rem))] -translate-x-full flex-col bg-slate-950 px-4 py-5 text-white shadow-xl transition-transform duration-200 md:z-40 md:w-72 md:translate-x-0 md:py-6">
         <div class="mb-6 flex items-center justify-between">
             <h2 class="text-2xl font-semibold text-white">Bratelus<span class="text-sky-400">.</span></h2>
-            <span class="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">CRM</span>
+            <div class="flex items-center gap-2">
+                <span class="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">CRM</span>
+                <button type="button" onclick="closeMobileSidebar()" class="flex h-8 w-8 items-center justify-center rounded-md text-slate-400 hover:bg-white/10 hover:text-white md:hidden" aria-label="Close navigation">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
         </div>
-        <nav class="flex flex-col gap-2 flex-1 overflow-y-auto pr-1">
-            <a href="{% url 'dashboard' %}" class="flex items-center rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-medium text-slate-100 hover:bg-white/10 transition-colors">
+        <nav class="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain pr-1">
+            <a href="{% url 'dashboard' %}" class="flex shrink-0 items-center rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-medium text-slate-100 hover:bg-white/10 transition-colors">
                 <span class="mr-3 flex h-8 w-8 items-center justify-center rounded-md bg-sky-500/10 text-sky-300">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
                 </span>
@@ -74,7 +82,6 @@
                     <a href="{% url 'contacts' %}" class="nav-subitem">Contacts</a>
                     <a href="{% url 'properties' %}" class="nav-subitem">Properties</a>
                     <a href="{% url 'payment_methods' %}" class="nav-subitem">Payment Methods</a>
-                    <a href="{% url 'billing_overview' %}" class="nav-subitem">Bratelus Subscription</a>
                     <a href="{% url 'leads' %}" class="nav-subitem">Leads Pipeline</a>
                 </div>
             </div>
@@ -200,21 +207,26 @@
         </div>
     </aside>
 
-    <div class="flex-1 flex flex-col relative w-full">
+    <div class="relative flex w-full min-w-0 flex-1 flex-col">
         
         <header class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-sm z-30 sticky top-0">
-            <div class="md:hidden font-semibold text-xl text-blue-700">Bratelus.</div>
+            <div class="flex items-center gap-2 md:hidden">
+                <button type="button" onclick="openMobileSidebar()" class="flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50" aria-label="Open navigation" aria-controls="app-sidebar">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
+                </button>
+                <div class="font-semibold text-lg text-blue-700">Bratelus.</div>
+            </div>
             
             <div class="hidden md:block flex-1"></div>
 
-            <div class="relative inline-block text-left">
+            <div class="relative inline-block max-w-[calc(100vw-8rem)] text-left sm:max-w-none">
                 <div>
-                    <button type="button" onclick="toggleOrgMenu()" class="inline-flex items-center justify-between w-full rounded-lg border border-gray-200 shadow-sm px-3 py-1.5 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all" id="org-menu-button" aria-expanded="true" aria-haspopup="true">
-                        <div class="flex items-center">
+                    <button type="button" onclick="toggleOrgMenu()" class="inline-flex w-full items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 shadow-sm transition-all hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2" id="org-menu-button" aria-expanded="false" aria-haspopup="true">
+                        <div class="flex min-w-0 items-center">
                             <div class="h-6 w-6 rounded bg-blue-100 text-blue-700 flex items-center justify-center font-bold mr-2 text-xs uppercase">
                                 {{ active_org.name|make_list|first|default:"?" }}
                             </div>
-                            <span id="current-org-name" class="hidden sm:inline">{{ active_org.name|default:"Select Organization" }}</span>
+                            <span id="current-org-name" class="hidden truncate sm:inline">{{ active_org.name|default:"Select Organization" }}</span>
                         </div>
                         <svg class="-mr-1 ml-2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
                             <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
@@ -222,7 +234,7 @@
                     </button>
                 </div>
 
-                <div id="org-dropdown-menu" class="origin-top-right absolute right-0 mt-2 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 hidden z-50" role="menu" aria-orientation="vertical" aria-labelledby="org-menu-button" tabindex="-1">
+                <div id="org-dropdown-menu" class="absolute right-0 z-50 mt-2 hidden w-72 max-w-[calc(100vw-2rem)] origin-top-right divide-y divide-gray-100 rounded-md bg-white shadow-lg ring-1 ring-black ring-opacity-5" role="menu" aria-orientation="vertical" aria-labelledby="org-menu-button" tabindex="-1">
                     <div class="px-4 py-3 bg-gray-50 rounded-t-md">
                         <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">My Organizations</p>
                     </div>
@@ -242,6 +254,15 @@
                         <div class="px-4 py-3 text-sm text-gray-500 italic text-center">No organizations assigned.</div>
                         {% endfor %}
                     </div>
+                    {% if can_manage_active_org %}
+                    <div class="py-1" role="none">
+                        <p class="px-4 pb-1 pt-2 text-[10px] font-medium uppercase tracking-wide text-gray-400">Bratelus account</p>
+                        <a href="{% url 'billing_overview' %}" class="flex items-center px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-100" role="menuitem">
+                            <svg class="mr-2 h-4 w-4 text-blue-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 10h18M7 15h2m4 0h4M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                            Subscription
+                        </a>
+                    </div>
+                    {% endif %}
                     <div class="py-1 border-t border-gray-100" role="none">
                         <a href="{% url 'workspace_create' %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" role="menuitem">
                             <span class="mr-2 text-lg leading-none text-gray-400">+</span>
@@ -319,6 +340,19 @@
         function toggleOrgMenu() {
             const menu = document.getElementById('org-dropdown-menu');
             menu.classList.toggle('hidden');
+            document.getElementById('org-menu-button').setAttribute('aria-expanded', menu.classList.contains('hidden') ? 'false' : 'true');
+        }
+
+        function openMobileSidebar() {
+            document.getElementById('app-sidebar').classList.remove('-translate-x-full');
+            document.getElementById('mobile-sidebar-backdrop').classList.remove('hidden');
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function closeMobileSidebar() {
+            document.getElementById('app-sidebar').classList.add('-translate-x-full');
+            document.getElementById('mobile-sidebar-backdrop').classList.add('hidden');
+            document.body.classList.remove('overflow-hidden');
         }
 
         function setOpenModule(moduleName, persist = true) {
@@ -403,6 +437,16 @@
             const menu = document.getElementById('org-dropdown-menu');
             if (button && menu && !button.contains(event.target) && !menu.contains(event.target)) {
                 menu.classList.add('hidden');
+                button.setAttribute('aria-expanded', 'false');
+            }
+        });
+
+        document.addEventListener('keydown', function(event) {
+            if (event.key === 'Escape') {
+                closeMobileSidebar();
+                const menu = document.getElementById('org-dropdown-menu');
+                menu.classList.add('hidden');
+                document.getElementById('org-menu-button').setAttribute('aria-expanded', 'false');
             }
         });
 
@@ -418,6 +462,10 @@
 
             setOpenModule(moduleForCurrentPath(), false);
             highlightActiveNavItem();
+
+            document.querySelectorAll('#app-sidebar a').forEach(link => {
+                link.addEventListener('click', closeMobileSidebar);
+            });
         });
     </script>
 </body>

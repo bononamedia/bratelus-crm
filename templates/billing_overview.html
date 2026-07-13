@@ -33,7 +33,7 @@
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white">
             <div class="border-b border-gray-200 px-5 py-4"><h2 class="font-semibold text-gray-950">Current price breakdown</h2></div>
             <div class="divide-y divide-gray-100">
-                {% for row in pricing_breakdown %}<div class="grid grid-cols-[1fr_auto_auto] gap-4 px-5 py-4 text-sm"><span class="text-gray-700">{{ row.label }}</span><span class="text-gray-500">{{ row.quantity }} x ${{ row.unit_amount }}</span><span class="font-semibold text-gray-950">${{ row.amount }}</span></div>{% endfor %}
+                {% for row in pricing_breakdown %}<div class="flex flex-col gap-1 px-5 py-4 text-sm sm:grid sm:grid-cols-[1fr_auto_auto] sm:gap-4"><span class="text-gray-700">{{ row.label }}</span><span class="text-gray-500">{{ row.quantity }} x ${{ row.unit_amount }}</span><span class="font-semibold text-gray-950">${{ row.amount }}</span></div>{% endfor %}
             </div>
         </section>
         <section class="overflow-hidden rounded-lg border border-gray-200 bg-white">
