@@ -1,0 +1,1000 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl space-y-5">
+    <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+            <p class="text-xs font-bold uppercase tracking-wide text-blue-600">{{ active_org.name|default:"Workspace" }}</p>
+            <h1 class="mt-1 text-2xl md:text-3xl font-extrabold text-gray-950 tracking-tight">CRM Workspace</h1>
+            <p class="mt-1 text-sm text-gray-500">Accounts, contacts, properties, and the client data dispatch depends on.</p>
+        </div>
+        <div class="flex flex-col sm:flex-row gap-2">
+            {% if can_manage_active_org %}
+            <a href="{% url 'admin_console' %}" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50">
+                Company Setup
+            </a>
+            {% endif %}
+            <button type="button" onclick="openRecordPanel()" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">
+                <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+                New Record
+            </button>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <p class="text-xs font-bold uppercase tracking-wide text-gray-500">Accounts</p>
+            <p class="mt-2 text-3xl font-extrabold text-gray-950" id="stat-accounts">{{ crm_stats.accounts }}</p>
+        </div>
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <p class="text-xs font-bold uppercase tracking-wide text-gray-500">Contacts</p>
+            <p class="mt-2 text-3xl font-extrabold text-gray-950" id="stat-contacts">{{ crm_stats.contacts }}</p>
+        </div>
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <p class="text-xs font-bold uppercase tracking-wide text-gray-500">Properties</p>
+            <p class="mt-2 text-3xl font-extrabold text-gray-950" id="stat-properties">{{ crm_stats.properties }}</p>
+        </div>
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <p class="text-xs font-bold uppercase tracking-wide text-gray-500">Payment Methods</p>
+            <p class="mt-2 text-3xl font-extrabold text-gray-950" id="stat-payment-methods">{{ crm_stats.payment_methods }}</p>
+        </div>
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <p class="text-xs font-bold uppercase tracking-wide text-gray-500">Open Jobs</p>
+            <p class="mt-2 text-3xl font-extrabold text-gray-950">{{ crm_stats.open_jobs }}</p>
+        </div>
+    </div>
+
+    <section class="rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div class="flex flex-col gap-3 border-b border-gray-200 p-3 lg:flex-row lg:items-center lg:justify-between">
+            <div class="inline-flex w-full rounded-lg border border-gray-200 bg-gray-50 p-1 lg:w-auto" role="tablist">
+                <button type="button" data-tab="accounts" onclick="setCrmTab('accounts')" class="crm-tab flex-1 rounded-md px-3 py-2 text-sm font-bold text-gray-600 lg:flex-none">Accounts</button>
+                <button type="button" data-tab="contacts" onclick="setCrmTab('contacts')" class="crm-tab flex-1 rounded-md px-3 py-2 text-sm font-bold text-gray-600 lg:flex-none">Contacts</button>
+                <button type="button" data-tab="properties" onclick="setCrmTab('properties')" class="crm-tab flex-1 rounded-md px-3 py-2 text-sm font-bold text-gray-600 lg:flex-none">Properties</button>
+                <button type="button" data-tab="payment_methods" onclick="setCrmTab('payment_methods')" class="crm-tab flex-1 rounded-md px-3 py-2 text-sm font-bold text-gray-600 lg:flex-none">Payments</button>
+            </div>
+            <div class="relative w-full lg:w-80">
+                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                    <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                </div>
+                <input type="search" id="crm-search" placeholder="Search CRM..." class="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+            </div>
+        </div>
+
+        <div id="crm-error" class="hidden border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700"></div>
+
+        <div class="overflow-x-auto">
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead id="crm-table-head" class="bg-gray-50"></thead>
+                <tbody id="crm-table-body" class="divide-y divide-gray-100 bg-white"></tbody>
+            </table>
+        </div>
+    </section>
+</div>
+
+<div id="record-overlay" class="fixed inset-0 z-40 hidden bg-gray-900 bg-opacity-50" onclick="closeRecordPanel()"></div>
+<aside id="record-panel" class="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300">
+    <div class="border-b border-gray-200 bg-gray-50 px-5 py-4">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <p class="text-xs font-bold uppercase tracking-wide text-blue-600" id="record-panel-eyebrow">CRM</p>
+                <h2 class="text-lg font-extrabold text-gray-950" id="record-panel-title">New Record</h2>
+            </div>
+            <button type="button" onclick="closeRecordPanel()" class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+                <span class="sr-only">Close</span>
+                <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+    </div>
+    <div class="border-b border-gray-100 p-4">
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <button type="button" data-type="accounts" onclick="setRecordType('accounts')" class="record-type rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold text-gray-600">Account</button>
+            <button type="button" data-type="contacts" onclick="setRecordType('contacts')" class="record-type rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold text-gray-600">Contact</button>
+            <button type="button" data-type="properties" onclick="setRecordType('properties')" class="record-type rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold text-gray-600">Property</button>
+            <button type="button" data-type="payment_methods" onclick="setRecordType('payment_methods')" class="record-type rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold text-gray-600">Payment</button>
+        </div>
+    </div>
+    <form id="record-form" class="flex flex-1 flex-col overflow-hidden">
+        <div id="record-form-fields" class="flex-1 space-y-4 overflow-y-auto p-5"></div>
+        <div class="flex justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-4">
+            <button type="button" onclick="closeRecordPanel()" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+            <button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Save Record</button>
+        </div>
+    </form>
+</aside>
+
+<div id="detail-overlay" class="fixed inset-0 z-40 hidden bg-slate-950/40" onclick="closeRecordDetail()"></div>
+<aside id="detail-panel" class="fixed inset-y-0 right-0 z-50 flex w-full max-w-6xl translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300">
+    <div class="border-b border-gray-200 bg-white px-5 py-4">
+        <div class="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+            <div class="flex min-w-0 items-center gap-4">
+                <button type="button" onclick="closeRecordDetail()" class="rounded-lg border border-gray-200 bg-white p-2 text-gray-500 hover:bg-gray-50 hover:text-gray-700">
+                    <span class="sr-only">Back to CRM list</span>
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path></svg>
+                </button>
+                <div id="detail-avatar" class="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-blue-100 text-lg font-semibold uppercase text-blue-700">?</div>
+                <div class="min-w-0">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <h2 id="detail-title" class="truncate text-xl font-semibold text-gray-950">Record</h2>
+                        <span id="detail-type-badge" class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">CRM</span>
+                    </div>
+                    <div class="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
+                        <span id="detail-subtitle">Select a CRM record</span>
+                        <span class="hidden text-gray-300 sm:inline">/</span>
+                        <button type="button" class="inline-flex items-center gap-1 text-gray-600 hover:text-blue-600" onclick="setDetailRelated('notes')">
+                            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h10M7 11h10M7 15h6M5 3h14a2 2 0 012 2v14l-4-3H5a2 2 0 01-2-2V5a2 2 0 012-2z"></path></svg>
+                            Add tag or note
+                        </button>
+                    </div>
+                </div>
+            </div>
+            <div class="flex flex-wrap gap-2">
+                <button type="button" onclick="setDetailRelated('emails')" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Send Email</button>
+                <button type="button" onclick="setDetailRelated('twilio_sms')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">SMS / Call</button>
+                <a href="{% url 'admin_console' %}#custom-fields" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Customize</a>
+            </div>
+        </div>
+    </div>
+    <div class="flex min-h-0 flex-1 flex-col bg-gray-50 xl:grid xl:grid-cols-[280px_minmax(0,1fr)]">
+        <nav class="border-b border-gray-200 bg-white p-4 xl:overflow-y-auto xl:border-b-0 xl:border-r">
+            <div class="mb-3 text-xs font-semibold uppercase tracking-wide text-gray-500">Related List</div>
+            <div id="detail-related-nav" class="grid grid-cols-2 gap-1 sm:grid-cols-3 xl:block xl:space-y-1"></div>
+        </nav>
+        <main class="min-h-0 overflow-y-auto p-4 sm:p-6">
+            <div class="mb-4 inline-flex rounded-lg border border-gray-200 bg-white p-1 shadow-sm" role="tablist">
+                <button type="button" onclick="setDetailRelated('overview')" id="detail-overview-tab" class="rounded-md px-4 py-2 text-sm font-semibold text-blue-700">Overview</button>
+                <button type="button" onclick="setDetailRelated('timeline')" id="detail-timeline-tab" class="rounded-md px-4 py-2 text-sm font-semibold text-gray-500 hover:text-gray-700">Timeline</button>
+            </div>
+            <div id="detail-content" class="space-y-4"></div>
+        </main>
+    </div>
+</aside>
+
+{{ crm_custom_fields|json_script:"crm-custom-fields-data" }}
+
+<script>
+    const crmState = {
+        activeTab: '{{ crm_initial_tab|default:"accounts" }}',
+        recordType: '{{ crm_initial_tab|default:"accounts" }}',
+        accounts: [],
+        contacts: [],
+        properties: [],
+        payment_methods: [],
+        jobs: [],
+        search: '',
+        detailType: null,
+        detailRecord: null,
+        detailRelated: 'overview',
+    };
+
+    const crmCustomFields = JSON.parse(document.getElementById('crm-custom-fields-data')?.textContent || '[]');
+    const detailTypeMeta = {
+        accounts: { singular: 'account', label: 'Account', badge: 'CRM Account' },
+        contacts: { singular: 'contact', label: 'Contact', badge: 'CRM Contact' },
+        properties: { singular: 'property', label: 'Property', badge: 'CRM Property' },
+        payment_methods: { singular: 'payment_method', label: 'Payment Method', badge: 'Billing' },
+    };
+
+    const relatedListDefinitions = [
+        { key: 'overview', label: 'Overview' },
+        { key: 'notes', label: 'Notes' },
+        { key: 'connected_records', label: 'Connected Records' },
+        { key: 'attachments', label: 'Attachments' },
+        { key: 'potentials', label: 'Potentials' },
+        { key: 'open_activities', label: 'Open Activities' },
+        { key: 'closed_activities', label: 'Closed Activities' },
+        { key: 'jobs', label: 'Jobs' },
+        { key: 'cases', label: 'Cases' },
+        { key: 'quotes', label: 'Quotes' },
+        { key: 'sales_orders', label: 'Sales Orders' },
+        { key: 'purchase_orders', label: 'Purchase Orders' },
+        { key: 'emails', label: 'Emails' },
+        { key: 'invoices', label: 'Invoices' },
+        { key: 'twilio_sms', label: 'SMS / Twilio' },
+        { key: 'timeline', label: 'Timeline' },
+    ];
+
+    const tableHeads = {
+        accounts: `
+            <tr>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Account</th>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Phone</th>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Billing Address</th>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Records</th>
+            </tr>`,
+        contacts: `
+            <tr>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Contact</th>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Account</th>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Email</th>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Phone</th>
+            </tr>`,
+        properties: `
+            <tr>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Property</th>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Account</th>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Address</th>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Access</th>
+            </tr>`,
+        payment_methods: `
+            <tr>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Payment Method</th>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Account</th>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Property</th>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Status</th>
+            </tr>`,
+    };
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function muted(value, fallback = '-') {
+        return value ? escapeHtml(value) : `<span class="text-gray-400">${fallback}</span>`;
+    }
+
+    async function fetchJson(url) {
+        const response = await fetch(url);
+        if (!response.ok) {
+            throw new Error(`Request failed: ${response.status}`);
+        }
+        return response.json();
+    }
+
+    async function loadCrmData() {
+        const errorEl = document.getElementById('crm-error');
+        errorEl.classList.add('hidden');
+
+        try {
+            const [accounts, contacts, properties, paymentMethods, jobs] = await Promise.all([
+                fetchJson('/api/v1/accounts/'),
+                fetchJson('/api/v1/contacts/'),
+                fetchJson('/api/v1/properties/'),
+                fetchJson('/api/v1/payment-methods/'),
+                fetchJson('/api/v1/jobs/'),
+            ]);
+
+            crmState.accounts = accounts;
+            crmState.contacts = contacts;
+            crmState.properties = properties;
+            crmState.payment_methods = paymentMethods;
+            crmState.jobs = jobs;
+            document.getElementById('stat-accounts').innerText = accounts.length;
+            document.getElementById('stat-contacts').innerText = contacts.length;
+            document.getElementById('stat-properties').innerText = properties.length;
+            document.getElementById('stat-payment-methods').innerText = paymentMethods.length;
+            renderCrmTable();
+            renderRecordForm();
+        } catch (error) {
+            console.error(error);
+            errorEl.innerText = 'Unable to load CRM data. Check your workspace access and try again.';
+            errorEl.classList.remove('hidden');
+        }
+    }
+
+    function setCrmTab(tab) {
+        crmState.activeTab = tab;
+        crmState.recordType = tab;
+        renderCrmTable();
+        updateTabStyles();
+        renderRecordForm();
+    }
+
+    function updateTabStyles() {
+        document.querySelectorAll('.crm-tab').forEach(button => {
+            const active = button.dataset.tab === crmState.activeTab;
+            button.classList.toggle('bg-white', active);
+            button.classList.toggle('text-blue-700', active);
+            button.classList.toggle('shadow-sm', active);
+        });
+
+        document.querySelectorAll('.record-type').forEach(button => {
+            const active = button.dataset.type === crmState.recordType;
+            button.classList.toggle('border-blue-200', active);
+            button.classList.toggle('bg-blue-50', active);
+            button.classList.toggle('text-blue-700', active);
+        });
+    }
+
+    function recordMatches(record) {
+        const query = crmState.search.trim().toLowerCase();
+        if (!query) return true;
+        return JSON.stringify(record).toLowerCase().includes(query);
+    }
+
+    function tabLabel(tab) {
+        const labels = {
+            accounts: 'accounts',
+            contacts: 'contacts',
+            properties: 'properties',
+            payment_methods: 'payment methods',
+        };
+        return labels[tab] || 'records';
+    }
+
+    function renderCrmTable() {
+        const head = document.getElementById('crm-table-head');
+        const body = document.getElementById('crm-table-body');
+        const tab = crmState.activeTab;
+        const records = crmState[tab].filter(recordMatches);
+
+        head.innerHTML = tableHeads[tab];
+        if (!records.length) {
+            body.innerHTML = `
+                <tr>
+                    <td colspan="4" class="px-4 py-12 text-center">
+                        <p class="font-semibold text-gray-700">No ${tabLabel(tab)} found.</p>
+                        <p class="mt-1 text-sm text-gray-500">Create a record or adjust your search.</p>
+                    </td>
+                </tr>`;
+            return;
+        }
+
+        if (tab === 'accounts') {
+            body.innerHTML = records.map(account => `
+                <tr class="cursor-pointer hover:bg-gray-50" onclick="openRecordDetail('accounts', ${account.id})">
+                    <td class="px-4 py-3">
+                        <div class="font-bold text-gray-950">${escapeHtml(account.name)}</div>
+                        <div class="text-xs text-gray-400">#${account.id}</div>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${muted(account.phone)}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${muted(account.billing_address, 'No billing address')}</td>
+                    <td class="px-4 py-3">
+                        <div class="flex flex-wrap gap-1">
+                            <span class="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">${account.contact_count || 0} contacts</span>
+                            <span class="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">${account.property_count || 0} properties</span>
+                        </div>
+                    </td>
+                </tr>`).join('');
+            return;
+        }
+
+        if (tab === 'contacts') {
+            body.innerHTML = records.map(contact => `
+                <tr class="cursor-pointer hover:bg-gray-50" onclick="openRecordDetail('contacts', ${contact.id})">
+                    <td class="px-4 py-3">
+                        <div class="font-bold text-gray-950">${escapeHtml(`${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unnamed contact')}</div>
+                        <div class="text-xs text-gray-400">#${contact.id}</div>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${muted(contact.account_details?.name, 'No account')}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${muted(contact.email, 'No email')}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${muted(contact.phone, 'No phone')}</td>
+                </tr>`).join('');
+            return;
+        }
+
+        if (tab === 'payment_methods') {
+            body.innerHTML = records.map(method => `
+                <tr class="cursor-pointer hover:bg-gray-50" onclick="openRecordDetail('payment_methods', ${method.id})">
+                    <td class="px-4 py-3">
+                        <div class="font-bold text-gray-950">${escapeHtml(method.card_type || 'Card')} ending ${escapeHtml(method.last_four)}</div>
+                        <div class="text-xs text-gray-400">Expires ${escapeHtml(method.expiration_date || 'not set')}</div>
+                    </td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${muted(method.account_details?.name, 'No account')}</td>
+                    <td class="px-4 py-3 text-sm text-gray-600">${muted(method.property_name, 'General billing')}</td>
+                    <td class="px-4 py-3">
+                        ${method.is_default ? '<span class="rounded-full bg-emerald-50 px-2 py-1 text-xs font-bold text-emerald-700">Default</span>' : '<span class="rounded-full bg-gray-100 px-2 py-1 text-xs font-semibold text-gray-600">Stored</span>'}
+                    </td>
+                </tr>`).join('');
+            return;
+        }
+
+        body.innerHTML = records.map(property => `
+            <tr class="cursor-pointer hover:bg-gray-50" onclick="openRecordDetail('properties', ${property.id})">
+                <td class="px-4 py-3">
+                    <div class="font-bold text-gray-950">${escapeHtml(property.name)}</div>
+                    <div class="text-xs text-gray-400">#${property.id}</div>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-600">${muted(property.account_details?.name, 'No account')}</td>
+                <td class="px-4 py-3 text-sm text-gray-600">
+                    ${muted(property.address, 'No address')}
+                    ${property.unit_number ? `<span class="ml-1 font-semibold text-gray-900">Unit ${escapeHtml(property.unit_number)}</span>` : ''}
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-600">${muted(property.gate_code, 'No gate code')}</td>
+            </tr>`).join('');
+    }
+
+    function findRecord(type, id) {
+        return (crmState[type] || []).find(record => String(record.id) === String(id));
+    }
+
+    function recordName(type, record) {
+        if (!record) return 'Record';
+        if (type === 'contacts') {
+            return `${record.first_name || ''} ${record.last_name || ''}`.trim() || 'Unnamed contact';
+        }
+        if (type === 'payment_methods') {
+            return `${record.card_type || 'Card'} ending ${record.last_four || '----'}`;
+        }
+        return record.name || `Record #${record.id}`;
+    }
+
+    function recordSubtitle(type, record) {
+        if (!record) return '';
+        if (type === 'accounts') {
+            return record.phone || record.billing_address || 'Account profile';
+        }
+        if (type === 'contacts') {
+            return [record.account_details?.name, record.email, record.phone].filter(Boolean).join(' / ') || 'Contact profile';
+        }
+        if (type === 'properties') {
+            return [record.account_details?.name, record.address, record.unit_number ? `Unit ${record.unit_number}` : ''].filter(Boolean).join(' / ') || 'Property profile';
+        }
+        return [record.account_details?.name, record.property_name || 'General billing'].filter(Boolean).join(' / ');
+    }
+
+    function recordInitial(type, record) {
+        return recordName(type, record).trim().charAt(0) || '?';
+    }
+
+    function customFieldsFor(type) {
+        const target = detailTypeMeta[type]?.singular;
+        return crmCustomFields.filter(field => field.target_model === target);
+    }
+
+    function customValue(record, field) {
+        const value = record?.custom_data?.[field.internal_name];
+        if (value === true) return 'Yes';
+        if (value === false) return 'No';
+        if (Array.isArray(value)) return value.join(', ');
+        return value || '';
+    }
+
+    function jobsForRecord(type, record) {
+        if (!record) return [];
+        if (type === 'accounts') {
+            return crmState.jobs.filter(job => String(job.account) === String(record.id));
+        }
+        if (type === 'contacts') {
+            return crmState.jobs.filter(job => String(job.account) === String(record.account));
+        }
+        if (type === 'properties') {
+            return crmState.jobs.filter(job => String(job.property) === String(record.id));
+        }
+        return [];
+    }
+
+    function connectedRecordsFor(type, record) {
+        if (!record) return [];
+        if (type === 'accounts') {
+            return [
+                ...crmState.contacts.filter(item => String(item.account) === String(record.id)).map(item => ({ type: 'Contact', name: recordName('contacts', item), detail: item.email || item.phone || 'No contact info' })),
+                ...crmState.properties.filter(item => String(item.account) === String(record.id)).map(item => ({ type: 'Property', name: item.name, detail: item.address || 'No address' })),
+                ...crmState.payment_methods.filter(item => String(item.account) === String(record.id)).map(item => ({ type: 'Payment', name: recordName('payment_methods', item), detail: item.property_name || 'General billing' })),
+            ];
+        }
+        if (type === 'contacts') {
+            const account = findRecord('accounts', record.account);
+            return account ? [{ type: 'Account', name: account.name, detail: account.phone || account.billing_address || 'Account record' }] : [];
+        }
+        if (type === 'properties') {
+            const account = findRecord('accounts', record.account);
+            return account ? [{ type: 'Account', name: account.name, detail: account.phone || account.billing_address || 'Account record' }] : [];
+        }
+        const account = findRecord('accounts', record.account);
+        const property = record.assigned_property ? findRecord('properties', record.assigned_property) : null;
+        return [
+            account ? { type: 'Account', name: account.name, detail: account.phone || 'Account record' } : null,
+            property ? { type: 'Property', name: property.name, detail: property.address || 'Property record' } : null,
+        ].filter(Boolean);
+    }
+
+    function relatedCount(key, type, record) {
+        const jobs = jobsForRecord(type, record);
+        const openJobs = jobs.filter(job => !['completed', 'canceled'].includes(job.status));
+        const closedJobs = jobs.filter(job => ['completed', 'canceled'].includes(job.status));
+        const connected = connectedRecordsFor(type, record);
+
+        const counts = {
+            overview: 0,
+            timeline: jobs.length,
+            notes: record?.custom_data?.notes ? 1 : 0,
+            connected_records: connected.length,
+            attachments: 0,
+            potentials: 0,
+            open_activities: openJobs.length,
+            closed_activities: closedJobs.length,
+            jobs: jobs.length,
+            cases: 0,
+            quotes: 0,
+            sales_orders: 0,
+            purchase_orders: 0,
+            emails: 0,
+            invoices: 0,
+            twilio_sms: Number(record?.custom_data?.sms_count || 0),
+        };
+        return counts[key] || 0;
+    }
+
+    function detailRow(label, value) {
+        return `
+            <div class="rounded-lg border border-gray-200 bg-white p-4">
+                <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">${escapeHtml(label)}</div>
+                <div class="mt-1 text-sm text-gray-900">${value ? escapeHtml(value) : '<span class="text-gray-400">Not set</span>'}</div>
+            </div>`;
+    }
+
+    function renderDetailOverview(type, record) {
+        const customFields = customFieldsFor(type);
+        const coreRows = {
+            accounts: [
+                ['Phone', record.phone],
+                ['Billing Address', record.billing_address],
+                ['Contact Records', String(record.contact_count || 0)],
+                ['Property Records', String(record.property_count || 0)],
+            ],
+            contacts: [
+                ['Account', record.account_details?.name],
+                ['Email', record.email],
+                ['Phone', record.phone],
+                ['Primary Contact', record.is_primary ? 'Yes' : 'No'],
+            ],
+            properties: [
+                ['Account', record.account_details?.name],
+                ['Address', record.address],
+                ['Unit / Suite', record.unit_number],
+                ['Gate Code', record.gate_code],
+            ],
+            payment_methods: [
+                ['Account', record.account_details?.name],
+                ['Payment Method', recordName(type, record)],
+                ['Property Restriction', record.property_name || 'General billing'],
+                ['Default', record.is_default ? 'Yes' : 'No'],
+            ],
+        }[type] || [];
+
+        return `
+            <section class="rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div class="border-b border-gray-200 px-4 py-3">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Record Details</h3>
+                </div>
+                <div class="grid grid-cols-1 gap-3 p-4 md:grid-cols-2 xl:grid-cols-4">
+                    ${coreRows.map(([label, value]) => detailRow(label, value)).join('')}
+                </div>
+            </section>
+            <section class="rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div class="flex items-center justify-between gap-3 border-b border-gray-200 px-4 py-3">
+                    <div>
+                        <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Custom Fields</h3>
+                        <p class="mt-1 text-xs text-gray-500">Configured from Company Setup.</p>
+                    </div>
+                    <a href="{% url 'admin_console' %}#custom-fields" class="text-sm font-semibold text-blue-600 hover:text-blue-700">Customize</a>
+                </div>
+                <div class="grid grid-cols-1 gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
+                    ${customFields.length ? customFields.map(field => detailRow(field.label, customValue(record, field))).join('') : '<div class="col-span-full rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-500">No custom fields configured for this module yet.</div>'}
+                </div>
+            </section>`;
+    }
+
+    function simpleEmptyState(title, copy, actionLabel = 'Configure module', actionKey = null) {
+        const action = actionKey
+            ? `<button type="button" onclick="setDetailRelated('${actionKey}')" class="mt-4 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">${actionLabel}</button>`
+            : `<a href="{% url 'admin_console' %}#custom-fields" class="mt-4 inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">${actionLabel}</a>`;
+        return `
+            <section class="rounded-lg border border-gray-200 bg-white p-8 text-center shadow-sm">
+                <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                    <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h6m-8 8h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>
+                </div>
+                <h3 class="mt-4 text-base font-semibold text-gray-950">${escapeHtml(title)}</h3>
+                <p class="mx-auto mt-2 max-w-xl text-sm text-gray-500">${escapeHtml(copy)}</p>
+                ${action}
+            </section>`;
+    }
+
+    function renderConnectedRecords(type, record) {
+        const rows = connectedRecordsFor(type, record);
+        if (!rows.length) {
+            return simpleEmptyState('No connected records yet', 'Accounts, contacts, properties, payment methods, and jobs will appear here as they are linked.');
+        }
+        return `
+            <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div class="border-b border-gray-200 px-4 py-3">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Connected Records</h3>
+                </div>
+                <div class="divide-y divide-gray-100">
+                    ${rows.map(row => `
+                        <div class="flex items-start justify-between gap-3 px-4 py-3">
+                            <div>
+                                <div class="text-sm font-semibold text-gray-950">${escapeHtml(row.name)}</div>
+                                <div class="mt-1 text-xs text-gray-500">${escapeHtml(row.detail)}</div>
+                            </div>
+                            <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">${escapeHtml(row.type)}</span>
+                        </div>`).join('')}
+                </div>
+            </section>`;
+    }
+
+    function renderJobsList(type, record, mode = 'all') {
+        const allJobs = jobsForRecord(type, record);
+        const jobs = mode === 'open'
+            ? allJobs.filter(job => !['completed', 'canceled'].includes(job.status))
+            : mode === 'closed'
+                ? allJobs.filter(job => ['completed', 'canceled'].includes(job.status))
+                : allJobs;
+
+        if (!jobs.length) {
+            return simpleEmptyState('No activities yet', 'Jobs, calls, meetings, and tasks connected to this record will appear here.');
+        }
+
+        return `
+            <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div class="border-b border-gray-200 px-4 py-3">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700">${mode === 'closed' ? 'Closed Activities' : mode === 'open' ? 'Open Activities' : 'Jobs'}</h3>
+                </div>
+                <div class="divide-y divide-gray-100">
+                    ${jobs.map(job => `
+                        <div class="px-4 py-3">
+                            <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <div>
+                                    <div class="text-sm font-semibold text-gray-950">${escapeHtml(job.title)}</div>
+                                    <div class="mt-1 text-xs text-gray-500">${escapeHtml(job.property_address || job.location_address || 'No location set')}</div>
+                                </div>
+                                <span class="w-fit rounded-full bg-blue-50 px-2.5 py-1 text-xs font-medium capitalize text-blue-700">${escapeHtml((job.status || '').replace('_', ' '))}</span>
+                            </div>
+                        </div>`).join('')}
+                </div>
+            </section>`;
+    }
+
+    function renderIntegrationPanel(key) {
+        if (key === 'emails') {
+            return `
+                <section class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+                    <h3 class="text-base font-semibold text-gray-950">Workspace Email Channel</h3>
+                    <p class="mt-2 text-sm text-gray-500">Email is configured at the workspace brand level with verified domains and shared sender mailboxes.</p>
+                    <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                        ${detailRow('Supported Methods', 'Google Workspace, Microsoft 365 / Exchange, IMAP, POP, SMTP')}
+                        ${detailRow('Storage Plan', 'Workspace channel settings with encrypted secret references')}
+                        ${detailRow('CRM Placement', 'Emails related list and timeline')}
+                    </div>
+                    <div class="mt-4 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">Configure domains and mailboxes in Workspace Setup under Channels.</div>
+                </section>`;
+        }
+
+        return `
+            <section class="rounded-lg border border-gray-200 bg-white p-6 shadow-sm">
+                <h3 class="text-base font-semibold text-gray-950">Workspace Twilio Channel</h3>
+                <p class="mt-2 text-sm text-gray-500">Twilio should work as a workspace channel, with numbers and messaging history attached back to Contacts and Accounts.</p>
+                <div class="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+                    ${detailRow('Objects', 'SMS Messages, Twilio History, Twilio Inbox')}
+                    ${detailRow('Connection Level', 'Workspace account with assignable sender numbers')}
+                    ${detailRow('CRM Placement', 'SMS / Twilio related list and timeline')}
+                </div>
+                    <div class="mt-4 rounded-lg border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">Next backend slice: Twilio workspace connection, webhook endpoints, message sync, and sender-number assignment.</div>
+            </section>`;
+    }
+
+    function renderTimeline(type, record) {
+        const jobs = jobsForRecord(type, record);
+        const customFields = customFieldsFor(type).length;
+        return `
+            <section class="rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div class="border-b border-gray-200 px-4 py-3">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Timeline</h3>
+                </div>
+                <div class="space-y-4 p-4">
+                    <div class="flex gap-3">
+                        <span class="mt-1 h-2.5 w-2.5 rounded-full bg-blue-600"></span>
+                        <div>
+                            <p class="text-sm font-semibold text-gray-950">Record opened in CRM workspace</p>
+                            <p class="mt-1 text-xs text-gray-500">Live timeline will combine notes, emails, SMS, calls, jobs, and attachments.</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-3">
+                        <span class="mt-1 h-2.5 w-2.5 rounded-full bg-emerald-500"></span>
+                        <div>
+                            <p class="text-sm font-semibold text-gray-950">${jobs.length} linked job${jobs.length === 1 ? '' : 's'}</p>
+                            <p class="mt-1 text-xs text-gray-500">Dispatch activity already has a path into this timeline.</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-3">
+                        <span class="mt-1 h-2.5 w-2.5 rounded-full bg-violet-500"></span>
+                        <div>
+                            <p class="text-sm font-semibold text-gray-950">${customFields} configured custom field${customFields === 1 ? '' : 's'}</p>
+                            <p class="mt-1 text-xs text-gray-500">Module customization is driven by Company Setup.</p>
+                        </div>
+                    </div>
+                </div>
+            </section>`;
+    }
+
+    function renderRelatedContent() {
+        const type = crmState.detailType;
+        const record = crmState.detailRecord;
+        const key = crmState.detailRelated;
+        const content = document.getElementById('detail-content');
+        if (!type || !record || !content) return;
+
+        document.getElementById('detail-overview-tab').classList.toggle('bg-blue-50', key === 'overview');
+        document.getElementById('detail-overview-tab').classList.toggle('text-blue-700', key === 'overview');
+        document.getElementById('detail-timeline-tab').classList.toggle('bg-blue-50', key === 'timeline');
+        document.getElementById('detail-timeline-tab').classList.toggle('text-blue-700', key === 'timeline');
+
+        if (key === 'overview') {
+            content.innerHTML = renderDetailOverview(type, record);
+        } else if (key === 'connected_records') {
+            content.innerHTML = renderConnectedRecords(type, record);
+        } else if (key === 'open_activities') {
+            content.innerHTML = renderJobsList(type, record, 'open');
+        } else if (key === 'closed_activities') {
+            content.innerHTML = renderJobsList(type, record, 'closed');
+        } else if (key === 'jobs') {
+            content.innerHTML = renderJobsList(type, record, 'all');
+        } else if (key === 'emails' || key === 'twilio_sms') {
+            content.innerHTML = renderIntegrationPanel(key);
+        } else if (key === 'timeline') {
+            content.innerHTML = renderTimeline(type, record);
+        } else {
+            const definition = relatedListDefinitions.find(item => item.key === key);
+            content.innerHTML = simpleEmptyState(
+                `${definition?.label || 'Related list'} is ready for data`,
+                'This module placeholder gives us the Zoho-style navigation now, while the backend object can be added cleanly as the feature comes online.'
+            );
+        }
+    }
+
+    function renderRelatedNav() {
+        const nav = document.getElementById('detail-related-nav');
+        const type = crmState.detailType;
+        const record = crmState.detailRecord;
+        if (!nav || !type || !record) return;
+
+        nav.innerHTML = relatedListDefinitions.map(item => {
+            const count = relatedCount(item.key, type, record);
+            const active = crmState.detailRelated === item.key;
+            return `
+                <button type="button" onclick="setDetailRelated('${item.key}')" class="flex w-full items-center justify-between gap-2 rounded-lg px-3 py-2 text-left text-sm transition-colors ${active ? 'bg-blue-50 font-semibold text-blue-700' : 'text-gray-700 hover:bg-gray-50'}">
+                    <span class="truncate">${escapeHtml(item.label)}</span>
+                    ${count ? `<span class="rounded-full bg-gray-100 px-2 py-0.5 text-xs font-medium text-gray-600">${count}</span>` : ''}
+                </button>`;
+        }).join('') + `
+            <a href="{% url 'admin_console' %}#custom-fields" class="mt-2 flex w-full items-center rounded-lg px-3 py-2 text-sm font-semibold text-blue-600 hover:bg-blue-50 xl:mt-3">Add Related List</a>`;
+    }
+
+    function openRecordDetail(type, id) {
+        const record = findRecord(type, id);
+        if (!record) return;
+
+        crmState.detailType = type;
+        crmState.detailRecord = record;
+        crmState.detailRelated = 'overview';
+
+        document.getElementById('detail-title').innerText = recordName(type, record);
+        document.getElementById('detail-subtitle').innerText = recordSubtitle(type, record);
+        document.getElementById('detail-avatar').innerText = recordInitial(type, record);
+        document.getElementById('detail-type-badge').innerText = detailTypeMeta[type]?.badge || 'CRM';
+
+        renderRelatedNav();
+        renderRelatedContent();
+        document.getElementById('detail-overlay').classList.remove('hidden');
+        document.getElementById('detail-panel').classList.remove('translate-x-full');
+    }
+
+    function setDetailRelated(key) {
+        crmState.detailRelated = key;
+        renderRelatedNav();
+        renderRelatedContent();
+    }
+
+    function closeRecordDetail() {
+        document.getElementById('detail-panel').classList.add('translate-x-full');
+        document.getElementById('detail-overlay').classList.add('hidden');
+    }
+
+    function accountOptions() {
+        if (!crmState.accounts.length) {
+            return '<option value="">Create an account first</option>';
+        }
+
+        return [
+            '<option value="" disabled selected>Select account...</option>',
+            ...crmState.accounts.map(account => `<option value="${account.id}">${escapeHtml(account.name)}</option>`),
+        ].join('');
+    }
+
+    function propertyOptions() {
+        return [
+            '<option value="" selected>General billing</option>',
+            ...crmState.properties.map(property => `<option value="${property.id}">${escapeHtml(property.name)} - ${escapeHtml(property.account_details?.name || 'No account')}</option>`),
+        ].join('');
+    }
+
+    function field(label, id, attrs = '') {
+        return `
+            <label class="block">
+                <span class="text-sm font-semibold text-gray-700">${label}</span>
+                <input id="${id}" ${attrs} class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+            </label>`;
+    }
+
+    function renderRecordForm() {
+        const fields = document.getElementById('record-form-fields');
+        const title = document.getElementById('record-panel-title');
+        const eyebrow = document.getElementById('record-panel-eyebrow');
+        const type = crmState.recordType;
+
+        updateTabStyles();
+        eyebrow.innerText = type === 'accounts' ? 'CRM Account' : type === 'contacts' ? 'CRM Contact' : type === 'properties' ? 'CRM Property' : 'CRM Payment';
+        title.innerText = type === 'accounts' ? 'New Account' : type === 'contacts' ? 'New Contact' : type === 'properties' ? 'New Property' : 'New Payment Method';
+
+        if (type === 'accounts') {
+            fields.innerHTML = `
+                ${field('Account Name', 'record-name', 'required placeholder="Client or property name"')}
+                ${field('Main Phone', 'record-phone', 'placeholder="(555) 000-0000"')}
+                <label class="block">
+                    <span class="text-sm font-semibold text-gray-700">Billing Address</span>
+                    <textarea id="record-billing-address" rows="4" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"></textarea>
+                </label>`;
+            return;
+        }
+
+        if (type === 'contacts') {
+            fields.innerHTML = `
+                <label class="block">
+                    <span class="text-sm font-semibold text-gray-700">Account</span>
+                    <select id="record-account" required class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${accountOptions()}</select>
+                </label>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    ${field('First Name', 'record-first-name', 'required')}
+                    ${field('Last Name', 'record-last-name', 'required')}
+                </div>
+                ${field('Email', 'record-email', 'type="email" required')}
+                ${field('Phone', 'record-phone', 'placeholder="(555) 000-0000"')}`;
+            return;
+        }
+
+        if (type === 'payment_methods') {
+            fields.innerHTML = `
+                <label class="block">
+                    <span class="text-sm font-semibold text-gray-700">Account</span>
+                    <select id="record-account" required class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${accountOptions()}</select>
+                </label>
+                <label class="block">
+                    <span class="text-sm font-semibold text-gray-700">Property Restriction</span>
+                    <select id="record-property" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${propertyOptions()}</select>
+                </label>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    ${field('Card Type', 'record-card-type', 'placeholder="Visa"')}
+                    ${field('Last Four', 'record-last-four', 'required maxlength="4" inputmode="numeric" placeholder="4242"')}
+                </div>
+                ${field('Expiration', 'record-expiration', 'placeholder="MM/YYYY"')}
+                <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700">
+                    <input id="record-is-default" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                    Default payment method
+                </label>`;
+            return;
+        }
+
+        fields.innerHTML = `
+            <label class="block">
+                <span class="text-sm font-semibold text-gray-700">Account</span>
+                <select id="record-account" required class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${accountOptions()}</select>
+            </label>
+            ${field('Property Name', 'record-name', 'required placeholder="Main Office"')}
+            ${field('Address', 'record-address', 'required placeholder="1170 N Federal Highway, Fort Lauderdale, FL"')}
+            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                ${field('Unit / Suite', 'record-unit', 'placeholder="Unit 204"')}
+                ${field('Gate Code', 'record-gate-code', 'placeholder="Optional"')}
+            </div>`;
+    }
+
+    function setRecordType(type) {
+        crmState.recordType = type;
+        renderRecordForm();
+    }
+
+    function openRecordPanel(type = crmState.activeTab) {
+        crmState.recordType = type;
+        renderRecordForm();
+        document.getElementById('record-overlay').classList.remove('hidden');
+        document.getElementById('record-panel').classList.remove('translate-x-full');
+    }
+
+    function closeRecordPanel() {
+        document.getElementById('record-panel').classList.add('translate-x-full');
+        document.getElementById('record-overlay').classList.add('hidden');
+        document.getElementById('record-form').reset();
+    }
+
+    function payloadForType(type) {
+        if (type === 'accounts') {
+            return {
+                name: document.getElementById('record-name').value,
+                phone: document.getElementById('record-phone').value,
+                billing_address: document.getElementById('record-billing-address').value,
+            };
+        }
+
+        if (type === 'contacts') {
+            return {
+                account: document.getElementById('record-account').value,
+                first_name: document.getElementById('record-first-name').value,
+                last_name: document.getElementById('record-last-name').value,
+                email: document.getElementById('record-email').value,
+                phone: document.getElementById('record-phone').value,
+            };
+        }
+
+        if (type === 'payment_methods') {
+            return {
+                account: document.getElementById('record-account').value,
+                assigned_property: document.getElementById('record-property').value || null,
+                card_type: document.getElementById('record-card-type').value,
+                last_four: document.getElementById('record-last-four').value,
+                expiration_date: document.getElementById('record-expiration').value,
+                is_default: document.getElementById('record-is-default').checked,
+            };
+        }
+
+        return {
+            account: document.getElementById('record-account').value,
+            name: document.getElementById('record-name').value,
+            address: document.getElementById('record-address').value,
+            unit_number: document.getElementById('record-unit').value,
+            gate_code: document.getElementById('record-gate-code').value,
+        };
+    }
+
+    function endpointForType(type) {
+        return type === 'payment_methods' ? 'payment-methods' : type;
+    }
+
+    document.getElementById('crm-search').addEventListener('input', event => {
+        crmState.search = event.target.value;
+        renderCrmTable();
+    });
+
+    document.getElementById('record-form').addEventListener('submit', async event => {
+        event.preventDefault();
+        const type = crmState.recordType;
+        try {
+            const response = await fetch(`/api/v1/${endpointForType(type)}/`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken'),
+                },
+                body: JSON.stringify(payloadForType(type)),
+            });
+
+            if (!response.ok) {
+                const data = await response.json();
+                alert(`Could not save record: ${JSON.stringify(data)}`);
+                return;
+            }
+
+            closeRecordPanel();
+            crmState.activeTab = type;
+            await loadCrmData();
+            setCrmTab(type);
+        } catch (error) {
+            console.error(error);
+            alert('Network error while saving the CRM record.');
+        }
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        setCrmTab(crmState.activeTab);
+        loadCrmData();
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,15 @@
+.git
+.gitignore
+.env
+.env.*
+__pycache__
+*.py[cod]
+.venv
+venv
+staticfiles
+media
+*.tgz
+*.tar.gz
+*.save
+*.save.*
+

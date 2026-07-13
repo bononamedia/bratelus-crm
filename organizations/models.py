@@ -1,0 +1,238 @@
+from django.db import models
+from django.contrib.auth.models import User
+import uuid
+
+# ---------------------------------------------------------
+# CORE TENANT MODELS
+# ---------------------------------------------------------
+class Workspace(models.Model):
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    slug = models.SlugField(unique=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'workspaces_workspace'
+
+    def __str__(self):
+        return self.name
+
+class WorkspaceMember(models.Model):
+    ROLE_CHOICES = [('admin', 'Admin'), ('manager', 'Manager'), ('worker', 'Field Worker')]
+    
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='members')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='workspaces')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='worker')
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'workspaces_workspacemember'
+
+    def __str__(self):
+        return f"{self.user.username} - {self.workspace.name} ({self.role})"
+
+
+# ---------------------------------------------------------
+# WORKSPACE CHANNELS (EMAIL / DOMAIN SETUP)
+# ---------------------------------------------------------
+class WorkspaceEmailDomain(models.Model):
+    """A verified sending domain owned by a workspace brand."""
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='email_domains')
+    domain = models.CharField(max_length=255)
+    is_verified = models.BooleanField(default=False)
+    verification_notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'workspaces_emaildomain'
+        unique_together = ('workspace', 'domain')
+        ordering = ('domain',)
+
+    def __str__(self):
+        return f"{self.domain} ({self.workspace.name})"
+
+
+class WorkspaceEmailConnection(models.Model):
+    """Mailbox or provider connection configured at the workspace level."""
+    CONNECTION_TYPES = [
+        ('google_workspace', 'Google Workspace'),
+        ('microsoft_365', 'Microsoft 365 / Exchange'),
+        ('imap_smtp', 'IMAP + SMTP'),
+        ('pop3_smtp', 'POP3 + SMTP'),
+        ('exchange', 'Exchange Server'),
+    ]
+    STATUS_CHOICES = [
+        ('draft', 'Draft'),
+        ('needs_auth', 'Needs Auth'),
+        ('active', 'Active'),
+        ('error', 'Error'),
+    ]
+
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='email_connections')
+    domain = models.ForeignKey(
+        WorkspaceEmailDomain,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='connections',
+    )
+    display_name = models.CharField(max_length=150)
+    from_email = models.EmailField()
+    connection_type = models.CharField(max_length=40, choices=CONNECTION_TYPES, default='imap_smtp')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='draft')
+    incoming_host = models.CharField(max_length=255, blank=True)
+    incoming_port = models.PositiveIntegerField(null=True, blank=True)
+    outgoing_host = models.CharField(max_length=255, blank=True)
+    outgoing_port = models.PositiveIntegerField(null=True, blank=True)
+    use_ssl = models.BooleanField(default=True)
+    username = models.CharField(max_length=255, blank=True)
+    secret_reference = models.CharField(
+        max_length=255,
+        blank=True,
+        help_text='Reference to encrypted credentials or OAuth token storage.',
+    )
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'workspaces_emailconnection'
+        ordering = ('from_email',)
+
+    def __str__(self):
+        return f"{self.from_email} ({self.workspace.name})"
+
+
+# ---------------------------------------------------------
+# THE WORKFORCE ENGINE
+# ---------------------------------------------------------
+class WorkerProfile(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE)
+    # Changed to ManyToMany so a user can belong to multiple organizations!
+    workspaces = models.ManyToManyField(Workspace, related_name='workers')
+    
+    phone = models.CharField(max_length=20, blank=True)
+    is_admin = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'workspaces_workerprofile'
+
+    def __str__(self):
+        return f"{self.user.get_full_name()} Profile"
+
+# ---------------------------------------------------------
+# THE CUSTOM FIELD BUILDER
+# ---------------------------------------------------------
+class CustomField(models.Model):
+    """Defines a custom field created by a Tenant Admin"""
+    FIELD_TYPES = [
+        ('text', 'Short Text'),
+        ('textarea', 'Paragraph'),
+        ('number', 'Number'),
+        ('date', 'Date'),
+        ('dropdown', 'Dropdown List'),
+        ('boolean', 'Checkbox')
+    ]
+    
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='custom_fields')
+    target_model = models.CharField(max_length=50) 
+    
+    label = models.CharField(max_length=100)           
+    internal_name = models.CharField(max_length=100)   
+    field_type = models.CharField(max_length=20, choices=FIELD_TYPES)
+    
+    options = models.JSONField(default=list, blank=True)
+    is_required = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = 'workspaces_customfield'
+
+    def __str__(self):
+        return f"{self.target_model} -> {self.label}"
+
+
+# ---------------------------------------------------------
+# THE FORM LAYOUT ENGINE
+# ---------------------------------------------------------
+class FormLayout(models.Model):
+    """Stores the drag-and-drop form layout for a specific model"""
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='form_layouts')
+    target_model = models.CharField(max_length=50) 
+    
+    layout_json = models.JSONField(default=list)
+
+    class Meta:
+        db_table = 'workspaces_formlayout'
+
+    def __str__(self):
+        return f"{self.workspace.name} - {self.target_model} Form"
+
+
+# ---------------------------------------------------------
+# THE DASHBOARD ENGINE
+# ---------------------------------------------------------
+class DashboardWidget(models.Model):
+    """Stores the size and position of widgets on a user's dashboard"""
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='dashboard_widgets')
+    
+    widget_type = models.CharField(max_length=50)
+    
+    width = models.IntegerField(default=2)
+    height = models.IntegerField(default=2)
+    x_position = models.IntegerField(default=0)
+    y_position = models.IntegerField(default=0)
+    
+    settings = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        db_table = 'workspaces_dashboardwidget'
+
+    def __str__(self):
+        return f"{self.user.username} - {self.widget_type}"
+    
+# ---------------------------------------------------------
+# THE FSM ROUTING ENGINE (SKILLS & TERRITORIES)
+# ---------------------------------------------------------
+class Skill(models.Model):
+    """The master list of services a tenant offers (e.g., 'Window Cleaning')"""
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='skills')
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+
+    class Meta:
+        db_table = 'workspaces_skill'
+
+    def __str__(self):
+        return f"{self.name} ({self.workspace.name})"
+
+class WorkerSkill(models.Model):
+    """Maps a worker to a skill with a specific proficiency level"""
+    PROFICIENCY_CHOICES = [
+        (1, 'Trainee / Helper'),
+        (2, 'Secondary / Competent'),
+        (3, 'Primary / Expert')
+    ]
+    
+    worker = models.ForeignKey('WorkerProfile', on_delete=models.CASCADE, related_name='skills')
+    skill = models.ForeignKey(Skill, on_delete=models.CASCADE, related_name='qualified_workers')
+    proficiency_level = models.IntegerField(choices=PROFICIENCY_CHOICES, default=3)
+
+    class Meta:
+        db_table = 'workspaces_workerskill'
+        unique_together = ('worker', 'skill') # A worker can't have the same skill listed twice
+
+    def __str__(self):
+        return f"{self.worker.user.first_name} - {self.skill.name} (Level {self.proficiency_level})"
+
+class ServiceZone(models.Model):
+    """Geofencing for dispatching (Keep it simple first: Map by Zip Codes)"""
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='service_zones')
+    name = models.CharField(max_length=100) # e.g., "North Broward County"
+    
+    # Store a list of zip codes this zone covers like: ["33301", "33302", "33304"]
+    active_zip_codes = models.JSONField(default=list)
+
+    class Meta:
+        db_table = 'workspaces_servicezone'
+
+    def __str__(self):
+        return f"{self.name} Zone"

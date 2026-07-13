@@ -1,0 +1,141 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl space-y-6">
+    <div class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-blue-600">{{ active_role_label }}</p>
+            <h1 class="mt-1 text-2xl md:text-3xl font-semibold text-gray-950">
+                {{ active_org.name|default:"Workspace" }} Command Center
+            </h1>
+            <p class="mt-1 text-sm text-gray-500">
+                {% if can_manage_dashboard %}
+                    CRM, dispatch, and team operations in one workspace.
+                {% else %}
+                    Your assigned work and field profile.
+                {% endif %}
+            </p>
+        </div>
+        {% if can_manage_dashboard %}
+        <div class="flex flex-col sm:flex-row gap-2">
+            <a href="{% url 'accounts' %}" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50">
+                Open CRM
+            </a>
+            <a href="{% url 'jobs' %}" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">
+                Dispatch Board
+            </a>
+        </div>
+        {% else %}
+        <a href="{% url 'employee_profile' %}" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">
+            Open My Work
+        </a>
+        {% endif %}
+    </div>
+
+    {% if can_manage_dashboard %}
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Action Required</p>
+            <p class="mt-2 text-3xl font-bold text-gray-950">{{ active_jobs }}</p>
+            <p class="mt-1 text-sm text-gray-500">Jobs waiting for dispatch.</p>
+        </div>
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">CRM Contacts</p>
+            <p class="mt-2 text-3xl font-bold text-gray-950">{{ new_leads }}</p>
+            <p class="mt-1 text-sm text-gray-500">People attached to accounts.</p>
+        </div>
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">My Open Work</p>
+            <p class="mt-2 text-3xl font-bold text-gray-950">{{ my_open_jobs_count }}</p>
+            <p class="mt-1 text-sm text-gray-500">Assignments tied to your profile.</p>
+        </div>
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Clocked In</p>
+            <p class="mt-2 text-3xl font-bold text-gray-950">{{ my_clocked_in_count }}</p>
+            <p class="mt-1 text-sm text-gray-500">Active shifts under your login.</p>
+        </div>
+    </div>
+
+    <div class="grid grid-cols-1 xl:grid-cols-3 gap-4">
+        <section class="xl:col-span-2 rounded-lg border border-gray-200 bg-white shadow-sm">
+            <div class="border-b border-gray-200 px-4 py-3">
+                <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Operational Shortcuts</h2>
+            </div>
+            <div class="grid grid-cols-1 sm:grid-cols-3 divide-y sm:divide-y-0 sm:divide-x divide-gray-100">
+                <a href="{% url 'accounts' %}" class="p-4 hover:bg-gray-50">
+                    <p class="font-semibold text-gray-950">CRM Workspace</p>
+                    <p class="mt-1 text-sm text-gray-500">Accounts, contacts, and properties.</p>
+                </a>
+                <a href="{% url 'jobs' %}" class="p-4 hover:bg-gray-50">
+                    <p class="font-semibold text-gray-950">Smart Dispatch</p>
+                    <p class="mt-1 text-sm text-gray-500">Map, jobs, and crew assignment.</p>
+                </a>
+                <a href="{% url 'admin_console' %}" class="p-4 hover:bg-gray-50">
+                    <p class="font-semibold text-gray-950">Company Setup</p>
+                    <p class="mt-1 text-sm text-gray-500">Fields, zones, skills, and workers.</p>
+                </a>
+            </div>
+        </section>
+
+        <section class="rounded-lg border border-gray-200 bg-white shadow-sm">
+            <div class="border-b border-gray-200 px-4 py-3">
+                <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Access Model</h2>
+            </div>
+            <div class="space-y-3 p-4 text-sm text-gray-600">
+                <div class="flex items-start gap-3">
+                    <span class="mt-1 h-2 w-2 rounded-full bg-blue-600"></span>
+                    <p><strong class="text-gray-900">Superadmin</strong> manages the whole platform through Django admin.</p>
+                </div>
+                <div class="flex items-start gap-3">
+                    <span class="mt-1 h-2 w-2 rounded-full bg-emerald-500"></span>
+                    <p><strong class="text-gray-900">Company Admin</strong> manages CRM, dispatch, team setup, skills, zones, and fields.</p>
+                </div>
+                <div class="flex items-start gap-3">
+                    <span class="mt-1 h-2 w-2 rounded-full bg-amber-400"></span>
+                    <p><strong class="text-gray-900">Employee</strong> sees assigned jobs and their own field profile.</p>
+                </div>
+            </div>
+        </section>
+    </div>
+    {% else %}
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Open Jobs</p>
+            <p class="mt-2 text-3xl font-bold text-gray-950">{{ my_open_jobs_count }}</p>
+        </div>
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Clocked In</p>
+            <p class="mt-2 text-3xl font-bold text-gray-950">{{ my_clocked_in_count }}</p>
+        </div>
+        <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Profile</p>
+            <p class="mt-2 text-lg font-bold text-gray-950">{{ worker_profile.phone|default:"No phone" }}</p>
+        </div>
+    </div>
+
+    <section class="rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div class="border-b border-gray-200 px-4 py-3">
+            <h2 class="text-sm font-semibold uppercase tracking-wide text-gray-700">My Current Work</h2>
+        </div>
+        <div class="divide-y divide-gray-100">
+            {% for assignment in my_open_assignments %}
+            <div class="p-4">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div>
+                        <p class="font-semibold text-gray-950">{{ assignment.job.title }}</p>
+                        <p class="mt-1 text-sm text-gray-500">{{ assignment.job.account.name }}</p>
+                        <p class="mt-1 text-xs text-gray-500">{{ assignment.job.property.address|default:assignment.job.location_address|default:"No location set" }}</p>
+                    </div>
+                    <span class="inline-flex w-fit rounded-full border border-blue-100 bg-blue-50 px-2.5 py-1 text-xs font-bold text-blue-700">
+                        {{ assignment.job.get_status_display }}
+                    </span>
+                </div>
+            </div>
+            {% empty %}
+            <div class="p-8 text-center text-sm text-gray-500">No active assignments yet.</div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+</div>
+{% endblock %}

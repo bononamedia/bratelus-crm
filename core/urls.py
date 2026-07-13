@@ -1,0 +1,110 @@
+import json
+from django.contrib import admin
+from django.db.models import Q
+from django.urls import path, include
+from django.http import JsonResponse
+from django.views.decorators.http import require_POST
+from django.contrib.auth.decorators import login_required
+from rest_framework.routers import DefaultRouter
+
+# ==========================================
+# 1 - IMPORTS
+# ==========================================
+
+# CRM UI Views
+from crm.views import dashboard_view, leads_list_view, crm_accounts_view
+
+# FSM Views & APIs
+from fsm.views import (
+    jobs_board_view, 
+    EvidenceUploadView, 
+    MobileClockInView, 
+    MobileClockOutView,
+    TrackLocationPingView,
+    LiveFleetLocationsView
+)
+
+# Unified API ViewSets
+from core.api.views import AccountViewSet, ContactViewSet, JobViewSet, PaymentMethodViewSet, PropertyViewSet, WorkerViewSet
+from core.views import reports_view
+from finance.views import finance_overview_view
+from organizations.models import Workspace
+from organizations.views import admin_console_view, employee_profile_view
+from workforce.views import workforce_view
+
+
+# ==========================================
+# 2 - REST FRAMEWORK ROUTER
+# ==========================================
+router = DefaultRouter()
+router.register(r'accounts', AccountViewSet, basename='api-account')
+router.register(r'contacts', ContactViewSet, basename='api-contact')
+router.register(r'properties', PropertyViewSet, basename='api-property')
+router.register(r'payment-methods', PaymentMethodViewSet, basename='api-payment-method')
+router.register(r'jobs', JobViewSet, basename='api-job')
+router.register(r'workers', WorkerViewSet, basename='api-worker')
+
+
+# ==========================================
+# 3 - HELPER VIEWS
+# ==========================================
+@login_required
+@require_POST
+def switch_organization_view(request):
+    """Updates the user's session cookie with their new active Organization ID"""
+    try:
+        data = json.loads(request.body)
+        org_id = data.get('org_id')
+
+        workspace = Workspace.objects.filter(
+            Q(members__user=request.user, members__is_active=True) |
+            Q(workers__user=request.user),
+            id=org_id,
+        ).distinct().first()
+
+        if not workspace:
+            return JsonResponse({'status': 'error', 'message': 'Organization not found.'}, status=404)
+
+        request.session['active_org_id'] = str(workspace.id)
+        return JsonResponse({'status': 'success', 'active_org_id': str(workspace.id)})
+    except Exception as e:
+        return JsonResponse({'status': 'error', 'message': str(e)}, status=400)
+
+
+# ==========================================
+# 4 - URL PATTERNS
+# ==========================================
+urlpatterns = [
+    # --- SYSTEM ---
+    path('admin/', admin.site.urls),
+    path('api/switch-org/', switch_organization_view, name='switch_org'),
+    
+    # --- WEB UI DASHBOARDS ---
+    path('', dashboard_view, name='dashboard'),
+    path('leads/', leads_list_view, name='leads'),
+    path('jobs/', jobs_board_view, name='jobs'),
+    path('accounts/', crm_accounts_view, name='accounts'),
+    path('contacts/', crm_accounts_view, {'section': 'contacts'}, name='contacts'),
+    path('properties/', crm_accounts_view, {'section': 'properties'}, name='properties'),
+    path('payment-methods/', crm_accounts_view, {'section': 'payment_methods'}, name='payment_methods'),
+    path('finance/', finance_overview_view, name='finance'),
+    path('workforce/', workforce_view, name='workforce'),
+    path('reports/', reports_view, name='reports'),
+    path('settings/', admin_console_view, name='admin_console'),
+    path('me/', employee_profile_view, name='employee_profile'),
+    
+    # FIX: Added Django's built-in authentication URLs
+    path('accounts/', include('django.contrib.auth.urls')), 
+    
+    # --- UNIFIED REST API ---
+    path('api/v1/', include(router.urls)),
+    
+    # --- INTERNAL MAP DASHBOARD API ---
+    path('api/fleet/live-locations/', LiveFleetLocationsView.as_view(), name='api_live_fleet'),
+    
+    # --- MOBILE APP ENDPOINTS ---
+    path('api/mobile/upload-evidence/', EvidenceUploadView.as_view(), name='api_upload_evidence'),
+    path('api/mobile/jobs/<int:job_id>/clock-in/', MobileClockInView.as_view(), name='api_mobile_clock_in'),
+    path('api/mobile/jobs/<int:job_id>/clock-out/', MobileClockOutView.as_view(), name='api_mobile_clock_out'),
+    path('api/mobile/track-location/', TrackLocationPingView.as_view(), name='api_track_location'),
+]

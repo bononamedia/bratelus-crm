@@ -1,0 +1,228 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mb-8 flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+    <div>
+        <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">Leads Pipeline</h1>
+        <p class="text-gray-500 mt-1">Manage incoming requests and build your contact list.</p>
+    </div>
+    <button onclick="toggleForm()" class="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-sm transition-all duration-200 focus:ring-4 focus:ring-blue-100">
+        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        Add New Lead
+    </button>
+</div>
+
+<div class="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
+    
+    <div class="xl:col-span-1 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden hidden transition-all" id="new-lead-panel">
+        <div class="bg-gray-50 px-6 py-4 border-b border-gray-200">
+            <h2 class="text-lg font-bold text-gray-800">Lead Details</h2>
+        </div>
+        
+        <form id="lead-form" onsubmit="submitLead(event)" class="p-6">
+            <div class="mb-5">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Company / Account</label>
+                <select id="account_id" required class="block w-full bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 transition-colors">
+                    <option value="">Loading accounts...</option>
+                </select>
+                <p class="text-xs text-gray-400 mt-1">Must be attached to a client account.</p>
+            </div>
+
+            <div class="grid grid-cols-2 gap-4 mb-5">
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">First Name</label>
+                    <input type="text" id="first_name" required placeholder="John" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 transition-colors">
+                </div>
+                <div>
+                    <label class="block text-sm font-semibold text-gray-700 mb-2">Last Name</label>
+                    <input type="text" id="last_name" required placeholder="Doe" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5 transition-colors">
+                </div>
+            </div>
+
+            <div class="mb-5">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Email Address</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                    </div>
+                    <input type="email" id="email" required placeholder="john@example.com" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 p-2.5 transition-colors">
+                </div>
+            </div>
+
+            <div class="mb-6">
+                <label class="block text-sm font-semibold text-gray-700 mb-2">Phone Number</label>
+                <div class="relative">
+                    <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                        <svg class="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z"></path></svg>
+                    </div>
+                    <input type="text" id="phone" placeholder="(555) 000-0000" class="bg-gray-50 border border-gray-300 text-gray-900 text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 p-2.5 transition-colors">
+                </div>
+            </div>
+
+            <button type="submit" class="w-full text-white bg-green-600 hover:bg-green-700 focus:ring-4 focus:ring-green-300 font-medium rounded-lg text-sm px-5 py-2.5 text-center transition-colors">
+                Save Lead to CRM
+            </button>
+        </form>
+    </div>
+
+    <div class="xl:col-span-3 bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden transition-all duration-300" id="table-panel">
+        <div class="overflow-x-auto">
+            <table class="w-full text-sm text-left text-gray-500">
+                <thead class="text-xs text-gray-700 uppercase bg-gray-50 border-b border-gray-200">
+                    <tr>
+                        <th scope="col" class="px-6 py-4">Name</th>
+                        <th scope="col" class="px-6 py-4">Contact Info</th>
+                        <th scope="col" class="px-6 py-4">Status</th>
+                        <th scope="col" class="px-6 py-4 text-right">Action</th>
+                    </tr>
+                </thead>
+                <tbody id="leads-table-body">
+                    <tr>
+                        <td colspan="4" class="px-6 py-8 text-center text-gray-500 animate-pulse">Loading pipeline...</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 1. Get CSRF Token for Security
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+
+    // 2. Form Slide-out Animation Logic
+    function toggleForm() {
+        const panel = document.getElementById('new-lead-panel');
+        const table = document.getElementById('table-panel');
+        if (panel.classList.contains('hidden')) {
+            panel.classList.remove('hidden');
+            table.classList.remove('xl:col-span-3');
+            table.classList.add('xl:col-span-2');
+        } else {
+            panel.classList.add('hidden');
+            table.classList.remove('xl:col-span-2');
+            table.classList.add('xl:col-span-3');
+        }
+    }
+
+    // 3. Fetch Accounts for Dropdown
+    async function loadAccounts() {
+        try {
+            const response = await fetch('/api/v1/accounts/');
+            const accounts = await response.json();
+            const select = document.getElementById('account_id');
+            
+            if (accounts.length === 0) {
+                select.innerHTML = '<option value="">Create an account in CRM first.</option>';
+                return;
+            }
+
+            select.innerHTML = '';
+            accounts.forEach(acc => {
+                select.innerHTML += `<option value="${acc.id}">${acc.name}</option>`;
+            });
+        } catch (error) {
+            console.error("Error loading accounts:", error);
+        }
+    }
+
+    // 4. Fetch Leads for Table
+    async function loadContacts() {
+        try {
+            const response = await fetch('/api/v1/contacts/');
+            const contacts = await response.json();
+            const tbody = document.getElementById('leads-table-body');
+            
+            if (contacts.length === 0) {
+                tbody.innerHTML = `
+                    <tr>
+                        <td colspan="4" class="px-6 py-10 text-center">
+                            <p class="text-gray-500 mb-2">No leads in your pipeline yet.</p>
+                            <button onclick="toggleForm()" class="text-blue-600 font-medium hover:underline">Create your first lead &rarr;</button>
+                        </td>
+                    </tr>`;
+                return;
+            }
+
+            tbody.innerHTML = '';
+            contacts.forEach(contact => {
+                tbody.innerHTML += `
+                    <tr class="bg-white border-b hover:bg-gray-50 transition-colors">
+                        <td class="px-6 py-4 font-medium text-gray-900 whitespace-nowrap">
+                            ${contact.first_name} ${contact.last_name}
+                        </td>
+                        <td class="px-6 py-4">
+                            <div class="text-sm text-gray-900">${contact.email}</div>
+                            <div class="text-xs text-gray-500">${contact.phone || 'No phone'}</div>
+                        </td>
+                        <td class="px-6 py-4">
+                            <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded border border-blue-200">New Lead</span>
+                        </td>
+                        <td class="px-6 py-4 text-right">
+                            <a href="#" class="font-medium text-blue-600 hover:underline">Edit</a>
+                        </td>
+                    </tr>
+                `;
+            });
+        } catch (error) {
+            console.error("Error loading contacts:", error);
+        }
+    }
+
+    // 5. Submit New Lead
+    async function submitLead(event) {
+        event.preventDefault(); // Stop page reload
+        
+        const data = {
+            account: document.getElementById('account_id').value,
+            first_name: document.getElementById('first_name').value,
+            last_name: document.getElementById('last_name').value,
+            email: document.getElementById('email').value,
+            phone: document.getElementById('phone').value,
+            is_primary: false
+        };
+
+        try {
+            const response = await fetch('/api/v1/contacts/', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': getCookie('csrftoken')
+                },
+                body: JSON.stringify(data)
+            });
+
+            if (response.ok) {
+                document.getElementById('lead-form').reset();
+                loadContacts(); // Instantly update table!
+                toggleForm();   // Slide form away
+            } else {
+                const errorData = await response.json();
+                alert("Error saving lead. See console for details.");
+                console.error("API Error:", errorData);
+            }
+        } catch (error) {
+            console.error("Network Error:", error);
+        }
+    }
+
+    // Boot up the page!
+    document.addEventListener("DOMContentLoaded", () => {
+        loadAccounts();
+        loadContacts();
+    });
+</script>
+{% endblock %}

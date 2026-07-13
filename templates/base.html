@@ -1,0 +1,414 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Bratelus CRM</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .nav-subitem {
+            display: block;
+            border-radius: 0.625rem;
+            padding: 0.45rem 0.75rem 0.45rem 2.75rem;
+            font-size: 0.8125rem;
+            font-weight: 500;
+            color: rgb(190 200 212);
+            transition: background-color 150ms ease, color 150ms ease, transform 150ms ease;
+        }
+
+        .nav-subitem:hover {
+            background: rgba(255, 255, 255, 0.07);
+            color: white;
+            transform: translateX(2px);
+        }
+
+        .nav-subitem.is-active {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .nav-module.is-open .nav-chevron {
+            transform: rotate(90deg);
+        }
+
+        .nav-module {
+            overflow: hidden;
+        }
+
+        .nav-module-toggle:focus-visible,
+        .nav-subitem:focus-visible {
+            outline: 2px solid rgba(125, 211, 252, 0.95);
+            outline-offset: 2px;
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-900 font-sans antialiased pb-16 md:pb-0 md:pl-72 flex flex-col min-h-screen">
+
+    <aside class="hidden md:flex flex-col w-72 h-screen px-4 py-6 bg-slate-950 text-white fixed top-0 left-0 z-40 shadow-lg">
+        <div class="mb-6 flex items-center justify-between">
+            <h2 class="text-2xl font-semibold text-white">Bratelus<span class="text-sky-400">.</span></h2>
+            <span class="rounded-full border border-white/10 bg-white/5 px-2 py-1 text-[10px] font-medium uppercase tracking-wide text-slate-400">CRM</span>
+        </div>
+        <nav class="flex flex-col gap-2 flex-1 overflow-y-auto pr-1">
+            <a href="{% url 'dashboard' %}" class="flex items-center rounded-lg border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-medium text-slate-100 hover:bg-white/10 transition-colors">
+                <span class="mr-3 flex h-8 w-8 items-center justify-center rounded-md bg-sky-500/10 text-sky-300">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+                </span>
+                Dashboard
+            </a>
+
+            {% if can_manage_active_org %}
+            <div class="nav-module rounded-lg border border-sky-400/15 bg-sky-400/10" data-module="crm">
+                <button type="button" class="nav-module-toggle flex w-full items-center gap-3 px-3 py-2.5 text-left" data-module-toggle="crm" aria-expanded="false">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-sky-400/15 text-sky-200">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5"></path></svg>
+                    </span>
+                    <span class="min-w-0 flex-1">
+                        <span class="block text-sm font-semibold text-slate-100">CRM</span>
+                        <span class="block text-xs text-sky-100/70">Accounts and relationships</span>
+                    </span>
+                    <svg class="nav-chevron h-4 w-4 text-sky-100 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+                <div class="nav-submenu hidden px-2 pb-2.5" data-module-panel="crm">
+                    <a href="{% url 'accounts' %}" class="nav-subitem">Accounts</a>
+                    <a href="{% url 'contacts' %}" class="nav-subitem">Contacts</a>
+                    <a href="{% url 'properties' %}" class="nav-subitem">Properties</a>
+                    <a href="{% url 'payment_methods' %}" class="nav-subitem">Payment Methods</a>
+                    <a href="{% url 'leads' %}" class="nav-subitem">Leads Pipeline</a>
+                </div>
+            </div>
+
+            <div class="nav-module rounded-lg border border-emerald-400/15 bg-emerald-400/10" data-module="dispatch">
+                <button type="button" class="nav-module-toggle flex w-full items-center gap-3 px-3 py-2.5 text-left" data-module-toggle="dispatch" aria-expanded="false">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-400/15 text-emerald-200">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2"></path></svg>
+                    </span>
+                    <span class="min-w-0 flex-1">
+                        <span class="block text-sm font-semibold text-slate-100">Dispatch</span>
+                        <span class="block text-xs text-emerald-100/70">Jobs and live fleet</span>
+                    </span>
+                    <svg class="nav-chevron h-4 w-4 text-emerald-100 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+                <div class="nav-submenu hidden px-2 pb-2.5" data-module-panel="dispatch">
+                    <a href="{% url 'jobs' %}" class="nav-subitem">Dispatch Board</a>
+                    <a href="{% url 'jobs' %}#fleet-radar" class="nav-subitem">Live Fleet</a>
+                    <a href="{% url 'jobs' %}#dispatch-board" class="nav-subitem">Crew Assignment</a>
+                </div>
+            </div>
+
+            <div class="nav-module rounded-lg border border-amber-400/15 bg-amber-400/10" data-module="finance">
+                <button type="button" class="nav-module-toggle flex w-full items-center gap-3 px-3 py-2.5 text-left" data-module-toggle="finance" aria-expanded="false">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-amber-400/15 text-amber-200">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8V6m0 10v2"></path></svg>
+                    </span>
+                    <span class="min-w-0 flex-1">
+                        <span class="block text-sm font-semibold text-slate-100">Finance</span>
+                        <span class="block text-xs text-amber-100/70">Books and invoices</span>
+                    </span>
+                    <svg class="nav-chevron h-4 w-4 text-amber-100 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+                <div class="nav-submenu hidden px-2 pb-2.5" data-module-panel="finance">
+                    <a href="{% url 'finance' %}" class="nav-subitem">Books Overview</a>
+                    <a href="{% url 'finance' %}#invoices" class="nav-subitem">Invoices</a>
+                    <a href="{% url 'payment_methods' %}" class="nav-subitem">Payment Methods</a>
+                </div>
+            </div>
+
+            <div class="nav-module rounded-lg border border-violet-400/15 bg-violet-400/10" data-module="workforce">
+                <button type="button" class="nav-module-toggle flex w-full items-center gap-3 px-3 py-2.5 text-left" data-module-toggle="workforce" aria-expanded="false">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-violet-400/15 text-violet-200">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a4 4 0 00-4-4h-1M9 20H4v-2a4 4 0 014-4h1m0-4a4 4 0 100-8 4 4 0 000 8zm8 0a4 4 0 100-8 4 4 0 000 8z"></path></svg>
+                    </span>
+                    <span class="min-w-0 flex-1">
+                        <span class="block text-sm font-semibold text-slate-100">Workforce</span>
+                        <span class="block text-xs text-violet-100/70">Employees and skills</span>
+                    </span>
+                    <svg class="nav-chevron h-4 w-4 text-violet-100 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+                <div class="nav-submenu hidden px-2 pb-2.5" data-module-panel="workforce">
+                    <a href="{% url 'workforce' %}" class="nav-subitem">Employee Directory</a>
+                    <a href="{% url 'admin_console' %}#skills" class="nav-subitem">Skills & Zones</a>
+                {% if active_worker_profile %}
+                    <a href="{% url 'employee_profile' %}" class="nav-subitem">My Work</a>
+                {% endif %}
+                </div>
+            </div>
+
+            <div class="nav-module rounded-lg border border-rose-400/15 bg-rose-400/10" data-module="reports">
+                <button type="button" class="nav-module-toggle flex w-full items-center gap-3 px-3 py-2.5 text-left" data-module-toggle="reports" aria-expanded="false">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-rose-400/15 text-rose-200">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 19V5m-4 14v-8m8 8v-5m4 5V9"></path></svg>
+                    </span>
+                    <span class="min-w-0 flex-1">
+                        <span class="block text-sm font-semibold text-slate-100">Reports</span>
+                        <span class="block text-xs text-rose-100/70">KPIs and exports</span>
+                    </span>
+                    <svg class="nav-chevron h-4 w-4 text-rose-100 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+                <div class="nav-submenu hidden px-2 pb-2.5" data-module-panel="reports">
+                    <a href="{% url 'reports' %}" class="nav-subitem">Overview</a>
+                    <a href="{% url 'reports' %}#operations" class="nav-subitem">Operations</a>
+                    <a href="{% url 'reports' %}#finance" class="nav-subitem">Finance</a>
+                    <a href="{% url 'reports' %}#workforce" class="nav-subitem">Workforce</a>
+                </div>
+            </div>
+
+            <div class="nav-module rounded-lg border border-slate-300/15 bg-white/10" data-module="setup">
+                <button type="button" class="nav-module-toggle flex w-full items-center gap-3 px-3 py-2.5 text-left" data-module-toggle="setup" aria-expanded="false">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-white/10 text-slate-200">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317a1.724 1.724 0 003.35 0"></path></svg>
+                    </span>
+                    <span class="min-w-0 flex-1">
+                        <span class="block text-sm font-semibold text-slate-100">Setup</span>
+                        <span class="block text-xs text-slate-200/70">Company configuration</span>
+                    </span>
+                    <svg class="nav-chevron h-4 w-4 text-slate-200 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+                <div class="nav-submenu hidden px-2 pb-2.5" data-module-panel="setup">
+                    <a href="{% url 'admin_console' %}" class="nav-subitem">Company Setup</a>
+                    <a href="{% url 'admin_console' %}#custom-fields" class="nav-subitem">Custom Fields</a>
+                {% if is_platform_admin %}
+                    <a href="/admin/" class="nav-subitem">Superadmin</a>
+                {% endif %}
+                </div>
+            </div>
+            {% elif active_worker_profile %}
+            <div class="nav-module rounded-lg border border-sky-400/15 bg-sky-400/10" data-module="employee">
+                <button type="button" class="nav-module-toggle flex w-full items-center gap-3 px-3 py-2.5 text-left" data-module-toggle="employee" aria-expanded="false">
+                    <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-sky-400/15 text-sky-200">
+                        <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6"></path></svg>
+                    </span>
+                    <span class="min-w-0 flex-1">
+                        <span class="block text-sm font-semibold text-slate-100">Employee</span>
+                        <span class="block text-xs text-sky-100/70">Assigned field work</span>
+                    </span>
+                    <svg class="nav-chevron h-4 w-4 text-sky-100 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
+                </button>
+                <div class="nav-submenu hidden px-2 pb-2.5" data-module-panel="employee">
+                    <a href="{% url 'employee_profile' %}" class="nav-subitem">My Work</a>
+                </div>
+            </div>
+            {% endif %}
+        </nav>
+        <div class="mt-4 border-t border-white/10 pt-4">
+            <div class="text-xs uppercase tracking-wide text-slate-500 font-medium mb-2">Access</div>
+            <div class="rounded-lg border border-white/10 bg-white/5 px-3 py-3">
+                <div class="text-sm font-medium text-white truncate">{{ active_role_label }}</div>
+                <div class="text-xs text-slate-400 truncate">{{ active_org.name|default:"No workspace selected" }}</div>
+            </div>
+        </div>
+    </aside>
+
+    <div class="flex-1 flex flex-col relative w-full">
+        
+        <header class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-sm z-30 sticky top-0">
+            <div class="md:hidden font-semibold text-xl text-blue-700">Bratelus.</div>
+            
+            <div class="hidden md:block flex-1"></div>
+
+            <div class="relative inline-block text-left">
+                <div>
+                    <button type="button" onclick="toggleOrgMenu()" class="inline-flex items-center justify-between w-full rounded-lg border border-gray-200 shadow-sm px-3 py-1.5 bg-white text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition-all" id="org-menu-button" aria-expanded="true" aria-haspopup="true">
+                        <div class="flex items-center">
+                            <div class="h-6 w-6 rounded bg-blue-100 text-blue-700 flex items-center justify-center font-bold mr-2 text-xs uppercase">
+                                {{ active_org.name|make_list|first|default:"?" }}
+                            </div>
+                            <span id="current-org-name" class="hidden sm:inline">{{ active_org.name|default:"Select Organization" }}</span>
+                        </div>
+                        <svg class="-mr-1 ml-2 h-4 w-4 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div id="org-dropdown-menu" class="origin-top-right absolute right-0 mt-2 w-64 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 divide-y divide-gray-100 hidden z-50" role="menu" aria-orientation="vertical" aria-labelledby="org-menu-button" tabindex="-1">
+                    <div class="px-4 py-3 bg-gray-50 rounded-t-md">
+                        <p class="text-xs font-medium text-gray-500 uppercase tracking-wider">My Organizations</p>
+                    </div>
+                    <div class="py-1 max-h-64 overflow-y-auto" role="none" id="org-list">
+                        
+                        {% for org in user_organizations %}
+                        <a href="#" onclick="event.preventDefault(); switchOrganization('{{ org.id }}')" class="group flex items-center px-4 py-3 text-sm {% if org.id == active_org.id %}bg-blue-50 text-blue-700{% else %}text-gray-700 hover:bg-gray-100{% endif %} transition-colors" role="menuitem">
+                            <div class="h-8 w-8 rounded {% if org.id == active_org.id %}bg-blue-100 text-blue-700 border-blue-200{% else %}bg-gray-100 text-gray-600 border-gray-200{% endif %} flex items-center justify-center font-bold mr-3 text-xs border uppercase">
+                                {{ org.name|make_list|first }}
+                            </div>
+                            <div class="flex flex-col">
+                                <span class="font-medium">{{ org.name }}</span>
+                                <span class="text-xs text-gray-500 group-hover:text-blue-500">Org ID: {{ org.id }}</span>
+                            </div>
+                        </a>
+                        {% empty %}
+                        <div class="px-4 py-3 text-sm text-gray-500 italic text-center">No organizations assigned.</div>
+                        {% endfor %}
+                    </div>
+                    {% if can_manage_active_org or is_platform_admin %}
+                    <div class="py-1 border-t border-gray-100" role="none">
+                        {% if can_manage_active_org %}
+                        <a href="{% url 'admin_console' %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" role="menuitem">
+                            <svg class="mr-2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+                            Company Setup
+                        </a>
+                        {% endif %}
+                        {% if is_platform_admin %}
+                        <a href="/admin/" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" role="menuitem">
+                            <svg class="mr-2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11c1.657 0 3-1.567 3-3.5S13.657 4 12 4 9 5.567 9 7.5s1.343 3.5 3 3.5zM5.5 20a6.5 6.5 0 0113 0"></path></svg>
+                            Superadmin
+                        </a>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </header>
+
+        <main class="p-4 sm:p-6 lg:p-8 flex-1">
+            {% block content %}
+            {% endblock %}
+        </main>
+    </div>
+
+    <nav class="md:hidden fixed bottom-0 w-full bg-white border-t border-gray-200 flex justify-around py-3 text-sm shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-40 pb-safe">
+        <a href="{% url 'dashboard' %}" class="flex flex-col items-center text-blue-600">
+            <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
+            <span class="font-bold text-[10px] uppercase tracking-wide">Home</span>
+        </a>
+        {% if can_manage_active_org %}
+        <a href="{% url 'accounts' %}" class="flex flex-col items-center text-gray-400 hover:text-blue-600 transition-colors">
+            <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"></path></svg>
+            <span class="font-bold text-[10px] uppercase tracking-wide">CRM</span>
+        </a>
+        <a href="{% url 'jobs' %}" class="flex flex-col items-center text-gray-400 hover:text-blue-600 transition-colors">
+            <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+            <span class="font-bold text-[10px] uppercase tracking-wide">Jobs</span>
+        </a>
+        {% endif %}
+        {% if active_worker_profile %}
+        <a href="{% url 'employee_profile' %}" class="flex flex-col items-center text-gray-400 hover:text-blue-600 transition-colors">
+            <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            <span class="font-bold text-[10px] uppercase tracking-wide">My Work</span>
+        </a>
+        {% endif %}
+    </nav>
+
+    <script>
+        function getCookie(name) {
+            let cookieValue = null;
+            if (document.cookie && document.cookie !== '') {
+                const cookies = document.cookie.split(';');
+                for (let i = 0; i < cookies.length; i++) {
+                    const cookie = cookies[i].trim();
+                    if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                        cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                        break;
+                    }
+                }
+            }
+            return cookieValue;
+        }
+
+        function toggleOrgMenu() {
+            const menu = document.getElementById('org-dropdown-menu');
+            menu.classList.toggle('hidden');
+        }
+
+        function setOpenModule(moduleName, persist = true) {
+            document.querySelectorAll('[data-module]').forEach(module => {
+                const isOpen = module.dataset.module === moduleName;
+                const panel = module.querySelector('[data-module-panel]');
+                const toggle = module.querySelector('[data-module-toggle]');
+
+                module.classList.toggle('is-open', isOpen);
+                if (panel) {
+                    panel.classList.toggle('hidden', !isOpen);
+                }
+                if (toggle) {
+                    toggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+                }
+            });
+
+            if (persist && moduleName) {
+                localStorage.setItem('bratelus_open_module', moduleName);
+            } else if (persist) {
+                localStorage.removeItem('bratelus_open_module');
+            }
+        }
+
+        function moduleForCurrentPath() {
+            const path = window.location.pathname;
+
+            if (['/accounts/', '/contacts/', '/properties/', '/payment-methods/', '/leads/'].includes(path)) {
+                return 'crm';
+            }
+            if (path === '/jobs/') {
+                return 'dispatch';
+            }
+            if (path === '/finance/') {
+                return 'finance';
+            }
+            if (path === '/workforce/') {
+                return 'workforce';
+            }
+            if (path === '/reports/') {
+                return 'reports';
+            }
+            if (path === '/settings/' || path.startsWith('/admin/')) {
+                return 'setup';
+            }
+            if (path === '/me/') {
+                return 'employee';
+            }
+
+            return localStorage.getItem('bratelus_open_module') || '';
+        }
+
+        function highlightActiveNavItem() {
+            const currentPath = window.location.pathname;
+            document.querySelectorAll('.nav-subitem').forEach(link => {
+                const linkPath = new URL(link.href, window.location.origin).pathname;
+                link.classList.toggle('is-active', linkPath === currentPath);
+            });
+        }
+
+        async function switchOrganization(orgId) {
+            try {
+                const response = await fetch('/api/switch-org/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken') 
+                    },
+                    body: JSON.stringify({ org_id: orgId })
+                });
+                
+                if (response.ok) {
+                    window.location.reload(); 
+                }
+            } catch (error) {
+                console.error("Failed to switch organization", error);
+            }
+        }
+
+        document.addEventListener('click', function(event) {
+            const button = document.getElementById('org-menu-button');
+            const menu = document.getElementById('org-dropdown-menu');
+            if (button && menu && !button.contains(event.target) && !menu.contains(event.target)) {
+                menu.classList.add('hidden');
+            }
+        });
+
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('[data-module-toggle]').forEach(toggle => {
+                toggle.addEventListener('click', function() {
+                    const moduleName = this.dataset.moduleToggle;
+                    const moduleEl = document.querySelector(`[data-module="${moduleName}"]`);
+                    const isAlreadyOpen = moduleEl && moduleEl.classList.contains('is-open');
+                    setOpenModule(isAlreadyOpen ? '' : moduleName);
+                });
+            });
+
+            setOpenModule(moduleForCurrentPath(), false);
+            highlightActiveNavItem();
+        });
+    </script>
+</body>
+</html>

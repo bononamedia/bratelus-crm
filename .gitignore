@@ -1,0 +1,36 @@
+# Environment and credentials
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Django runtime
+db.sqlite3
+media/
+staticfiles/
+*.log
+
+# Local backups and deployment bundles
+*.save
+*.save.*
+*.bak
+*.tgz
+*.tar.gz
+
+# IDE and operating system
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+

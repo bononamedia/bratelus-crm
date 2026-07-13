@@ -1,0 +1,692 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl space-y-6">
+    <div class="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
+        <div>
+            <p class="text-xs font-semibold uppercase tracking-wide text-blue-600">Workspace Setup</p>
+            <h1 class="mt-1 text-2xl md:text-3xl font-semibold text-gray-950">{{ active_org.name }} Setup</h1>
+            <p class="mt-1 text-sm text-gray-500">Workspace-level configuration for channels, modules, routing, and team access.</p>
+        </div>
+        {% if is_platform_admin %}
+        <a href="/admin/" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50">
+            <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 5h14v14H5zM9 17v-6m4 6V7m4 10v-3"></path></svg>
+            Superadmin
+        </a>
+        {% endif %}
+    </div>
+
+    {% if messages %}
+    <div class="space-y-2">
+        {% for message in messages %}
+        <div class="rounded-lg border px-4 py-3 text-sm {% if message.tags == 'error' %}border-red-200 bg-red-50 text-red-700{% else %}border-green-200 bg-green-50 text-green-700{% endif %}">
+            {{ message }}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <div class="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        <a href="#channels" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50/40">
+            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Email Domains</div>
+            <div class="mt-2 text-2xl font-bold text-gray-950">{{ stats.email_domains }}</div>
+        </a>
+        <a href="#channels" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50/40">
+            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Mailboxes</div>
+            <div class="mt-2 text-2xl font-bold text-gray-950">{{ stats.email_connections }}</div>
+        </a>
+        <a href="#modules-fields" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50/40">
+            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Custom Fields</div>
+            <div class="mt-2 text-2xl font-bold text-gray-950">{{ stats.custom_fields }}</div>
+        </a>
+        <a href="#skills" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50/40">
+            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Skills</div>
+            <div class="mt-2 text-2xl font-bold text-gray-950">{{ stats.skills }}</div>
+        </a>
+        <a href="#team" class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm hover:border-blue-200 hover:bg-blue-50/40">
+            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Workers</div>
+            <div class="mt-2 text-2xl font-bold text-gray-950">{{ stats.workers }}</div>
+        </a>
+    </div>
+
+    <section class="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+            <div class="flex items-center gap-3">
+                <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6l4 2"></path></svg>
+                </span>
+                <h2 class="text-base font-semibold text-gray-950">General</h2>
+            </div>
+            <div class="mt-4 space-y-2 text-sm">
+                <a href="#team" class="block text-gray-700 hover:text-blue-700">Users and roles</a>
+                <a href="#team" class="block text-gray-700 hover:text-blue-700">Company settings</a>
+                <span class="block text-gray-400">Calendar booking</span>
+            </div>
+        </div>
+        <div id="channels-card" class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+            <div class="flex items-center gap-3">
+                <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-blue-50 text-blue-700">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 8l9 6 9-6M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path></svg>
+                </span>
+                <h2 class="text-base font-semibold text-gray-950">Channels</h2>
+            </div>
+            <div class="mt-4 space-y-2 text-sm">
+                <a href="#channels" class="block text-gray-700 hover:text-blue-700">Email</a>
+                <a href="#channels" class="block text-gray-700 hover:text-blue-700">Telephony</a>
+                <a href="#channels" class="block text-gray-700 hover:text-blue-700">Business messaging</a>
+            </div>
+        </div>
+        <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+            <div class="flex items-center gap-3">
+                <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-violet-50 text-violet-700">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h10M4 18h7"></path></svg>
+                </span>
+                <h2 class="text-base font-semibold text-gray-950">Customization</h2>
+            </div>
+            <div class="mt-4 space-y-2 text-sm">
+                <a href="#modules-fields" class="block text-gray-700 hover:text-blue-700">Modules and fields</a>
+                <a href="#module-layout-builder" class="block text-gray-700 hover:text-blue-700">Form layouts</a>
+                <span class="block text-gray-400">Pipelines</span>
+            </div>
+        </div>
+        <div class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+            <div class="flex items-center gap-3">
+                <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 text-amber-700">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"></path></svg>
+                </span>
+                <h2 class="text-base font-semibold text-gray-950">Automation</h2>
+            </div>
+            <div class="mt-4 space-y-2 text-sm">
+                <span class="block text-gray-400">Workflow rules</span>
+                <span class="block text-gray-400">Assignment</span>
+                <span class="block text-gray-400">Schedules</span>
+            </div>
+        </div>
+    </section>
+
+    <section id="channels" class="space-y-4">
+        <div>
+            <h2 class="text-lg font-semibold text-gray-950">Channels</h2>
+            <p class="mt-1 text-sm text-gray-500">Email belongs to the workspace brand. Sender domains and mailboxes are configured once for the workspace.</p>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+            <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div class="border-b border-gray-200 px-4 py-3">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Email Domains</h3>
+                </div>
+                <form method="post" class="grid grid-cols-1 gap-3 p-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_email_domain">
+                    <label class="text-sm font-medium text-gray-700">
+                        Domain
+                        <input name="domain" required placeholder="perfectcleaning.com" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                    </label>
+                    <label class="text-sm font-medium text-gray-700">
+                        Verification notes
+                        <textarea name="verification_notes" rows="2" placeholder="SPF, DKIM, DMARC notes" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></textarea>
+                    </label>
+                    <button class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Add domain</button>
+                </form>
+                <div class="divide-y divide-gray-100 border-t border-gray-100">
+                    {% for domain in email_domains %}
+                    <div class="flex items-start justify-between gap-3 px-4 py-3">
+                        <div>
+                            <div class="text-sm font-semibold text-gray-950">{{ domain.domain }}</div>
+                            <div class="mt-1 text-xs text-gray-500">{% if domain.is_verified %}Verified{% else %}Pending verification{% endif %}</div>
+                        </div>
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="delete_email_domain">
+                            <input type="hidden" name="id" value="{{ domain.id }}">
+                            <button class="text-xs font-semibold text-red-600 hover:text-red-700">Remove</button>
+                        </form>
+                    </div>
+                    {% empty %}
+                    <div class="px-4 py-8 text-center text-sm text-gray-400">No workspace domains yet.</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div class="border-b border-gray-200 px-4 py-3">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Workspace Email Connections</h3>
+                </div>
+                <form method="post" class="p-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_email_connection">
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        <label class="text-sm font-medium text-gray-700">
+                            Display name
+                            <input name="display_name" required placeholder="Perfect Cleaning" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        </label>
+                        <label class="text-sm font-medium text-gray-700">
+                            From email
+                            <input name="from_email" type="email" required placeholder="dispatch@perfectcleaning.com" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        </label>
+                        <label class="text-sm font-medium text-gray-700">
+                            Provider
+                            <select name="connection_type" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+                                {% for value, label in email_connection_types %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label class="text-sm font-medium text-gray-700">
+                            Domain
+                            <select name="domain_id" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+                                <option value="">No domain selected</option>
+                                {% for domain in email_domains %}
+                                <option value="{{ domain.id }}">{{ domain.domain }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label class="text-sm font-medium text-gray-700">
+                            Username
+                            <input name="username" placeholder="mailbox login" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        </label>
+                        <label class="text-sm font-medium text-gray-700">
+                            Secret reference
+                            <input name="secret_reference" placeholder="vault/mailbox-key" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        </label>
+                        <label class="text-sm font-medium text-gray-700">
+                            Incoming host
+                            <input name="incoming_host" placeholder="imap.example.com" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        </label>
+                        <label class="text-sm font-medium text-gray-700">
+                            Incoming port
+                            <input name="incoming_port" inputmode="numeric" placeholder="993" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        </label>
+                        <label class="text-sm font-medium text-gray-700">
+                            Outgoing host
+                            <input name="outgoing_host" placeholder="smtp.example.com" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        </label>
+                        <label class="text-sm font-medium text-gray-700">
+                            Outgoing port
+                            <input name="outgoing_port" inputmode="numeric" placeholder="587" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        </label>
+                        <label class="flex items-end gap-2 text-sm font-medium text-gray-700">
+                            <span class="mb-2 inline-flex items-center gap-2">
+                                <input name="use_ssl" type="checkbox" checked class="rounded border-gray-300 text-blue-600">
+                                Use SSL/TLS
+                            </span>
+                        </label>
+                        <div class="flex items-end">
+                            <button class="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Add connection</button>
+                        </div>
+                    </div>
+                </form>
+                <div class="overflow-x-auto border-t border-gray-100">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                            <tr>
+                                <th class="px-4 py-3 text-left">Mailbox</th>
+                                <th class="px-4 py-3 text-left">Provider</th>
+                                <th class="px-4 py-3 text-left">Status</th>
+                                <th class="px-4 py-3 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            {% for connection in email_connections %}
+                            <tr>
+                                <td class="px-4 py-3">
+                                    <div class="font-semibold text-gray-950">{{ connection.from_email }}</div>
+                                    <div class="text-xs text-gray-500">{{ connection.display_name }}{% if connection.domain %} / {{ connection.domain.domain }}{% endif %}</div>
+                                </td>
+                                <td class="px-4 py-3 text-gray-600">{{ connection.get_connection_type_display }}</td>
+                                <td class="px-4 py-3">
+                                    <span class="rounded-full bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-700">{{ connection.get_status_display }}</span>
+                                </td>
+                                <td class="px-4 py-3 text-right">
+                                    <form method="post" class="inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="delete_email_connection">
+                                        <input type="hidden" name="id" value="{{ connection.id }}">
+                                        <button class="text-xs font-semibold text-red-600 hover:text-red-700">Remove</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="px-4 py-8 text-center text-gray-400">No workspace email connections yet.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="modules-fields" class="space-y-4">
+        <div>
+            <h2 class="text-lg font-semibold text-gray-950">Modules and Fields</h2>
+            <p class="mt-1 text-sm text-gray-500">Customize the fields and form order for Accounts, Contacts, Properties, Jobs, and Workers.</p>
+        </div>
+
+        <div class="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+            <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div class="border-b border-gray-200 px-4 py-3">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Custom Fields</h3>
+                </div>
+                <form method="post" class="p-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="create_custom_field">
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <label class="text-sm font-medium text-gray-700">
+                            Module
+                            <select name="target_model" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+                                {% for value, label in target_model_choices %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label class="text-sm font-medium text-gray-700">
+                            Field type
+                            <select name="field_type" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+                                {% for value, label in field_types %}
+                                <option value="{{ value }}">{{ label }}</option>
+                                {% endfor %}
+                            </select>
+                        </label>
+                        <label class="text-sm font-medium text-gray-700">
+                            Label
+                            <input name="label" required placeholder="Preferred cleaner" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        </label>
+                        <label class="text-sm font-medium text-gray-700">
+                            Internal name
+                            <input name="internal_name" placeholder="preferred_cleaner" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        </label>
+                    </div>
+                    <div class="mt-3 grid grid-cols-1 gap-3 md:grid-cols-[1fr_auto_auto] md:items-end">
+                        <label class="text-sm font-medium text-gray-700">
+                            Options
+                            <input name="options" placeholder="Option A, Option B" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        </label>
+                        <label class="inline-flex h-10 items-center gap-2 text-sm font-medium text-gray-700">
+                            <input name="is_required" type="checkbox" class="rounded border-gray-300 text-blue-600">
+                            Required
+                        </label>
+                        <button class="h-10 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700">Add field</button>
+                    </div>
+                </form>
+                <div class="max-h-96 overflow-auto border-t border-gray-100">
+                    <table class="w-full text-sm">
+                        <thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                            <tr>
+                                <th class="px-4 py-3 text-left">Field</th>
+                                <th class="px-4 py-3 text-left">Module</th>
+                                <th class="px-4 py-3 text-left">Type</th>
+                                <th class="px-4 py-3 text-right">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody class="divide-y divide-gray-100">
+                            {% for field in custom_fields %}
+                            <tr>
+                                <td class="px-4 py-3">
+                                    <div class="font-semibold text-gray-950">{{ field.label }}</div>
+                                    <div class="text-xs text-gray-500">{{ field.internal_name }}{% if field.is_required %} / required{% endif %}</div>
+                                </td>
+                                <td class="px-4 py-3 text-gray-600">{{ field.target_model }}</td>
+                                <td class="px-4 py-3 text-gray-600">{{ field.get_field_type_display }}</td>
+                                <td class="px-4 py-3 text-right">
+                                    <form method="post" class="inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="action" value="delete_custom_field">
+                                        <input type="hidden" name="id" value="{{ field.id }}">
+                                        <button class="text-xs font-semibold text-red-600 hover:text-red-700">Remove</button>
+                                    </form>
+                                </td>
+                            </tr>
+                            {% empty %}
+                            <tr><td colspan="4" class="px-4 py-8 text-center text-gray-400">No custom fields yet.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <div id="module-layout-builder" class="rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div class="flex flex-col gap-3 border-b border-gray-200 px-4 py-3 md:flex-row md:items-center md:justify-between">
+                    <div>
+                        <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Form Layout Builder</h3>
+                        <p class="mt-1 text-xs text-gray-500">Saved layouts feed CRM record forms and detail views.</p>
+                    </div>
+                    <select id="layout-target" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+                        {% for value, label in target_model_choices %}
+                        <option value="{{ value }}">{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="grid grid-cols-1 gap-4 p-4 lg:grid-cols-2">
+                    <div>
+                        <div class="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Available Fields</div>
+                        <div id="field-palette" class="min-h-72 space-y-2 rounded-lg border border-dashed border-gray-300 bg-gray-50 p-3"></div>
+                    </div>
+                    <form method="post" id="layout-form">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="save_form_layout">
+                        <input type="hidden" name="target_model" id="layout-target-hidden" value="account">
+                        <input type="hidden" name="layout_json" id="layout-json" value="[]">
+                        <div class="mb-2 flex items-center justify-between gap-3">
+                            <div class="text-xs font-semibold uppercase tracking-wide text-gray-500">Form Layout</div>
+                            <button type="button" onclick="resetLayoutToDefaults()" class="text-xs font-semibold text-gray-500 hover:text-blue-700">Reset</button>
+                        </div>
+                        <div id="layout-canvas" class="min-h-72 space-y-2 rounded-lg border border-gray-200 bg-white p-3"></div>
+                        <button class="mt-3 w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Save layout</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div id="skills" class="space-y-4">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-950">Skills and Service Zones</h2>
+                <p class="mt-1 text-sm text-gray-500">Routing rules used by the dispatch board and mobile workforce.</p>
+            </div>
+            <div class="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-1">
+                <section class="rounded-lg border border-gray-200 bg-white shadow-sm">
+                    <div class="border-b border-gray-200 px-4 py-3">
+                        <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Skills</h3>
+                    </div>
+                    <form method="post" class="space-y-3 p-4">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="create_skill">
+                        <input name="name" required placeholder="House Cleaning" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        <textarea name="description" rows="2" placeholder="Short description" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></textarea>
+                        <button class="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Add skill</button>
+                    </form>
+                    <div class="divide-y divide-gray-100 border-t border-gray-100">
+                        {% for skill in skills %}
+                        <div class="flex items-center justify-between gap-3 px-4 py-3">
+                            <div class="min-w-0">
+                                <div class="truncate text-sm font-semibold text-gray-950">{{ skill.name }}</div>
+                                <div class="truncate text-xs text-gray-500">{{ skill.description|default:"No description" }}</div>
+                            </div>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="delete_skill">
+                                <input type="hidden" name="id" value="{{ skill.id }}">
+                                <button class="text-xs font-semibold text-red-600 hover:text-red-700">Remove</button>
+                            </form>
+                        </div>
+                        {% empty %}
+                        <div class="px-4 py-8 text-center text-sm text-gray-400">No skills yet.</div>
+                        {% endfor %}
+                    </div>
+                </section>
+
+                <section id="zones" class="rounded-lg border border-gray-200 bg-white shadow-sm">
+                    <div class="border-b border-gray-200 px-4 py-3">
+                        <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Service Zones</h3>
+                    </div>
+                    <form method="post" class="space-y-3 p-4">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="create_service_zone">
+                        <input name="name" required placeholder="Broward County" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        <input name="active_zip_codes" placeholder="33301, 33304, 33308" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        <button class="w-full rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Add zone</button>
+                    </form>
+                    <div class="divide-y divide-gray-100 border-t border-gray-100">
+                        {% for zone in service_zones %}
+                        <div class="flex items-start justify-between gap-3 px-4 py-3">
+                            <div>
+                                <div class="text-sm font-semibold text-gray-950">{{ zone.name }}</div>
+                                <div class="mt-1 text-xs text-gray-500">{{ zone.active_zip_codes|join:", "|default:"No zip codes" }}</div>
+                            </div>
+                            <form method="post">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="delete_service_zone">
+                                <input type="hidden" name="id" value="{{ zone.id }}">
+                                <button class="text-xs font-semibold text-red-600 hover:text-red-700">Remove</button>
+                            </form>
+                        </div>
+                        {% empty %}
+                        <div class="px-4 py-8 text-center text-sm text-gray-400">No zones yet.</div>
+                        {% endfor %}
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <div id="team" class="space-y-4">
+            <div>
+                <h2 class="text-lg font-semibold text-gray-950">Team Access</h2>
+                <p class="mt-1 text-sm text-gray-500">Workspace members, field profiles, and worker skill mapping.</p>
+            </div>
+            <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div class="border-b border-gray-200 px-4 py-3">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Workers</h3>
+                </div>
+                <table class="w-full text-sm">
+                    <thead class="bg-gray-50 text-xs uppercase tracking-wide text-gray-500">
+                        <tr>
+                            <th class="px-4 py-3 text-left">Worker</th>
+                            <th class="px-4 py-3 text-left">Phone</th>
+                            <th class="px-4 py-3 text-left">Admin</th>
+                        </tr>
+                    </thead>
+                    <tbody class="divide-y divide-gray-100">
+                        {% for worker in workers %}
+                        <tr>
+                            <td class="px-4 py-3">
+                                <div class="font-semibold text-gray-950">{{ worker.user.get_full_name|default:worker.user.username }}</div>
+                                <div class="text-xs text-gray-500">{{ worker.user.email|default:"No email" }}</div>
+                            </td>
+                            <td class="px-4 py-3 text-gray-600">{{ worker.phone|default:"-" }}</td>
+                            <td class="px-4 py-3 text-gray-600">{% if worker.is_admin %}Yes{% else %}No{% endif %}</td>
+                        </tr>
+                        {% empty %}
+                        <tr><td colspan="3" class="px-4 py-8 text-center text-gray-400">No workers attached.</td></tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </section>
+
+            <section class="rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div class="border-b border-gray-200 px-4 py-3">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Worker Skills</h3>
+                </div>
+                <form method="post" class="p-4">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="assign_worker_skill">
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-4">
+                        <select name="worker_id" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+                            {% for worker in workers %}
+                            <option value="{{ worker.id }}">{{ worker.user.get_full_name|default:worker.user.username }}</option>
+                            {% endfor %}
+                        </select>
+                        <select name="skill_id" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+                            {% for skill in skills %}
+                            <option value="{{ skill.id }}">{{ skill.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <select name="proficiency_level" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">
+                            {% for value, label in proficiency_choices %}
+                            <option value="{{ value }}">{{ label }}</option>
+                            {% endfor %}
+                        </select>
+                        <button class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Save</button>
+                    </div>
+                </form>
+                <div class="divide-y divide-gray-100 border-t border-gray-100">
+                    {% for worker_skill in worker_skills %}
+                    <div class="flex items-center justify-between gap-3 px-4 py-3">
+                        <div>
+                            <div class="text-sm font-semibold text-gray-950">{{ worker_skill.worker.user.get_full_name|default:worker_skill.worker.user.username }}</div>
+                            <div class="text-xs text-gray-500">{{ worker_skill.skill.name }} / {{ worker_skill.get_proficiency_level_display }}</div>
+                        </div>
+                        <form method="post">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="delete_worker_skill">
+                            <input type="hidden" name="id" value="{{ worker_skill.id }}">
+                            <button class="text-xs font-semibold text-red-600 hover:text-red-700">Remove</button>
+                        </form>
+                    </div>
+                    {% empty %}
+                    <div class="px-4 py-8 text-center text-sm text-gray-400">No worker skills mapped yet.</div>
+                    {% endfor %}
+                </div>
+            </section>
+        </div>
+    </section>
+</div>
+
+{{ standard_module_fields|json_script:"standard-module-fields-data" }}
+{{ custom_fields_json|json_script:"setup-custom-fields-data" }}
+{{ form_layouts_json|json_script:"form-layouts-data" }}
+
+<script>
+    const standardModuleFields = JSON.parse(document.getElementById('standard-module-fields-data').textContent);
+    const setupCustomFields = JSON.parse(document.getElementById('setup-custom-fields-data').textContent);
+    const savedFormLayouts = JSON.parse(document.getElementById('form-layouts-data').textContent);
+    const layoutState = {
+        target: document.getElementById('layout-target').value,
+        fields: [],
+    };
+
+    function setupFieldKey(field) {
+        return `${field.source}:${field.key}`;
+    }
+
+    function moduleFields(target) {
+        const standard = (standardModuleFields[target] || []).map(field => ({
+            source: 'standard',
+            key: field.key,
+            label: field.label,
+            field_type: field.field_type,
+            required: true,
+        }));
+        const custom = setupCustomFields
+            .filter(field => field.target_model === target)
+            .map(field => ({
+                source: 'custom',
+                key: field.internal_name,
+                label: field.label,
+                field_type: field.field_type,
+                required: field.is_required,
+                custom_field_id: field.id,
+            }));
+        return [...standard, ...custom];
+    }
+
+    function savedLayoutFor(target) {
+        const saved = savedFormLayouts.find(layout => layout.target_model === target);
+        if (!saved || !Array.isArray(saved.layout_json) || !saved.layout_json.length) {
+            return moduleFields(target).filter(field => field.source === 'standard');
+        }
+
+        const available = moduleFields(target);
+        return saved.layout_json
+            .map(savedField => available.find(field => setupFieldKey(field) === setupFieldKey(savedField)) || savedField)
+            .filter(Boolean);
+    }
+
+    function availableFields() {
+        const activeKeys = new Set(layoutState.fields.map(setupFieldKey));
+        return moduleFields(layoutState.target).filter(field => !activeKeys.has(setupFieldKey(field)));
+    }
+
+    function fieldPill(field, options = {}) {
+        const isLayout = options.layoutIndex !== undefined;
+        const typeLabel = field.field_type.replace('_', ' ');
+        return `
+            <div class="field-pill flex items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm shadow-sm ${isLayout ? 'cursor-move' : 'cursor-grab'}"
+                draggable="true"
+                data-source="${field.source}"
+                data-key="${field.key}"
+                ${isLayout ? `data-index="${options.layoutIndex}"` : ''}>
+                <div class="min-w-0">
+                    <div class="truncate font-semibold text-gray-900">${escapeHtml(field.label)}</div>
+                    <div class="text-xs capitalize text-gray-500">${escapeHtml(typeLabel)} / ${field.source}</div>
+                </div>
+                ${isLayout ? `<button type="button" class="shrink-0 text-xs font-semibold text-red-600 hover:text-red-700" onclick="removeLayoutField(${options.layoutIndex})">Remove</button>` : '<span class="shrink-0 text-xs font-semibold text-blue-600">Add</span>'}
+            </div>`;
+    }
+
+    function escapeHtml(value) {
+        return String(value ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+    }
+
+    function renderLayoutBuilder() {
+        const palette = document.getElementById('field-palette');
+        const canvas = document.getElementById('layout-canvas');
+        const hiddenTarget = document.getElementById('layout-target-hidden');
+        const hiddenJson = document.getElementById('layout-json');
+
+        hiddenTarget.value = layoutState.target;
+        hiddenJson.value = JSON.stringify(layoutState.fields);
+
+        const fields = availableFields();
+        palette.innerHTML = fields.length
+            ? fields.map(field => fieldPill(field)).join('')
+            : '<div class="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-400">All fields are already in the layout.</div>';
+
+        canvas.innerHTML = layoutState.fields.length
+            ? layoutState.fields.map((field, index) => fieldPill(field, { layoutIndex: index })).join('')
+            : '<div class="rounded-lg border border-dashed border-gray-300 px-4 py-8 text-center text-sm text-gray-400">No fields selected.</div>';
+
+        bindDragEvents();
+    }
+
+    function bindDragEvents() {
+        document.querySelectorAll('.field-pill').forEach(item => {
+            item.addEventListener('dragstart', event => {
+                event.dataTransfer.setData('application/json', JSON.stringify({
+                    source: item.dataset.source,
+                    key: item.dataset.key,
+                    index: item.dataset.index,
+                }));
+            });
+        });
+
+        const canvas = document.getElementById('layout-canvas');
+        canvas.ondragover = event => event.preventDefault();
+        canvas.ondrop = event => {
+            event.preventDefault();
+            const data = JSON.parse(event.dataTransfer.getData('application/json') || '{}');
+            const targetItem = event.target.closest('.field-pill');
+            const targetIndex = targetItem?.dataset.index ? Number(targetItem.dataset.index) : layoutState.fields.length;
+
+            if (data.index !== undefined) {
+                const currentIndex = Number(data.index);
+                const field = layoutState.fields.splice(currentIndex, 1)[0];
+                const insertIndex = currentIndex < targetIndex ? targetIndex - 1 : targetIndex;
+                layoutState.fields.splice(insertIndex, 0, field);
+            } else {
+                const field = moduleFields(layoutState.target).find(item => item.source === data.source && item.key === data.key);
+                if (field) {
+                    layoutState.fields.splice(targetIndex, 0, field);
+                }
+            }
+            renderLayoutBuilder();
+        };
+    }
+
+    function removeLayoutField(index) {
+        layoutState.fields.splice(index, 1);
+        renderLayoutBuilder();
+    }
+
+    function resetLayoutToDefaults() {
+        layoutState.fields = moduleFields(layoutState.target).filter(field => field.source === 'standard');
+        renderLayoutBuilder();
+    }
+
+    document.getElementById('layout-target').addEventListener('change', event => {
+        layoutState.target = event.target.value;
+        layoutState.fields = savedLayoutFor(layoutState.target);
+        renderLayoutBuilder();
+    });
+
+    document.addEventListener('DOMContentLoaded', () => {
+        layoutState.fields = savedLayoutFor(layoutState.target);
+        renderLayoutBuilder();
+    });
+</script>
+{% endblock %}

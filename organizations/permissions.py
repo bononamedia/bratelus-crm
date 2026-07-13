@@ -1,0 +1,63 @@
+from django.db.models import Q
+
+from .models import WorkerProfile, WorkspaceMember
+
+
+MANAGER_ROLES = ('admin', 'manager')
+
+
+def workspace_membership_for_user(user, workspace):
+    if not user.is_authenticated or not workspace:
+        return None
+
+    return WorkspaceMember.objects.filter(
+        workspace=workspace,
+        user=user,
+        is_active=True,
+    ).first()
+
+
+def worker_profile_for_workspace(user, workspace):
+    if not user.is_authenticated or not workspace:
+        return None
+
+    return WorkerProfile.objects.filter(
+        Q(user=user),
+        Q(workspaces=workspace),
+    ).select_related('user').first()
+
+
+def user_can_manage_workspace(user, workspace):
+    if not user.is_authenticated or not workspace:
+        return False
+
+    if user.is_staff or user.is_superuser:
+        return True
+
+    membership = workspace_membership_for_user(user, workspace)
+    if membership and membership.role in MANAGER_ROLES:
+        return True
+
+    worker_profile = worker_profile_for_workspace(user, workspace)
+    return bool(worker_profile and worker_profile.is_admin)
+
+
+def workspace_role_label(user, workspace):
+    if not user.is_authenticated:
+        return 'Signed out'
+
+    if user.is_superuser:
+        return 'Platform Superadmin'
+
+    if user.is_staff:
+        return 'Platform Staff'
+
+    membership = workspace_membership_for_user(user, workspace)
+    if membership:
+        return membership.get_role_display()
+
+    worker_profile = worker_profile_for_workspace(user, workspace)
+    if worker_profile:
+        return 'Workspace Admin' if worker_profile.is_admin else 'Employee'
+
+    return 'Member'
