@@ -1,8 +1,12 @@
 import json
 
 from django.contrib import messages
+from django.contrib.auth import get_user_model, login
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 from django.core.exceptions import PermissionDenied
+from django.db import transaction
 from django.shortcuts import redirect, render
 from django.utils.text import slugify
 from fsm.models import JobAssignment
@@ -17,6 +21,7 @@ from .models import (
     WorkspaceEmailConnection,
     WorkspaceEmailDomain,
     WorkspaceMember,
+    Workspace,
 )
 from .permissions import user_can_manage_workspace, worker_profile_for_workspace
 
@@ -33,13 +38,26 @@ STANDARD_MODULE_FIELDS = {
     'account': [
         {'key': 'name', 'label': 'Account Name', 'field_type': 'text'},
         {'key': 'phone', 'label': 'Phone', 'field_type': 'text'},
-        {'key': 'billing_address', 'label': 'Billing Address', 'field_type': 'textarea'},
+        {'key': 'email', 'label': 'Email', 'field_type': 'text'},
+        {'key': 'website', 'label': 'Website', 'field_type': 'text'},
+        {'key': 'billing_street', 'label': 'Billing Street', 'field_type': 'text'},
+        {'key': 'billing_city', 'label': 'Billing City', 'field_type': 'text'},
+        {'key': 'billing_state', 'label': 'Billing State', 'field_type': 'text'},
+        {'key': 'billing_postal_code', 'label': 'Billing ZIP', 'field_type': 'text'},
+        {'key': 'billing_country', 'label': 'Billing Country', 'field_type': 'text'},
     ],
     'contact': [
         {'key': 'first_name', 'label': 'First Name', 'field_type': 'text'},
         {'key': 'last_name', 'label': 'Last Name', 'field_type': 'text'},
         {'key': 'email', 'label': 'Email', 'field_type': 'text'},
         {'key': 'phone', 'label': 'Phone', 'field_type': 'text'},
+        {'key': 'mobile', 'label': 'Mobile', 'field_type': 'text'},
+        {'key': 'mailing_street', 'label': 'Mailing Street', 'field_type': 'text'},
+        {'key': 'mailing_city', 'label': 'Mailing City', 'field_type': 'text'},
+        {'key': 'mailing_state', 'label': 'Mailing State', 'field_type': 'text'},
+        {'key': 'mailing_postal_code', 'label': 'Mailing ZIP', 'field_type': 'text'},
+        {'key': 'lead_source', 'label': 'Lead Source', 'field_type': 'text'},
+        {'key': 'status', 'label': 'Status', 'field_type': 'text'},
         {'key': 'is_primary', 'label': 'Primary Contact', 'field_type': 'boolean'},
     ],
     'property': [
@@ -71,6 +89,109 @@ def optional_int(value):
         return int(value) if value not in ['', None] else None
     except (TypeError, ValueError):
         return None
+
+
+def unique_workspace_slug(name):
+    base = slugify(name)[:45] or 'workspace'
+    candidate = base
+    counter = 2
+    while Workspace.objects.filter(slug=candidate).exists():
+        candidate = f'{base[:40]}-{counter}'
+        counter += 1
+    return candidate
+
+
+@transaction.atomic
+def signup_view(request):
+    if request.user.is_authenticated:
+        return redirect('workspace_create')
+    if request.method == 'POST':
+        company_name = request.POST.get('company_name', '').strip()
+        first_name = request.POST.get('first_name', '').strip()
+        last_name = request.POST.get('last_name', '').strip()
+        email = request.POST.get('email', '').strip().lower()
+        password = request.POST.get('password', '')
+        User = get_user_model()
+        errors = []
+        if not company_name:
+            errors.append('Company name is required.')
+        if not email or '@' not in email:
+            errors.append('Enter a valid work email.')
+        if User.objects.filter(email__iexact=email).exists():
+            errors.append('An account already exists for that email. Sign in instead.')
+        try:
+            validate_password(password)
+        except ValidationError as exc:
+            errors.extend(exc.messages)
+        if errors:
+            for error in errors:
+                messages.error(request, error)
+        else:
+            user = User.objects.create_user(
+                username=email,
+                email=email,
+                password=password,
+                first_name=first_name,
+                last_name=last_name,
+            )
+            workspace = Workspace.objects.create(
+                name=company_name,
+                slug=unique_workspace_slug(company_name),
+                created_by=user,
+            )
+            WorkspaceMember.objects.create(workspace=workspace, user=user, role='admin', is_active=True)
+            from finance.models import SubscriptionPlan, WorkspaceSubscription
+
+            plan = SubscriptionPlan.objects.filter(is_active=True).first()
+            if plan:
+                WorkspaceSubscription.objects.create(
+                    workspace=workspace,
+                    plan=plan,
+                    billing_email=email,
+                    seat_count=1,
+                    status='trialing',
+                )
+            login(request, user)
+            request.session['active_org_id'] = str(workspace.id)
+            return redirect('billing_overview')
+    return render(request, 'registration/signup.html')
+
+
+@login_required
+@transaction.atomic
+def create_workspace_view(request):
+    if request.method == 'POST':
+        name = request.POST.get('name', '').strip()
+        billing_email = request.POST.get('billing_email', '').strip().lower()
+        if not name:
+            messages.error(request, 'Workspace name is required.')
+        else:
+            workspace = Workspace.objects.create(
+                name=name,
+                slug=unique_workspace_slug(name),
+                created_by=request.user,
+            )
+            WorkspaceMember.objects.create(
+                workspace=workspace,
+                user=request.user,
+                role='admin',
+                is_active=True,
+            )
+            from finance.models import SubscriptionPlan, WorkspaceSubscription
+
+            plan = SubscriptionPlan.objects.filter(is_active=True).first()
+            if plan:
+                WorkspaceSubscription.objects.create(
+                    workspace=workspace,
+                    plan=plan,
+                    billing_email=billing_email or request.user.email,
+                    seat_count=1,
+                    status='trialing',
+                )
+            request.session['active_org_id'] = str(workspace.id)
+            messages.success(request, f'Workspace "{workspace.name}" created. Complete billing when ready.')
+            return redirect('admin_console')
+    return render(request, 'workspace_create.html')
 
 
 @login_required
@@ -257,6 +378,55 @@ def admin_console_view(request):
             ).delete()
             messages.success(request, 'Worker skill removed.')
 
+        elif action == 'invite_member':
+            email = request.POST.get('email', '').strip().lower()
+            first_name = request.POST.get('first_name', '').strip()
+            last_name = request.POST.get('last_name', '').strip()
+            role = request.POST.get('role', 'worker')
+            if role not in dict(WorkspaceMember.ROLE_CHOICES):
+                role = 'worker'
+            existing_member = WorkspaceMember.objects.filter(workspace=active_org, user__email__iexact=email).exists()
+            if not email or '@' not in email:
+                messages.error(request, 'Enter a valid user email address.')
+            elif existing_member:
+                messages.error(request, 'That user already belongs to this workspace.')
+            elif request.POST.get('confirm_price') != 'yes':
+                messages.error(request, 'Confirm the displayed monthly estimate before adding the user.')
+            else:
+                User = get_user_model()
+                user = User.objects.filter(email__iexact=email).first()
+                created_user = False
+                if not user:
+                    username = email
+                    user = User(username=username, email=email, first_name=first_name, last_name=last_name)
+                    user.set_unusable_password()
+                    user.save()
+                    created_user = True
+                WorkspaceMember.objects.create(workspace=active_org, user=user, role=role, is_active=True)
+                worker, _ = WorkerProfile.objects.get_or_create(user=user)
+                worker.workspaces.add(active_org)
+                worker.is_admin = role in {'admin', 'manager'}
+                worker.save(update_fields=['is_admin'])
+
+                from finance.billing_views import sync_subscription_seats
+                from finance.models import BillingEvent, WorkspaceSubscription
+
+                subscription = WorkspaceSubscription.objects.filter(workspace=active_org).select_related('plan').first()
+                seat_count = WorkspaceMember.objects.filter(workspace=active_org, is_active=True).count()
+                if subscription:
+                    stripe_synced = sync_subscription_seats(subscription, seat_count)
+                    BillingEvent.objects.create(
+                        workspace=active_org,
+                        event_type='seats.updated',
+                        summary=f'User added; subscription now has {seat_count} seats.',
+                        actor=request.user,
+                        metadata={'stripe_synced': stripe_synced, 'member_email': email},
+                    )
+                message = f'{email} added to the workspace.'
+                if created_user:
+                    message += ' Send the user a password-reset link so they can activate the account.'
+                messages.success(request, message)
+
         return redirect('admin_console')
 
     custom_fields = CustomField.objects.filter(workspace=active_org).order_by('target_model', 'label')
@@ -277,6 +447,21 @@ def admin_console_view(request):
         skill__workspace=active_org,
     ).select_related('worker__user', 'skill').order_by('worker__user__username', 'skill__name')
     members = WorkspaceMember.objects.filter(workspace=active_org).select_related('user').order_by('user__username')
+
+    from finance.models import SubscriptionPlan, WorkspaceSubscription
+    from finance.pricing import monthly_price
+
+    subscription = WorkspaceSubscription.objects.filter(workspace=active_org).select_related('plan').first()
+    if not subscription:
+        plan = SubscriptionPlan.objects.filter(is_active=True).first()
+        if plan:
+            subscription = WorkspaceSubscription.objects.create(
+                workspace=active_org,
+                plan=plan,
+                billing_email=request.user.email,
+                seat_count=max(members.filter(is_active=True).count(), 1),
+            )
+    active_seats = max(members.filter(is_active=True).count(), 1)
 
     context = {
         'custom_fields': custom_fields,
@@ -311,6 +496,11 @@ def admin_console_view(request):
         'worker_skills': worker_skills,
         'members': members,
         'proficiency_choices': WorkerSkill.PROFICIENCY_CHOICES,
+        'member_role_choices': WorkspaceMember.ROLE_CHOICES,
+        'subscription': subscription,
+        'active_seats': active_seats,
+        'current_monthly_price': monthly_price(subscription.plan, active_seats) if subscription else 0,
+        'next_monthly_price': monthly_price(subscription.plan, active_seats + 1) if subscription else 0,
         'stats': {
             'custom_fields': custom_fields.count(),
             'email_domains': email_domains.count(),

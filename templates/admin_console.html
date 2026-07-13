@@ -454,6 +454,25 @@
                 <h2 class="text-lg font-semibold text-gray-950">Team Access</h2>
                 <p class="mt-1 text-sm text-gray-500">Workspace members, field profiles, and worker skill mapping.</p>
             </div>
+            <section class="rounded-lg border border-blue-200 bg-white shadow-sm">
+                <div class="flex flex-col gap-3 border-b border-blue-100 bg-blue-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div><h3 class="text-sm font-semibold text-blue-950">Add workspace user</h3><p class="mt-1 text-xs text-blue-700">Current estimate: ${{ current_monthly_price }}/month for {{ active_seats }} user{{ active_seats|pluralize }}.</p></div>
+                    <div class="text-sm font-semibold text-blue-950">After adding: ${{ next_monthly_price }}/month</div>
+                </div>
+                <form method="post" class="p-4">
+                    {% csrf_token %}<input type="hidden" name="action" value="invite_member">
+                    <div class="grid gap-3 md:grid-cols-2 lg:grid-cols-5">
+                        <input name="first_name" placeholder="First name" required class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        <input name="last_name" placeholder="Last name" required class="rounded-lg border border-gray-300 px-3 py-2 text-sm">
+                        <input name="email" type="email" placeholder="Work email" required class="rounded-lg border border-gray-300 px-3 py-2 text-sm lg:col-span-2">
+                        <select name="role" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm">{% for value, label in member_role_choices %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select>
+                    </div>
+                    <div class="mt-4 flex flex-col gap-3 border-t border-gray-100 pt-4 sm:flex-row sm:items-center sm:justify-between">
+                        <label class="flex items-start gap-2 text-sm text-gray-600"><input type="checkbox" name="confirm_price" value="yes" required class="mt-0.5 h-4 w-4 rounded border-gray-300 text-blue-600"><span>I confirm the estimated subscription changes from <strong>${{ current_monthly_price }}</strong> to <strong>${{ next_monthly_price }}</strong> per month.</span></label>
+                        <button class="shrink-0 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Add User</button>
+                    </div>
+                </form>
+            </section>
             <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
                 <div class="border-b border-gray-200 px-4 py-3">
                     <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Workers</h3>

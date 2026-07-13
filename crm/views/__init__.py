@@ -27,7 +27,7 @@ def crm_accounts_view(request, section='accounts'):
 
     if active_org:
         accounts = Account.objects.filter(organization=active_org)
-        contacts = Contact.objects.filter(account__organization=active_org)
+        contacts = Contact.objects.filter(organization=active_org)
         properties = Property.objects.filter(account__organization=active_org)
         payment_methods = PaymentMethod.objects.filter(account__organization=active_org)
         open_jobs = Job.objects.filter(organization=active_org).exclude(status__in=['completed', 'canceled'])

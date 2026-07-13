@@ -64,7 +64,7 @@ class ContactViewSet(BaseWorkspaceViewSet):
         if not active_org or not user_can_manage_workspace(self.request.user, active_org):
             return self.queryset.none()
             
-        return Contact.objects.filter(account__organization=active_org).select_related('account')
+        return Contact.objects.filter(organization=active_org).select_related('account')
 
     def perform_create(self, serializer):
         active_org = getattr(self.request, 'active_organization', None)
@@ -72,10 +72,10 @@ class ContactViewSet(BaseWorkspaceViewSet):
             raise PermissionDenied('Only workspace admins can manage CRM contacts.')
 
         account = serializer.validated_data.get('account')
-        if not active_org or account.organization_id != active_org.id:
+        if account and account.organization_id != active_org.id:
             raise ValidationError({'account': 'Account must belong to the active organization.'})
 
-        serializer.save()
+        serializer.save(organization=active_org)
 
 
 class PropertyViewSet(BaseWorkspaceViewSet):

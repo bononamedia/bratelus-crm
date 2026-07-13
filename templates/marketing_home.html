@@ -1,0 +1,46 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="Bratelus combines CRM, dispatch, field workforce, billing, and reporting for service companies.">
+    <title>Bratelus | CRM and Dispatch for Field Service Teams</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>body{letter-spacing:0}.hero-photo{background-image:linear-gradient(90deg,rgba(3,10,24,.93) 0%,rgba(3,10,24,.78) 38%,rgba(3,10,24,.18) 70%,rgba(3,10,24,.08) 100%),url('{% static "marketing/bratelus-field-operations-hero.png" %}');background-size:cover;background-position:center}</style>
+</head>
+<body class="bg-white text-slate-950 antialiased">
+    <header class="fixed inset-x-0 top-0 z-40 border-b border-white/15 bg-slate-950/75 backdrop-blur">
+        <div class="mx-auto flex h-16 max-w-7xl items-center justify-between px-5 lg:px-8">
+            <a href="/" class="text-2xl font-semibold text-white">Bratelus<span class="text-sky-400">.</span></a>
+            <nav class="hidden items-center gap-7 text-sm text-slate-200 md:flex"><a href="#platform" class="hover:text-white">Platform</a><a href="#industries" class="hover:text-white">Industries</a><a href="#pricing" class="hover:text-white">Pricing</a></nav>
+            <div class="flex items-center gap-3"><a href="https://app.bratelus.com/accounts/login/" class="text-sm font-medium text-white">Sign in</a><a href="https://app.bratelus.com/signup/" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-500">Start now</a></div>
+        </div>
+    </header>
+
+    <main>
+        <section class="hero-photo flex min-h-[86vh] items-center pt-16 text-white">
+            <div class="mx-auto w-full max-w-7xl px-5 py-20 lg:px-8">
+                <div class="max-w-2xl">
+                    <p class="text-sm font-semibold uppercase text-sky-300">CRM + Field Operations</p>
+                    <h1 class="mt-4 text-5xl font-semibold leading-tight sm:text-6xl">Bratelus</h1>
+                    <p class="mt-5 max-w-xl text-xl leading-8 text-slate-200">Run every customer relationship, job, crew, location, invoice, and workspace from one service operations platform.</p>
+                    <div class="mt-8 flex flex-wrap gap-3"><a href="https://app.bratelus.com/signup/" class="rounded-md bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-500">Create your workspace</a><a href="#platform" class="rounded-md border border-white/35 bg-white/10 px-5 py-3 text-sm font-semibold text-white hover:bg-white/15">Explore the platform</a></div>
+                    <div class="mt-10 flex flex-wrap gap-x-8 gap-y-3 text-sm text-slate-300"><span>Full CRM included</span><span>Live dispatch</span><span>Multi-brand workspaces</span><span>Mobile-ready APIs</span></div>
+                </div>
+            </div>
+        </section>
+
+        <section id="platform" class="border-b border-slate-200 bg-white py-20">
+            <div class="mx-auto max-w-7xl px-5 lg:px-8">
+                <div class="grid gap-12 lg:grid-cols-[.8fr_1.2fr]"><div><p class="text-sm font-semibold uppercase text-blue-600">One operating system</p><h2 class="mt-3 text-4xl font-semibold leading-tight">From first call to completed field work.</h2><p class="mt-5 text-lg leading-8 text-slate-600">Bratelus keeps sales, scheduling, teams, locations, service evidence, and money tied to the same customer record. Each workspace can represent a separate brand, domain, team, and billing relationship without mixing data.</p></div><div class="grid gap-px overflow-hidden rounded-lg border border-slate-200 bg-slate-200 sm:grid-cols-2"><div class="bg-white p-6"><h3 class="font-semibold">CRM</h3><p class="mt-2 text-sm leading-6 text-slate-600">Accounts, contacts, properties, activities, custom fields, email, and imports.</p></div><div class="bg-white p-6"><h3 class="font-semibold">Smart Dispatch</h3><p class="mt-2 text-sm leading-6 text-slate-600">Jobs, crew assignment, service zones, skills, status, and live fleet position.</p></div><div class="bg-white p-6"><h3 class="font-semibold">Workforce</h3><p class="mt-2 text-sm leading-6 text-slate-600">Company admins, managers, employees, field profiles, access, and assignments.</p></div><div class="bg-white p-6"><h3 class="font-semibold">Finance & Reports</h3><p class="mt-2 text-sm leading-6 text-slate-600">Service invoices, payment routing, platform billing, operational KPIs, and exports.</p></div></div></div>
+            </div>
+        </section>
+
+        <section id="industries" class="bg-slate-50 py-20"><div class="mx-auto max-w-7xl px-5 lg:px-8"><div class="max-w-2xl"><p class="text-sm font-semibold uppercase text-emerald-700">Built for teams in motion</p><h2 class="mt-3 text-4xl font-semibold">A clearer day for every field service business.</h2></div><div class="mt-10 grid gap-8 md:grid-cols-3"><div><div class="h-1 w-12 bg-blue-600"></div><h3 class="mt-5 text-xl font-semibold">Construction & trades</h3><p class="mt-3 leading-7 text-slate-600">Coordinate crews, site contacts, access information, dependencies, evidence, and completion.</p></div><div><div class="h-1 w-12 bg-emerald-500"></div><h3 class="mt-5 text-xl font-semibold">Cleaning & property service</h3><p class="mt-3 leading-7 text-slate-600">Manage recurring customers, properties, teams, frequency, notes, materials, and quality history.</p></div><div><div class="h-1 w-12 bg-amber-500"></div><h3 class="mt-5 text-xl font-semibold">Insurance & inspections</h3><p class="mt-3 leading-7 text-slate-600">Dispatch inspectors, document field evidence, preserve timelines, and keep every case connected.</p></div></div></div></section>
+
+        <section id="pricing" class="bg-slate-950 py-20 text-white"><div class="mx-auto max-w-6xl px-5 lg:px-8"><div class="grid gap-12 lg:grid-cols-[.8fr_1.2fr]"><div><p class="text-sm font-semibold uppercase text-sky-300">Simple graduated pricing</p><h2 class="mt-3 text-4xl font-semibold">Full CRM from $49 per month.</h2><p class="mt-5 leading-7 text-slate-300">One workspace and one user are included. Add people as your operation grows, with lower rates in each additional-user band.</p><a href="https://app.bratelus.com/workspaces/new/" class="mt-8 inline-block rounded-md bg-blue-600 px-5 py-3 text-sm font-semibold hover:bg-blue-500">Start with one workspace</a></div><div class="overflow-hidden rounded-lg border border-slate-700"><div class="flex items-end justify-between border-b border-slate-700 p-6"><div><div class="text-sm text-slate-400">Base workspace</div><div class="mt-1 text-xl font-semibold">Full Bratelus CRM</div></div><div class="text-right"><div class="text-4xl font-semibold">$49</div><div class="text-sm text-slate-400">monthly / 1 user</div></div></div><div class="divide-y divide-slate-800 text-sm"><div class="flex justify-between p-4"><span>Additional users 1-5</span><span class="font-semibold">$25 each</span></div><div class="flex justify-between p-4"><span>Additional users 6-10</span><span class="font-semibold">$20 each</span></div><div class="flex justify-between p-4"><span>Additional users 11-50</span><span class="font-semibold">$15 each</span></div><div class="flex justify-between p-4"><span>Additional users 51+</span><span class="font-semibold">$10 each</span></div></div></div></div></div></section>
+    </main>
+    <footer class="border-t border-slate-200 bg-white"><div class="mx-auto flex max-w-7xl flex-col gap-3 px-5 py-8 text-sm text-slate-500 sm:flex-row sm:items-center sm:justify-between lg:px-8"><span>Bratelus. Service operations, connected.</span><div class="flex gap-5"><a href="https://app.bratelus.com/accounts/login/">Sign in</a><a href="mailto:sales@bratelus.com">Sales</a></div></div></footer>
+</body>
+</html>

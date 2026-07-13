@@ -26,10 +26,11 @@ from fsm.views import (
 
 # Unified API ViewSets
 from core.api.views import AccountViewSet, ContactViewSet, JobViewSet, PaymentMethodViewSet, PropertyViewSet, WorkerViewSet
-from core.views import reports_view
+from core.views import home_view, reports_view
 from finance.views import finance_overview_view
+from finance.billing_views import billing_overview_view, create_billing_portal_view, create_checkout_session_view, stripe_webhook_view
 from organizations.models import Workspace
-from organizations.views import admin_console_view, employee_profile_view
+from organizations.views import admin_console_view, create_workspace_view, employee_profile_view, signup_view
 from workforce.views import workforce_view
 
 
@@ -77,10 +78,12 @@ def switch_organization_view(request):
 urlpatterns = [
     # --- SYSTEM ---
     path('admin/', admin.site.urls),
+    path('signup/', signup_view, name='signup'),
     path('api/switch-org/', switch_organization_view, name='switch_org'),
     
     # --- WEB UI DASHBOARDS ---
-    path('', dashboard_view, name='dashboard'),
+    path('', home_view, name='marketing_home'),
+    path('dashboard/', dashboard_view, name='dashboard'),
     path('leads/', leads_list_view, name='leads'),
     path('jobs/', jobs_board_view, name='jobs'),
     path('accounts/', crm_accounts_view, name='accounts'),
@@ -91,6 +94,11 @@ urlpatterns = [
     path('workforce/', workforce_view, name='workforce'),
     path('reports/', reports_view, name='reports'),
     path('settings/', admin_console_view, name='admin_console'),
+    path('workspaces/new/', create_workspace_view, name='workspace_create'),
+    path('billing/', billing_overview_view, name='billing_overview'),
+    path('billing/checkout/', create_checkout_session_view, name='billing_checkout'),
+    path('billing/portal/', create_billing_portal_view, name='billing_portal'),
+    path('billing/webhook/stripe/', stripe_webhook_view, name='stripe_webhook'),
     path('me/', employee_profile_view, name='employee_profile'),
     
     # FIX: Added Django's built-in authentication URLs

@@ -16,7 +16,7 @@ class WorkspaceMemberInline(admin.TabularInline):
 
 @admin.register(Workspace)
 class WorkspaceAdmin(admin.ModelAdmin):
-    list_display = ('name', 'slug', 'created_at')
+    list_display = ('name', 'slug', 'created_by', 'created_at')
     prepopulated_fields = {'slug': ('name',)}
     search_fields = ('name', 'slug')
     ordering = ('name',)

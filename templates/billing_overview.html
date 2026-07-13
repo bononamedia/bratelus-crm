@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block title %}Subscription & Billing | Bratelus{% endblock %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl space-y-6">
+    <div class="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+            <p class="text-xs font-semibold uppercase text-blue-600">Workspace billing</p>
+            <h1 class="mt-1 text-3xl font-semibold text-gray-950">Subscription & invoices</h1>
+            <p class="mt-2 text-sm text-gray-500">Full CRM, dispatch, workforce, finance, and reporting for {{ active_org.name }}.</p>
+        </div>
+        <div class="flex gap-2">
+            {% if subscription.stripe_customer_id %}
+            <form method="post" action="{% url 'billing_portal' %}">{% csrf_token %}<button class="rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-700 hover:bg-gray-50">Manage in Stripe</button></form>
+            {% endif %}
+            {% if subscription.status != 'active' %}
+            <form method="post" action="{% url 'billing_checkout' %}">{% csrf_token %}<button {% if not stripe_ready %}disabled title="Stripe prices are not configured"{% endif %} class="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-gray-300">Activate billing</button></form>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if not stripe_ready %}<div class="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">Stripe is ready in the application, but the secret and two recurring Price IDs must be configured before checkout can open.</div>{% endif %}
+
+    <div class="grid gap-4 md:grid-cols-4">
+        <div class="rounded-lg border border-gray-200 bg-white p-5"><div class="text-xs font-semibold uppercase text-gray-500">Plan</div><div class="mt-2 text-lg font-semibold text-gray-950">{{ subscription.plan.name }}</div></div>
+        <div class="rounded-lg border border-gray-200 bg-white p-5"><div class="text-xs font-semibold uppercase text-gray-500">Status</div><div class="mt-2 text-lg font-semibold capitalize text-gray-950">{{ subscription.get_status_display }}</div></div>
+        <div class="rounded-lg border border-gray-200 bg-white p-5"><div class="text-xs font-semibold uppercase text-gray-500">Active users</div><div class="mt-2 text-3xl font-semibold text-gray-950">{{ active_users }}</div></div>
+        <div class="rounded-lg border border-blue-200 bg-blue-50 p-5"><div class="text-xs font-semibold uppercase text-blue-700">Estimated monthly</div><div class="mt-2 text-3xl font-semibold text-blue-950">${{ estimated_monthly }}</div></div>
+    </div>
+
+    <div class="grid gap-6 lg:grid-cols-[1.1fr_.9fr]">
+        <section class="overflow-hidden rounded-lg border border-gray-200 bg-white">
+            <div class="border-b border-gray-200 px-5 py-4"><h2 class="font-semibold text-gray-950">Current price breakdown</h2></div>
+            <div class="divide-y divide-gray-100">
+                {% for row in pricing_breakdown %}<div class="grid grid-cols-[1fr_auto_auto] gap-4 px-5 py-4 text-sm"><span class="text-gray-700">{{ row.label }}</span><span class="text-gray-500">{{ row.quantity }} x ${{ row.unit_amount }}</span><span class="font-semibold text-gray-950">${{ row.amount }}</span></div>{% endfor %}
+            </div>
+        </section>
+        <section class="overflow-hidden rounded-lg border border-gray-200 bg-white">
+            <div class="border-b border-gray-200 px-5 py-4"><h2 class="font-semibold text-gray-950">Seat planning</h2></div>
+            <div class="divide-y divide-gray-100">{% for estimate in estimates %}<div class="flex justify-between px-5 py-3 text-sm"><span class="text-gray-600">{{ estimate.users }} users</span><span class="font-semibold text-gray-950">${{ estimate.amount }}/mo</span></div>{% endfor %}</div>
+        </section>
+    </div>
+
+    <section class="overflow-hidden rounded-lg border border-gray-200 bg-white" id="platform-invoices">
+        <div class="border-b border-gray-200 px-5 py-4"><h2 class="font-semibold text-gray-950">Bratelus invoice history</h2></div>
+        <div class="overflow-x-auto"><table class="w-full text-sm"><thead class="bg-gray-50 text-left text-xs uppercase text-gray-500"><tr><th class="px-5 py-3">Invoice</th><th class="px-5 py-3">Status</th><th class="px-5 py-3">Due</th><th class="px-5 py-3">Paid</th><th class="px-5 py-3"></th></tr></thead><tbody class="divide-y divide-gray-100">{% for invoice in platform_invoices %}<tr><td class="px-5 py-4 font-medium text-gray-950">{{ invoice.invoice_number|default:invoice.stripe_invoice_id }}</td><td class="px-5 py-4 capitalize text-gray-600">{{ invoice.status }}</td><td class="px-5 py-4">${{ invoice.amount_due }}</td><td class="px-5 py-4">${{ invoice.amount_paid }}</td><td class="px-5 py-4 text-right">{% if invoice.hosted_invoice_url %}<a href="{{ invoice.hosted_invoice_url }}" class="font-semibold text-blue-600" target="_blank" rel="noopener">View</a>{% endif %}</td></tr>{% empty %}<tr><td colspan="5" class="px-5 py-10 text-center text-gray-400">Stripe invoices will appear here.</td></tr>{% endfor %}</tbody></table></div>
+    </section>
+</div>
+{% endblock %}

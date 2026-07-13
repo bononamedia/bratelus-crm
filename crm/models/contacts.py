@@ -13,8 +13,20 @@ class Account(models.Model):
     """
     organization = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='accounts')
     name = models.CharField(max_length=255)
-    phone = models.CharField(max_length=20, blank=True)
+    phone = models.CharField(max_length=50, blank=True)
+    email = models.EmailField(blank=True)
+    website = models.URLField(blank=True)
     billing_address = models.TextField(blank=True)
+    billing_street = models.CharField(max_length=255, blank=True)
+    billing_city = models.CharField(max_length=100, blank=True)
+    billing_state = models.CharField(max_length=100, blank=True)
+    billing_postal_code = models.CharField(max_length=20, blank=True)
+    billing_country = models.CharField(max_length=100, blank=True, default='United States')
+    shipping_street = models.CharField(max_length=255, blank=True)
+    shipping_city = models.CharField(max_length=100, blank=True)
+    shipping_state = models.CharField(max_length=100, blank=True)
+    shipping_postal_code = models.CharField(max_length=20, blank=True)
+    shipping_country = models.CharField(max_length=100, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     
     # The bucket for infinite custom fields
@@ -32,15 +44,47 @@ class Contact(models.Model):
     """
     Individual people associated with an Account.
     """
-    account = models.ForeignKey(Account, on_delete=models.CASCADE, related_name='contacts')
+    organization = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='contacts')
+    account = models.ForeignKey(
+        Account,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='contacts',
+    )
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
-    email = models.EmailField()
-    phone = models.CharField(max_length=20, blank=True)
+    email = models.EmailField(blank=True)
+    secondary_email = models.EmailField(blank=True)
+    phone = models.CharField(max_length=50, blank=True)
+    mobile = models.CharField(max_length=50, blank=True)
+    mailing_street = models.CharField(max_length=255, blank=True)
+    mailing_city = models.CharField(max_length=100, blank=True)
+    mailing_state = models.CharField(max_length=100, blank=True)
+    mailing_postal_code = models.CharField(max_length=20, blank=True)
+    mailing_country = models.CharField(max_length=100, blank=True)
+    lead_source = models.CharField(max_length=100, blank=True)
+    status = models.CharField(max_length=100, blank=True)
+    description = models.TextField(blank=True)
+    email_opt_out = models.BooleanField(default=False)
+    sms_opt_out = models.BooleanField(default=False)
+    external_source = models.CharField(max_length=50, blank=True)
+    external_id = models.CharField(max_length=100, blank=True)
     is_primary = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
     
     # The bucket for infinite custom fields
     custom_data = models.JSONField(default=dict, blank=True)
+
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=('organization', 'external_source', 'external_id'),
+                condition=~models.Q(external_id=''),
+                name='crm_contact_unique_external_record',
+            ),
+        ]
 
     def __str__(self):
         return f"{self.first_name} {self.last_name}"

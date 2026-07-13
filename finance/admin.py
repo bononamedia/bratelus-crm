@@ -1,5 +1,13 @@
 from django.contrib import admin
-from .models import Invoice, LineItem
+from .models import (
+    BillingEvent,
+    Invoice,
+    LineItem,
+    PlatformInvoice,
+    SeatPricingTier,
+    SubscriptionPlan,
+    WorkspaceSubscription,
+)
 
 
 class LineItemInline(admin.TabularInline):
@@ -21,3 +29,40 @@ class LineItemAdmin(admin.ModelAdmin):
     list_display = ('description', 'invoice', 'quantity', 'unit_price', 'total_price')
     search_fields = ('description', 'invoice__invoice_number')
     autocomplete_fields = ('invoice', 'job')
+
+
+class SeatPricingTierInline(admin.TabularInline):
+    model = SeatPricingTier
+    extra = 0
+
+
+@admin.register(SubscriptionPlan)
+class SubscriptionPlanAdmin(admin.ModelAdmin):
+    list_display = ('name', 'base_monthly_amount', 'included_users', 'currency', 'is_active')
+    list_filter = ('is_active', 'currency')
+    search_fields = ('name', 'code')
+    prepopulated_fields = {'code': ('name',)}
+    inlines = (SeatPricingTierInline,)
+
+
+@admin.register(WorkspaceSubscription)
+class WorkspaceSubscriptionAdmin(admin.ModelAdmin):
+    list_display = ('workspace', 'plan', 'status', 'seat_count', 'billing_email')
+    list_filter = ('status', 'plan')
+    search_fields = ('workspace__name', 'billing_email', 'stripe_customer_id', 'stripe_subscription_id')
+    autocomplete_fields = ('workspace', 'plan')
+
+
+@admin.register(PlatformInvoice)
+class PlatformInvoiceAdmin(admin.ModelAdmin):
+    list_display = ('invoice_number', 'workspace', 'status', 'amount_due', 'amount_paid', 'created_at')
+    list_filter = ('status', 'currency')
+    search_fields = ('invoice_number', 'workspace__name', 'stripe_invoice_id')
+
+
+@admin.register(BillingEvent)
+class BillingEventAdmin(admin.ModelAdmin):
+    list_display = ('event_type', 'workspace', 'summary', 'created_at')
+    list_filter = ('event_type',)
+    search_fields = ('summary', 'stripe_event_id', 'workspace__name')
+    readonly_fields = ('created_at',)

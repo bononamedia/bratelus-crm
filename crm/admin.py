@@ -10,9 +10,10 @@ class AccountAdmin(admin.ModelAdmin):
 
 @admin.register(Contact)
 class ContactAdmin(admin.ModelAdmin):
-    list_display = ('first_name', 'last_name', 'email', 'account')
-    search_fields = ('first_name', 'last_name', 'email', 'phone', 'account__name')
-    autocomplete_fields = ('account',)
+    list_display = ('first_name', 'last_name', 'email', 'organization', 'account', 'status')
+    list_filter = ('organization', 'status', 'external_source', 'email_opt_out', 'sms_opt_out')
+    search_fields = ('first_name', 'last_name', 'email', 'phone', 'mobile', 'account__name', 'external_id')
+    autocomplete_fields = ('organization', 'account')
 
 @admin.register(Property)
 class PropertyAdmin(admin.ModelAdmin):

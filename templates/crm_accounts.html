@@ -538,6 +538,8 @@
         const coreRows = {
             accounts: [
                 ['Phone', record.phone],
+                ['Email', record.email],
+                ['Website', record.website],
                 ['Billing Address', record.billing_address],
                 ['Contact Records', String(record.contact_count || 0)],
                 ['Property Records', String(record.property_count || 0)],
@@ -545,7 +547,11 @@
             contacts: [
                 ['Account', record.account_details?.name],
                 ['Email', record.email],
+                ['Secondary Email', record.secondary_email],
                 ['Phone', record.phone],
+                ['Mobile', record.mobile],
+                ['Mailing Address', [record.mailing_street, record.mailing_city, record.mailing_state, record.mailing_postal_code].filter(Boolean).join(', ')],
+                ['Status', record.status],
                 ['Primary Contact', record.is_primary ? 'Yes' : 'No'],
             ],
             properties: [
@@ -800,13 +806,13 @@
         document.getElementById('detail-overlay').classList.add('hidden');
     }
 
-    function accountOptions() {
+    function accountOptions(allowNone = false) {
         if (!crmState.accounts.length) {
-            return '<option value="">Create an account first</option>';
+            return allowNone ? '<option value="" selected>No account yet</option>' : '<option value="">Create an account first</option>';
         }
 
         return [
-            '<option value="" disabled selected>Select account...</option>',
+            allowNone ? '<option value="" selected>No account yet</option>' : '<option value="" disabled selected>Select account...</option>',
             ...crmState.accounts.map(account => `<option value="${account.id}">${escapeHtml(account.name)}</option>`),
         ].join('');
     }
@@ -839,11 +845,12 @@
         if (type === 'accounts') {
             fields.innerHTML = `
                 ${field('Account Name', 'record-name', 'required placeholder="Client or property name"')}
-                ${field('Main Phone', 'record-phone', 'placeholder="(555) 000-0000"')}
-                <label class="block">
-                    <span class="text-sm font-semibold text-gray-700">Billing Address</span>
-                    <textarea id="record-billing-address" rows="4" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"></textarea>
-                </label>`;
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Main Phone', 'record-phone', 'placeholder="(555) 000-0000"')}${field('Email', 'record-email', 'type="email"')}</div>
+                ${field('Website', 'record-website', 'type="url" placeholder="https://company.com"')}
+                <div class="border-t border-gray-200 pt-4"><h3 class="text-sm font-semibold text-gray-900">Billing address</h3></div>
+                ${field('Street', 'record-billing-street', 'placeholder="1170 N Federal Highway"')}
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('City', 'record-billing-city')}${field('State', 'record-billing-state')}</div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('ZIP / Postal code', 'record-billing-postal')}${field('Country', 'record-billing-country', 'value="United States"')}</div>`;
             return;
         }
 
@@ -851,14 +858,17 @@
             fields.innerHTML = `
                 <label class="block">
                     <span class="text-sm font-semibold text-gray-700">Account</span>
-                    <select id="record-account" required class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${accountOptions()}</select>
+                    <select id="record-account" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${accountOptions(true)}</select>
                 </label>
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     ${field('First Name', 'record-first-name', 'required')}
                     ${field('Last Name', 'record-last-name', 'required')}
                 </div>
-                ${field('Email', 'record-email', 'type="email" required')}
-                ${field('Phone', 'record-phone', 'placeholder="(555) 000-0000"')}`;
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Email', 'record-email', 'type="email"')}${field('Secondary Email', 'record-secondary-email', 'type="email"')}</div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Phone', 'record-phone', 'placeholder="(555) 000-0000"')}${field('Mobile', 'record-mobile', 'placeholder="(555) 000-0000"')}</div>
+                ${field('Mailing Street', 'record-mailing-street')}
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Mailing City', 'record-mailing-city')}${field('Mailing State', 'record-mailing-state')}</div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Mailing ZIP', 'record-mailing-postal')}${field('Status', 'record-status')}</div>`;
             return;
         }
 
@@ -917,20 +927,39 @@
 
     function payloadForType(type) {
         if (type === 'accounts') {
+            const street = document.getElementById('record-billing-street').value;
+            const city = document.getElementById('record-billing-city').value;
+            const state = document.getElementById('record-billing-state').value;
+            const postal = document.getElementById('record-billing-postal').value;
+            const country = document.getElementById('record-billing-country').value;
             return {
                 name: document.getElementById('record-name').value,
                 phone: document.getElementById('record-phone').value,
-                billing_address: document.getElementById('record-billing-address').value,
+                email: document.getElementById('record-email').value,
+                website: document.getElementById('record-website').value,
+                billing_street: street,
+                billing_city: city,
+                billing_state: state,
+                billing_postal_code: postal,
+                billing_country: country,
+                billing_address: [street, city, state, postal, country].filter(Boolean).join(', '),
             };
         }
 
         if (type === 'contacts') {
             return {
-                account: document.getElementById('record-account').value,
+                account: document.getElementById('record-account').value || null,
                 first_name: document.getElementById('record-first-name').value,
                 last_name: document.getElementById('record-last-name').value,
                 email: document.getElementById('record-email').value,
+                secondary_email: document.getElementById('record-secondary-email').value,
                 phone: document.getElementById('record-phone').value,
+                mobile: document.getElementById('record-mobile').value,
+                mailing_street: document.getElementById('record-mailing-street').value,
+                mailing_city: document.getElementById('record-mailing-city').value,
+                mailing_state: document.getElementById('record-mailing-state').value,
+                mailing_postal_code: document.getElementById('record-mailing-postal').value,
+                status: document.getElementById('record-status').value,
             };
         }
 

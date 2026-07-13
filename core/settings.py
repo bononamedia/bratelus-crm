@@ -20,7 +20,7 @@ ALLOWED_HOSTS = [
     host.strip()
     for host in os.environ.get(
         'ALLOWED_HOSTS',
-        'app.bratelus.com,5.78.144.9,localhost,127.0.0.1',
+        'bratelus.com,www.bratelus.com,app.bratelus.com,5.78.144.9,localhost,127.0.0.1',
     ).split(',')
     if host.strip()
 ]
@@ -140,6 +140,10 @@ USE_TZ = True
 STATIC_URL = 'static/'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / 'static']
+
+LOGIN_REDIRECT_URL = '/dashboard/'
+LOGOUT_REDIRECT_URL = '/'
 
 
 # ==========================================
@@ -166,8 +170,13 @@ ASGI_APPLICATION = 'core.asgi.application'
 
 # Tell Django to trust form submissions coming from your actual domain
 CSRF_TRUSTED_ORIGINS = [
+    'https://bratelus.com',
+    'https://www.bratelus.com',
     'https://app.bratelus.com',
 ]
 
 # Tell Django it is sitting safely behind an Nginx proxy that is handling HTTPS
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+STRIPE_SECRET_KEY = os.environ.get('STRIPE_SECRET_KEY', '')
+STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')

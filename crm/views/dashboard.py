@@ -12,7 +12,7 @@ def dashboard_view(request):
 
     if active_org:
         active_jobs_count = Job.objects.filter(organization=active_org, status='pending').count()
-        new_leads_count = Contact.objects.filter(account__organization=active_org).count()
+        new_leads_count = Contact.objects.filter(organization=active_org).count()
     else:
         active_jobs_count = 0
         new_leads_count = 0

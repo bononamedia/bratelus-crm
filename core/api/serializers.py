@@ -29,7 +29,12 @@ class AccountSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Account
-        fields = ['id', 'name', 'phone', 'billing_address', 'custom_data', 'contact_count', 'property_count']
+        fields = [
+            'id', 'name', 'phone', 'email', 'website', 'billing_address',
+            'billing_street', 'billing_city', 'billing_state', 'billing_postal_code', 'billing_country',
+            'shipping_street', 'shipping_city', 'shipping_state', 'shipping_postal_code', 'shipping_country',
+            'custom_data', 'contact_count', 'property_count',
+        ]
 
     def get_contact_count(self, obj):
         return obj.contacts.count()
@@ -43,7 +48,13 @@ class ContactSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Contact
-        fields = ['id', 'account', 'account_details', 'first_name', 'last_name', 'email', 'phone', 'is_primary', 'custom_data']
+        fields = [
+            'id', 'account', 'account_details', 'first_name', 'last_name', 'email', 'secondary_email',
+            'phone', 'mobile', 'mailing_street', 'mailing_city', 'mailing_state',
+            'mailing_postal_code', 'mailing_country', 'lead_source', 'status', 'description',
+            'email_opt_out', 'sms_opt_out', 'external_source', 'external_id', 'is_primary', 'custom_data',
+        ]
+        read_only_fields = ['external_source', 'external_id']
 
 
 class PropertySerializer(serializers.ModelSerializer):

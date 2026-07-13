@@ -33,4 +33,5 @@ staticfiles/
 .vscode/
 .DS_Store
 Thumbs.db
-
+.codex-*
+.private-imports/

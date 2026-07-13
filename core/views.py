@@ -10,6 +10,16 @@ from organizations.models import WorkerProfile
 from organizations.permissions import user_can_manage_workspace, worker_profile_for_workspace
 
 
+def home_view(request):
+    """Render the public site on bratelus.com and route app users into the CRM."""
+    host = request.get_host().split(':')[0].lower()
+    if host.startswith('app.') or host in {'localhost', '127.0.0.1'}:
+        if request.user.is_authenticated:
+            return redirect('dashboard')
+        return redirect('login')
+    return render(request, 'marketing_home.html')
+
+
 @login_required
 def reports_view(request):
     active_org = getattr(request, 'active_organization', None)
@@ -20,7 +30,7 @@ def reports_view(request):
 
     if active_org:
         accounts = Account.objects.filter(organization=active_org)
-        contacts = Contact.objects.filter(account__organization=active_org)
+        contacts = Contact.objects.filter(organization=active_org)
         properties = Property.objects.filter(account__organization=active_org)
         payment_methods = PaymentMethod.objects.filter(account__organization=active_org)
         jobs = Job.objects.filter(organization=active_org)
