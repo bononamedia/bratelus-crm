@@ -1,0 +1,10 @@
+{
+  "name": "Bratelus Field",
+  "short_name": "Bratelus",
+  "description": "Mobile field operations, job check-in, tasks, evidence, and closeout.",
+  "start_url": "/field/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f9fafb",
+  "theme_color": "#0f172a"
+}

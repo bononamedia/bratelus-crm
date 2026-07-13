@@ -12,10 +12,10 @@
             </div>
         </div>
         {% if worker_profile %}
-        <a href="#profile" class="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100">
+        <div class="flex flex-wrap gap-2"><a href="{% url 'field_operations' %}" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Open field app</a><a href="#profile" class="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100">
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4L16.5 3.5z"></path></svg>
             Edit profile
-        </a>
+        </a></div>
         {% endif %}
     </header>
 
@@ -50,7 +50,7 @@
                                 <p class="mt-1 text-sm text-gray-700">{{ assignment.job.property.address|default:assignment.job.location_address|default:"No location set" }}{% if assignment.job.property.unit_number %}, Unit {{ assignment.job.property.unit_number }}{% endif %}</p>
                             </div>
                             <div class="grid shrink-0 grid-cols-2 gap-2 text-xs sm:w-56"><div class="rounded-md bg-gray-50 p-2"><span class="text-gray-500">Clock in</span><strong class="mt-1 block text-gray-900">{{ assignment.clocked_in_at|date:"g:i A"|default:"Not yet" }}</strong></div><div class="rounded-md bg-gray-50 p-2"><span class="text-gray-500">Clock out</span><strong class="mt-1 block text-gray-900">{{ assignment.clocked_out_at|date:"g:i A"|default:"Not yet" }}</strong></div></div>
-                        </div>
+                        </div><div class="mt-3 text-right"><a href="{% url 'field_job' assignment.job_id %}" class="inline-flex rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Open field workflow</a></div>
                     </article>
                     {% empty %}<div class="px-4 py-10 text-center text-sm text-gray-500"><strong class="block text-gray-700">No open assignments</strong><span class="mt-1 block">New dispatch work will appear here.</span></div>{% endfor %}
                 </div>

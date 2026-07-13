@@ -101,6 +101,7 @@
                 <span class="block text-gray-400">Assignment</span>
                 <span class="block text-gray-400">Schedules</span>
             </div>
+
         </div>
     </section>
 
@@ -253,6 +254,17 @@
                     </table>
                 </div>
             </div>
+        </div>
+        <div class="rounded-lg border border-gray-200 bg-white shadow-sm">
+            <div class="border-b border-gray-200 px-4 py-3"><h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700">Job Completion Message</h3><p class="mt-1 text-xs text-gray-500">Default customer message used when a manager enables email or SMS on a job.</p></div>
+            <form method="post" class="grid gap-4 p-4 md:grid-cols-2">
+                {% csrf_token %}<input type="hidden" name="action" value="save_completion_notification">
+                <label class="text-sm font-medium text-gray-700 md:col-span-2">Email subject<input name="email_subject" value="{{ completion_notification_setting.email_subject }}" {% if not is_workspace_admin %}disabled{% endif %} class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></label>
+                <label class="text-sm font-medium text-gray-700 md:col-span-2">Message template<textarea name="message_template" rows="7" {% if not is_workspace_admin %}disabled{% endif %} class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm">{{ completion_notification_setting.message_template }}</textarea><span class="mt-1 block text-xs font-normal text-gray-500">Available: {% verbatim %}{{first_name}}, {{service}}, {{workspace_name}}, {{account_name}}{% endverbatim %}</span></label>
+                <label class="text-sm font-medium text-gray-700">Reply-to email<input name="reply_to_email" type="email" value="{{ completion_notification_setting.reply_to_email }}" {% if not is_workspace_admin %}disabled{% endif %} class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></label>
+                <label class="text-sm font-medium text-gray-700">Twilio sender number<input name="sms_from_number" value="{{ completion_notification_setting.sms_from_number }}" {% if not is_workspace_admin %}disabled{% endif %} placeholder="+15551234567" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></label>
+                {% if is_workspace_admin %}<div class="md:col-span-2 text-right"><button class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Save completion message</button></div>{% endif %}
+            </form>
         </div>
     </section>
 

@@ -1,8 +1,19 @@
 import math
+import os
+import requests
 from celery import shared_task
+from django.core.mail import EmailMessage
 from PIL import Image
 from PIL.ExifTags import TAGS, GPSTAGS
-from .models import JobEvidence
+from .models import (
+    CompletionNotificationDelivery,
+    CompletionNotificationSetting,
+    FieldEvent,
+    Job,
+    JobEvidence,
+)
+from organizations.models import WorkspaceEmailConnection
+from .translation import translate_note_to_english
 import json
 from django.core.cache import cache
 from django.utils import timezone
@@ -40,6 +51,11 @@ def verify_photo_evidence(evidence_id):
     """
     try:
         evidence = JobEvidence.objects.select_related('job__property').get(id=evidence_id)
+        if evidence.media_type != 'photo':
+            evidence.qc_notes = "Video evidence saved. GPS was verified from the field event."
+            evidence.is_verified = True
+            evidence.save(update_fields=['qc_notes', 'is_verified'])
+            return
         
         # Open the image using Pillow (works seamlessly with S3 via Django Storage)
         image = Image.open(evidence.photo.open('rb'))
@@ -92,6 +108,105 @@ def verify_photo_evidence(evidence_id):
 
     except JobEvidence.DoesNotExist:
         pass
+
+
+@shared_task
+def translate_field_note(event_id):
+    try:
+        event = FieldEvent.objects.get(id=event_id, event_type='note_added')
+    except FieldEvent.DoesNotExist:
+        return
+    translated, language, translation_status = translate_note_to_english(event.note_original)
+    event.note_english = translated
+    event.source_language = language
+    event.translation_status = translation_status
+    event.save(update_fields=['note_english', 'source_language', 'translation_status'])
+
+
+def render_completion_template(template, job, contact):
+    values = {
+        'first_name': contact.first_name if contact else 'Customer',
+        'service': job.title,
+        'workspace_name': job.organization.name,
+        'account_name': job.account.name,
+    }
+    rendered = template
+    for key, value in values.items():
+        rendered = rendered.replace('{{' + key + '}}', str(value or ''))
+    return rendered
+
+
+@shared_task
+def send_completion_notifications(job_id):
+    try:
+        job = Job.objects.select_related('organization', 'account', 'completion_contact').get(id=job_id)
+    except Job.DoesNotExist:
+        return
+    if job.completion_notification_method == 'none':
+        return
+
+    contact = job.completion_contact or job.account.contacts.order_by('-is_primary', 'id').first()
+    setting, _ = CompletionNotificationSetting.objects.get_or_create(workspace=job.organization)
+    message = render_completion_template(job.completion_message_override or setting.message_template, job, contact)
+    subject = render_completion_template(setting.email_subject, job, contact)
+    channels = ['email', 'sms'] if job.completion_notification_method == 'both' else [job.completion_notification_method]
+
+    for channel in channels:
+        recipient = ''
+        if contact:
+            recipient = contact.email if channel == 'email' else (contact.mobile or contact.phone)
+        delivery, created = CompletionNotificationDelivery.objects.get_or_create(
+            job=job,
+            channel=channel,
+            defaults={'contact': contact, 'recipient': recipient, 'subject': subject if channel == 'email' else '', 'message': message},
+        )
+        if not created and delivery.status == 'sent':
+            continue
+        delivery.contact = contact
+        delivery.recipient = recipient
+        delivery.message = message
+        delivery.subject = subject if channel == 'email' else ''
+        if not recipient:
+            delivery.status = 'failed'
+            delivery.error_message = f'The completion contact has no {channel} address.'
+            delivery.save()
+            continue
+
+        try:
+            if channel == 'email':
+                mailbox = WorkspaceEmailConnection.objects.filter(workspace=job.organization, status='active').first()
+                if not mailbox:
+                    raise RuntimeError('No active workspace email connection is configured.')
+                email = EmailMessage(
+                    subject=subject,
+                    body=message,
+                    from_email=mailbox.from_email,
+                    to=[recipient],
+                    reply_to=[setting.reply_to_email or mailbox.from_email],
+                )
+                email.send(fail_silently=False)
+                delivery.provider_reference = 'workspace-email'
+            else:
+                account_sid = os.environ.get('TWILIO_ACCOUNT_SID', '').strip()
+                auth_token = os.environ.get('TWILIO_AUTH_TOKEN', '').strip()
+                from_number = setting.sms_from_number or os.environ.get('TWILIO_FROM_NUMBER', '').strip()
+                if not all([account_sid, auth_token, from_number]):
+                    raise RuntimeError('Twilio credentials or workspace sender number are not configured.')
+                response = requests.post(
+                    f'https://api.twilio.com/2010-04-01/Accounts/{account_sid}/Messages.json',
+                    data={'To': recipient, 'From': from_number, 'Body': message},
+                    auth=(account_sid, auth_token),
+                    timeout=20,
+                )
+                response.raise_for_status()
+                delivery.provider_reference = response.json().get('sid', '')
+            delivery.status = 'sent'
+            delivery.sent_at = timezone.now()
+            delivery.error_message = ''
+        except (RuntimeError, requests.RequestException, ValueError, Exception) as exc:
+            delivery.status = 'failed'
+            delivery.error_message = str(exc)[:1000]
+        delivery.save()
 
 # ----------------------------------------------------------------------------
 # Creat the Bulk Writer

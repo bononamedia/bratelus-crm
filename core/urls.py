@@ -21,7 +21,11 @@ from fsm.views import (
     MobileClockInView, 
     MobileClockOutView,
     TrackLocationPingView,
-    LiveFleetLocationsView
+    LiveFleetLocationsView,
+    FieldJobActionView,
+    FieldShiftView,
+    field_job_view,
+    field_operations_view,
 )
 
 # Unified API ViewSets
@@ -103,6 +107,8 @@ urlpatterns = [
     path('billing/portal/', create_billing_portal_view, name='billing_portal'),
     path('billing/webhook/stripe/', stripe_webhook_view, name='stripe_webhook'),
     path('me/', employee_profile_view, name='employee_profile'),
+    path('field/', field_operations_view, name='field_operations'),
+    path('field/jobs/<int:job_id>/', field_job_view, name='field_job'),
     
     # FIX: Added Django's built-in authentication URLs
     path('accounts/', include('django.contrib.auth.urls')), 
@@ -118,4 +124,6 @@ urlpatterns = [
     path('api/mobile/jobs/<int:job_id>/clock-in/', MobileClockInView.as_view(), name='api_mobile_clock_in'),
     path('api/mobile/jobs/<int:job_id>/clock-out/', MobileClockOutView.as_view(), name='api_mobile_clock_out'),
     path('api/mobile/track-location/', TrackLocationPingView.as_view(), name='api_track_location'),
+    path('api/mobile/shift/', FieldShiftView.as_view(), name='api_field_shift'),
+    path('api/mobile/jobs/<int:job_id>/action/', FieldJobActionView.as_view(), name='api_field_job_action'),
 ]

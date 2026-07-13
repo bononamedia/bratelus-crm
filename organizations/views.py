@@ -207,6 +207,8 @@ def create_workspace_view(request):
 
 @login_required
 def admin_console_view(request):
+    from fsm.models import CompletionNotificationSetting
+
     active_org = getattr(request, 'active_organization', None)
 
     if not active_org:
@@ -337,6 +339,20 @@ def admin_console_view(request):
         elif action == 'delete_email_connection':
             WorkspaceEmailConnection.objects.filter(workspace=active_org, id=request.POST.get('id')).delete()
             messages.success(request, 'Email connection removed.')
+
+        elif action == 'save_completion_notification':
+            setting, _ = CompletionNotificationSetting.objects.get_or_create(workspace=active_org)
+            subject = request.POST.get('email_subject', '').strip()
+            message_template = request.POST.get('message_template', '').strip()
+            if not subject or not message_template:
+                messages.error(request, 'The completion subject and message are required.')
+            else:
+                setting.email_subject = subject
+                setting.message_template = message_template
+                setting.reply_to_email = request.POST.get('reply_to_email', '').strip()
+                setting.sms_from_number = request.POST.get('sms_from_number', '').strip()
+                setting.save()
+                messages.success(request, 'Customer completion message updated.')
 
         elif action == 'create_skill':
             name = request.POST.get('name', '').strip()
@@ -538,6 +554,7 @@ def admin_console_view(request):
         'user',
         'user__workerprofile',
     ).order_by('user__username')
+    completion_notification_setting, _ = CompletionNotificationSetting.objects.get_or_create(workspace=active_org)
 
     from finance.models import SubscriptionPlan, WorkspaceSubscription
     from finance.pricing import monthly_price
@@ -581,6 +598,7 @@ def admin_console_view(request):
         'email_domains': email_domains,
         'email_connections': email_connections,
         'email_connection_types': WorkspaceEmailConnection.CONNECTION_TYPES,
+        'completion_notification_setting': completion_notification_setting,
         'skills': skills,
         'service_zones': service_zones,
         'workers': workers,

@@ -25,7 +25,7 @@ class ActiveOrganizationMiddleware:
                     request.session.pop('active_org_id', None)
 
             if not active_org:
-                active_org = user_workspaces.first()
+                active_org = user_workspaces.order_by('created_at', 'id').first()
                 if active_org:
                     request.session['active_org_id'] = str(active_org.id)
 

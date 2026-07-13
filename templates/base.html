@@ -1,8 +1,14 @@
+{% load static %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="Bratelus Field">
+    <link rel="manifest" href="{% static 'manifest.webmanifest' %}">
     <title>Bratelus CRM</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
@@ -207,7 +213,8 @@
                     <svg class="nav-chevron h-4 w-4 text-sky-100 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path></svg>
                 </button>
                 <div class="nav-submenu hidden px-2 pb-2.5" data-module-panel="employee">
-                    <a href="{% url 'employee_profile' %}" class="nav-subitem">My Work</a>
+                    <a href="{% url 'field_operations' %}" class="nav-subitem">Field App</a>
+                    <a href="{% url 'employee_profile' %}" class="nav-subitem">My Profile</a>
                 </div>
             </div>
             {% endif %}
@@ -330,9 +337,9 @@
         </a>
         {% endif %}
         {% if active_worker_profile %}
-        <a href="{% url 'employee_profile' %}" class="flex flex-col items-center text-gray-400 hover:text-blue-600 transition-colors">
+        <a href="{% url 'field_operations' %}" class="flex flex-col items-center text-gray-400 hover:text-blue-600 transition-colors">
             <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
-            <span class="font-bold text-[10px] uppercase tracking-wide">My Work</span>
+            <span class="font-bold text-[10px] uppercase tracking-wide">Field</span>
         </a>
         {% endif %}
     </nav>
@@ -414,7 +421,7 @@
             if (path === '/settings/' || path.startsWith('/admin/')) {
                 return 'setup';
             }
-            if (path === '/me/') {
+            if (path === '/me/' || path.startsWith('/field/')) {
                 return 'employee';
             }
 
