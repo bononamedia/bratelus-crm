@@ -42,14 +42,22 @@ class AccountSerializer(serializers.ModelSerializer):
     def get_property_count(self, obj):
         return obj.properties.count()
 
+class ContactAccountSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Account
+        fields = ['id', 'name', 'phone', 'email', 'billing_address']
+
+
 class ContactSerializer(serializers.ModelSerializer):
-    # This brings the full Account details into the Lead JSON
-    account_details = AccountSerializer(source='account', read_only=True)
+    account_details = ContactAccountSerializer(source='account', read_only=True)
+    workspace_id = serializers.UUIDField(source='organization_id', read_only=True)
+    workspace_name = serializers.CharField(source='organization.name', read_only=True)
     
     class Meta:
         model = Contact
         fields = [
-            'id', 'account', 'account_details', 'first_name', 'last_name', 'email', 'secondary_email',
+            'id', 'account', 'account_details', 'workspace_id', 'workspace_name',
+            'first_name', 'last_name', 'email', 'secondary_email',
             'phone', 'mobile', 'mailing_street', 'mailing_city', 'mailing_state',
             'mailing_postal_code', 'mailing_country', 'lead_source', 'status', 'description',
             'email_opt_out', 'sms_opt_out', 'external_source', 'external_id', 'is_primary', 'custom_data',

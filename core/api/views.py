@@ -1,5 +1,9 @@
+import re
+
+from django.db.models import Q
 from rest_framework import viewsets
 from rest_framework.decorators import action
+from rest_framework.pagination import PageNumberPagination
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
 from rest_framework import status
@@ -16,6 +20,37 @@ from organizations.models import WorkerProfile
 from organizations.permissions import user_can_manage_workspace
 from crm.models.contacts import Account, Contact, PaymentMethod, Property
 from fsm.models import Job, JobAssignment
+
+
+class ContactPagination(PageNumberPagination):
+    page_size = 100
+    page_size_query_param = 'page_size'
+    max_page_size = 25000
+
+    def get_page_size(self, request):
+        if request.query_params.get(self.page_size_query_param) == 'all':
+            return self.max_page_size
+        return super().get_page_size(request)
+
+
+def contact_search_query(query):
+    query = (query or '').strip()
+    if not query:
+        return Q()
+
+    filters = (
+        Q(first_name__icontains=query) |
+        Q(last_name__icontains=query) |
+        Q(email__icontains=query) |
+        Q(secondary_email__icontains=query) |
+        Q(phone__icontains=query) |
+        Q(mobile__icontains=query)
+    )
+    digits = ''.join(character for character in query if character.isdigit())
+    if len(digits) >= 3:
+        flexible_phone = r'\D*'.join(re.escape(character) for character in digits)
+        filters |= Q(phone__iregex=flexible_phone) | Q(mobile__iregex=flexible_phone)
+    return filters
 
 class BaseWorkspaceViewSet(viewsets.ModelViewSet):
     """
@@ -57,6 +92,7 @@ class AccountViewSet(BaseWorkspaceViewSet):
 class ContactViewSet(BaseWorkspaceViewSet):
     queryset = Contact.objects.all()
     serializer_class = ContactSerializer
+    pagination_class = ContactPagination
     
     # Contacts don't have a direct organization link, they link through Account
     def get_queryset(self):
@@ -64,7 +100,12 @@ class ContactViewSet(BaseWorkspaceViewSet):
         if not active_org or not user_can_manage_workspace(self.request.user, active_org):
             return self.queryset.none()
             
-        return Contact.objects.filter(organization=active_org).select_related('account')
+        return (
+            Contact.objects.filter(organization=active_org)
+            .filter(contact_search_query(self.request.query_params.get('search')))
+            .select_related('account', 'organization')
+            .order_by('last_name', 'first_name', 'id')
+        )
 
     def perform_create(self, serializer):
         active_org = getattr(self.request, 'active_organization', None)
@@ -76,6 +117,34 @@ class ContactViewSet(BaseWorkspaceViewSet):
             raise ValidationError({'account': 'Account must belong to the active organization.'})
 
         serializer.save(organization=active_org)
+
+    def perform_update(self, serializer):
+        active_org = getattr(self.request, 'active_organization', None)
+        if not user_can_manage_workspace(self.request.user, active_org):
+            raise PermissionDenied('Only workspace admins can manage CRM contacts.')
+
+        account = serializer.validated_data.get('account', serializer.instance.account)
+        if account and account.organization_id != active_org.id:
+            raise ValidationError({'account': 'Account must belong to the active organization.'})
+        serializer.save(organization=active_org)
+
+    @action(detail=False, methods=['get'], url_path='global-search')
+    def global_search(self, request):
+        if not (request.user.is_staff or request.user.is_superuser):
+            raise PermissionDenied('Global contact search is restricted to platform administrators.')
+
+        query = (request.query_params.get('search') or '').strip()
+        if len(query) < 2:
+            raise ValidationError({'search': 'Enter at least 2 characters for global search.'})
+        queryset = (
+            Contact.objects.filter(contact_search_query(query))
+            .select_related('account', 'organization')
+            .order_by('last_name', 'first_name', 'organization__name', 'id')
+        )
+        page = self.paginate_queryset(queryset)
+        if page is not None:
+            return self.get_paginated_response(self.get_serializer(page, many=True).data)
+        return Response(self.get_serializer(queryset, many=True).data)
 
 
 class PropertyViewSet(BaseWorkspaceViewSet):

@@ -52,11 +52,20 @@
                 <button type="button" data-tab="properties" onclick="setCrmTab('properties')" class="crm-tab flex-1 rounded-md px-3 py-2 text-sm font-bold text-gray-600 lg:flex-none">Properties</button>
                 <button type="button" data-tab="payment_methods" onclick="setCrmTab('payment_methods')" class="crm-tab flex-1 rounded-md px-3 py-2 text-sm font-bold text-gray-600 lg:flex-none">Payments</button>
             </div>
-            <div class="relative w-full lg:w-80">
-                <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
-                    <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+            <div class="flex w-full flex-col gap-2 sm:flex-row lg:w-auto">
+                {% if is_platform_admin %}
+                <label class="sr-only" for="crm-search-scope">Search scope</label>
+                <select id="crm-search-scope" class="rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                    <option value="workspace">This workspace</option>
+                    <option value="global">All workspaces</option>
+                </select>
+                {% endif %}
+                <div class="relative w-full lg:w-80">
+                    <div class="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3">
+                        <svg class="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+                    </div>
+                    <input type="search" id="crm-search" placeholder="Search name, email, or phone..." class="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
                 </div>
-                <input type="search" id="crm-search" placeholder="Search CRM..." class="w-full rounded-lg border border-gray-300 bg-white py-2 pl-9 pr-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
             </div>
         </div>
 
@@ -67,6 +76,21 @@
                 <thead id="crm-table-head" class="bg-gray-50"></thead>
                 <tbody id="crm-table-body" class="divide-y divide-gray-100 bg-white"></tbody>
             </table>
+        </div>
+        <div id="crm-pagination" class="hidden flex-col gap-3 border-t border-gray-200 px-4 py-3 text-sm text-gray-600 sm:flex-row sm:items-center sm:justify-between">
+            <div id="crm-pagination-summary">Showing contacts</div>
+            <div class="flex flex-wrap items-center gap-2">
+                <label for="crm-page-size" class="text-xs font-semibold uppercase tracking-wide text-gray-500">Rows</label>
+                <select id="crm-page-size" class="rounded-md border border-gray-300 bg-white px-2 py-1.5 text-sm">
+                    <option value="100">100</option>
+                    <option value="250">250</option>
+                    <option value="500">500</option>
+                    <option value="all">View all</option>
+                </select>
+                <button id="crm-page-prev" type="button" onclick="changeContactPage(-1)" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 font-semibold hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+                <span id="crm-page-label" class="min-w-20 text-center font-semibold text-gray-700">Page 1</span>
+                <button id="crm-page-next" type="button" onclick="changeContactPage(1)" class="rounded-md border border-gray-300 bg-white px-3 py-1.5 font-semibold hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-40">Next</button>
+            </div>
         </div>
     </section>
 </div>
@@ -100,6 +124,39 @@
             <button type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Save Record</button>
         </div>
     </form>
+</aside>
+
+<div id="account-link-overlay" class="fixed inset-0 z-[60] hidden bg-slate-950/45" onclick="closeAccountLinkPanel()"></div>
+<aside id="account-link-panel" class="fixed inset-y-0 right-0 z-[70] flex w-full max-w-md translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300">
+    <div class="border-b border-gray-200 px-5 py-4">
+        <div class="flex items-start justify-between gap-4">
+            <div>
+                <p class="text-xs font-semibold uppercase tracking-wide text-blue-600">Contact account</p>
+                <h2 class="mt-1 text-xl font-semibold text-gray-950">Assign <span id="account-link-contact-name">contact</span></h2>
+            </div>
+            <button type="button" onclick="closeAccountLinkPanel()" class="flex h-8 w-8 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label="Close account assignment">
+                <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+            </button>
+        </div>
+    </div>
+    <div class="flex-1 space-y-6 overflow-y-auto p-5">
+        <section>
+            <h3 class="text-sm font-semibold text-gray-900">Use an existing account</h3>
+            <p class="mt-1 text-sm text-gray-500">Attach this contact to a customer already in {{ active_org.name }}.</p>
+            <label class="mt-4 block text-sm font-semibold text-gray-700" for="account-link-existing">Account</label>
+            <select id="account-link-existing" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"></select>
+            <button type="button" onclick="assignExistingAccount()" class="mt-3 w-full rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">Assign account</button>
+        </section>
+        <div class="flex items-center gap-3"><div class="h-px flex-1 bg-gray-200"></div><span class="text-xs font-semibold uppercase tracking-wide text-gray-400">or</span><div class="h-px flex-1 bg-gray-200"></div></div>
+        <section>
+            <h3 class="text-sm font-semibold text-gray-900">Create a new account</h3>
+            <p class="mt-1 text-sm text-gray-500">A new customer account will be created and linked immediately.</p>
+            <label class="mt-4 block text-sm font-semibold text-gray-700" for="account-link-new-name">Account name</label>
+            <input id="account-link-new-name" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" placeholder="Company or customer name">
+            <button type="button" onclick="createAndAssignAccount()" class="mt-3 w-full rounded-lg border border-blue-200 bg-blue-50 px-4 py-2.5 text-sm font-semibold text-blue-700 hover:bg-blue-100">Create and assign</button>
+        </section>
+        <div id="account-link-error" class="hidden rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"></div>
+    </div>
 </aside>
 
 <div id="detail-overlay" class="fixed inset-0 z-40 hidden bg-slate-950/40" onclick="closeRecordDetail()"></div>
@@ -153,6 +210,7 @@
 
 <script>
     const crmState = {
+        activeWorkspaceId: '{{ active_org.id|default:"" }}',
         activeTab: '{{ crm_initial_tab|default:"accounts" }}',
         recordType: '{{ crm_initial_tab|default:"accounts" }}',
         accounts: [],
@@ -161,6 +219,15 @@
         payment_methods: [],
         jobs: [],
         search: '',
+        searchScope: 'workspace',
+        contactPagination: {
+            count: {{ crm_stats.contacts|default:0 }},
+            page: 1,
+            pageSize: '100',
+            next: null,
+            previous: null,
+        },
+        pendingAccountContact: null,
         detailType: null,
         detailRecord: null,
         detailRelated: 'overview',
@@ -265,24 +332,21 @@
         errorEl.classList.add('hidden');
 
         try {
-            const [accounts, contacts, properties, paymentMethods, jobs] = await Promise.all([
+            const [accounts, properties, paymentMethods, jobs] = await Promise.all([
                 fetchJson('/api/v1/accounts/'),
-                fetchJson('/api/v1/contacts/'),
                 fetchJson('/api/v1/properties/'),
                 fetchJson('/api/v1/payment-methods/'),
                 fetchJson('/api/v1/jobs/'),
             ]);
 
             crmState.accounts = accounts;
-            crmState.contacts = contacts;
             crmState.properties = properties;
             crmState.payment_methods = paymentMethods;
             crmState.jobs = jobs;
             document.getElementById('stat-accounts').innerText = accounts.length;
-            document.getElementById('stat-contacts').innerText = contacts.length;
             document.getElementById('stat-properties').innerText = properties.length;
             document.getElementById('stat-payment-methods').innerText = paymentMethods.length;
-            renderCrmTable();
+            await loadContacts(false);
             renderRecordForm();
         } catch (error) {
             console.error(error);
@@ -291,9 +355,44 @@
         }
     }
 
+    async function loadContacts(showLoading = true) {
+        const pagination = crmState.contactPagination;
+        const params = new URLSearchParams({
+            page: String(pagination.page),
+            page_size: String(pagination.pageSize),
+        });
+        if (crmState.search.trim()) params.set('search', crmState.search.trim());
+
+        const globalSearch = crmState.searchScope === 'global';
+        if (globalSearch && crmState.search.trim().length < 2) {
+            crmState.contacts = [];
+            pagination.count = 0;
+            pagination.next = null;
+            pagination.previous = null;
+            renderCrmTable();
+            return;
+        }
+
+        if (showLoading) {
+            document.getElementById('crm-table-body').innerHTML = '<tr><td colspan="6" class="px-4 py-12 text-center text-sm text-gray-500">Searching contacts...</td></tr>';
+        }
+        const endpoint = globalSearch ? '/api/v1/contacts/global-search/' : '/api/v1/contacts/';
+        const payload = await fetchJson(`${endpoint}?${params.toString()}`);
+        crmState.contacts = payload.results || [];
+        pagination.count = payload.count || 0;
+        pagination.next = payload.next;
+        pagination.previous = payload.previous;
+        renderCrmTable();
+    }
+
     function setCrmTab(tab) {
         crmState.activeTab = tab;
         crmState.recordType = tab;
+        const scope = document.getElementById('crm-search-scope');
+        if (scope) scope.disabled = tab !== 'contacts';
+        document.getElementById('crm-search').placeholder = tab === 'contacts'
+            ? 'Search name, email, or phone...'
+            : `Search ${tabLabel(tab)}...`;
         renderCrmTable();
         updateTabStyles();
         renderRecordForm();
@@ -331,19 +430,56 @@
         return labels[tab] || 'records';
     }
 
+    function contactTableHead() {
+        const workspaceColumn = crmState.searchScope === 'global'
+            ? '<th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Workspace</th>'
+            : '';
+        return `
+            <tr>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Contact</th>
+                ${workspaceColumn}
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Account</th>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Email</th>
+                <th class="px-4 py-3 text-left text-xs font-bold uppercase tracking-wide text-gray-500">Phone</th>
+            </tr>`;
+    }
+
+    function renderContactPagination() {
+        const container = document.getElementById('crm-pagination');
+        const pagination = crmState.contactPagination;
+        const isContacts = crmState.activeTab === 'contacts';
+        container.classList.toggle('hidden', !isContacts);
+        container.classList.toggle('flex', isContacts);
+        if (!isContacts) return;
+
+        const pageSize = pagination.pageSize === 'all' ? Math.max(pagination.count, 1) : Number(pagination.pageSize);
+        const start = pagination.count ? ((pagination.page - 1) * pageSize) + 1 : 0;
+        const end = Math.min(start + crmState.contacts.length - 1, pagination.count);
+        const totalPages = pagination.pageSize === 'all' ? 1 : Math.max(Math.ceil(pagination.count / pageSize), 1);
+        const scopeLabel = crmState.searchScope === 'global' ? ' across all workspaces' : '';
+
+        document.getElementById('crm-pagination-summary').innerText = `Showing ${start}-${Math.max(end, 0)} of ${pagination.count} contacts${scopeLabel}`;
+        document.getElementById('crm-page-label').innerText = pagination.pageSize === 'all' ? 'All rows' : `Page ${pagination.page} of ${totalPages}`;
+        document.getElementById('crm-page-prev').disabled = !pagination.previous;
+        document.getElementById('crm-page-next').disabled = !pagination.next;
+        document.getElementById('crm-page-size').value = pagination.pageSize;
+    }
+
     function renderCrmTable() {
         const head = document.getElementById('crm-table-head');
         const body = document.getElementById('crm-table-body');
         const tab = crmState.activeTab;
-        const records = crmState[tab].filter(recordMatches);
+        const records = tab === 'contacts' ? crmState.contacts : crmState[tab].filter(recordMatches);
 
-        head.innerHTML = tableHeads[tab];
+        head.innerHTML = tab === 'contacts' ? contactTableHead() : tableHeads[tab];
+        renderContactPagination();
         if (!records.length) {
+            const globalPrompt = tab === 'contacts' && crmState.searchScope === 'global' && crmState.search.trim().length < 2;
             body.innerHTML = `
                 <tr>
-                    <td colspan="4" class="px-4 py-12 text-center">
-                        <p class="font-semibold text-gray-700">No ${tabLabel(tab)} found.</p>
-                        <p class="mt-1 text-sm text-gray-500">Create a record or adjust your search.</p>
+                    <td colspan="6" class="px-4 py-12 text-center">
+                        <p class="font-semibold text-gray-700">${globalPrompt ? 'Search all workspaces' : `No ${tabLabel(tab)} found.`}</p>
+                        <p class="mt-1 text-sm text-gray-500">${globalPrompt ? 'Enter at least 2 characters to run a protected global search.' : 'Create a record or adjust your search.'}</p>
                     </td>
                 </tr>`;
             return;
@@ -375,7 +511,14 @@
                         <div class="font-bold text-gray-950">${escapeHtml(`${contact.first_name || ''} ${contact.last_name || ''}`.trim() || 'Unnamed contact')}</div>
                         <div class="text-xs text-gray-400">#${contact.id}</div>
                     </td>
-                    <td class="px-4 py-3 text-sm text-gray-600">${muted(contact.account_details?.name, 'No account')}</td>
+                    ${crmState.searchScope === 'global' ? `<td class="px-4 py-3"><div class="text-sm font-semibold text-gray-700">${escapeHtml(contact.workspace_name || 'Unknown workspace')}</div></td>` : ''}
+                    <td class="px-4 py-3 text-sm text-gray-600">
+                        ${contact.account_details?.name
+                            ? escapeHtml(contact.account_details.name)
+                            : String(contact.workspace_id) === String(crmState.activeWorkspaceId)
+                                ? '<button type="button" onclick="event.stopPropagation(); openAccountLinkPanel(' + contact.id + ')" class="rounded-md border border-blue-200 bg-blue-50 px-2.5 py-1.5 text-xs font-semibold text-blue-700 hover:bg-blue-100">Assign account</button>'
+                                : '<span class="text-gray-400">No account</span>'}
+                    </td>
                     <td class="px-4 py-3 text-sm text-gray-600">${muted(contact.email, 'No email')}</td>
                     <td class="px-4 py-3 text-sm text-gray-600">${muted(contact.phone, 'No phone')}</td>
                 </tr>`).join('');
@@ -987,9 +1130,115 @@
         return type === 'payment_methods' ? 'payment-methods' : type;
     }
 
+    function changeContactPage(direction) {
+        const pagination = crmState.contactPagination;
+        if ((direction < 0 && !pagination.previous) || (direction > 0 && !pagination.next)) return;
+        pagination.page += direction;
+        loadContacts();
+    }
+
+    function showAccountLinkError(message) {
+        const error = document.getElementById('account-link-error');
+        error.innerText = message;
+        error.classList.remove('hidden');
+    }
+
+    function openAccountLinkPanel(contactId) {
+        const contact = findRecord('contacts', contactId);
+        if (!contact || String(contact.workspace_id) !== String(crmState.activeWorkspaceId)) return;
+        crmState.pendingAccountContact = contact;
+        document.getElementById('account-link-contact-name').innerText = recordName('contacts', contact);
+        document.getElementById('account-link-existing').innerHTML = accountOptions();
+        document.getElementById('account-link-new-name').value = recordName('contacts', contact);
+        document.getElementById('account-link-error').classList.add('hidden');
+        document.getElementById('account-link-overlay').classList.remove('hidden');
+        document.getElementById('account-link-panel').classList.remove('translate-x-full');
+    }
+
+    function closeAccountLinkPanel() {
+        crmState.pendingAccountContact = null;
+        document.getElementById('account-link-overlay').classList.add('hidden');
+        document.getElementById('account-link-panel').classList.add('translate-x-full');
+    }
+
+    async function patchContactAccount(accountId) {
+        const contact = crmState.pendingAccountContact;
+        if (!contact) return false;
+        const response = await fetch(`/api/v1/contacts/${contact.id}/`, {
+            method: 'PATCH',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+            body: JSON.stringify({account: accountId}),
+        });
+        if (!response.ok) {
+            const data = await response.json();
+            showAccountLinkError(data.account?.[0] || 'Could not assign this account.');
+            return false;
+        }
+        return true;
+    }
+
+    async function refreshAccountsAndContacts() {
+        crmState.accounts = await fetchJson('/api/v1/accounts/');
+        document.getElementById('stat-accounts').innerText = crmState.accounts.length;
+        await loadContacts();
+    }
+
+    async function assignExistingAccount() {
+        const accountId = document.getElementById('account-link-existing').value;
+        if (!accountId) {
+            showAccountLinkError('Select an existing account first.');
+            return;
+        }
+        if (await patchContactAccount(accountId)) {
+            closeAccountLinkPanel();
+            await refreshAccountsAndContacts();
+        }
+    }
+
+    async function createAndAssignAccount() {
+        const name = document.getElementById('account-link-new-name').value.trim();
+        if (!name) {
+            showAccountLinkError('Enter a name for the new account.');
+            return;
+        }
+        const response = await fetch('/api/v1/accounts/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+            body: JSON.stringify({name}),
+        });
+        if (!response.ok) {
+            showAccountLinkError('Could not create the account. Check the name and try again.');
+            return;
+        }
+        const account = await response.json();
+        if (await patchContactAccount(account.id)) {
+            closeAccountLinkPanel();
+            await refreshAccountsAndContacts();
+        }
+    }
+
+    let crmSearchTimer;
     document.getElementById('crm-search').addEventListener('input', event => {
         crmState.search = event.target.value;
-        renderCrmTable();
+        clearTimeout(crmSearchTimer);
+        if (crmState.activeTab === 'contacts') {
+            crmState.contactPagination.page = 1;
+            crmSearchTimer = setTimeout(() => loadContacts(), 300);
+        } else {
+            renderCrmTable();
+        }
+    });
+
+    document.getElementById('crm-page-size').addEventListener('change', event => {
+        crmState.contactPagination.pageSize = event.target.value;
+        crmState.contactPagination.page = 1;
+        loadContacts();
+    });
+
+    document.getElementById('crm-search-scope')?.addEventListener('change', event => {
+        crmState.searchScope = event.target.value;
+        crmState.contactPagination.page = 1;
+        loadContacts();
     });
 
     document.getElementById('record-form').addEventListener('submit', async event => {

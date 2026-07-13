@@ -143,7 +143,8 @@
     async function loadContacts() {
         try {
             const response = await fetch('/api/v1/contacts/');
-            const contacts = await response.json();
+            const payload = await response.json();
+            const contacts = payload.results || payload;
             const tbody = document.getElementById('leads-table-body');
             
             if (contacts.length === 0) {
