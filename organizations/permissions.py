@@ -1,9 +1,44 @@
 from django.db.models import Q
 
-from .models import WorkerProfile, WorkspaceMember
+from .models import CustomerAccountMember, WorkerProfile, Workspace, WorkspaceMember
 
 
 OPERATIONAL_ROLES = ('admin', 'manager', 'employee')
+
+
+def customer_account_membership_for_user(user, customer_account):
+    if not user.is_authenticated or not customer_account:
+        return None
+    return CustomerAccountMember.objects.filter(
+        account=customer_account,
+        user=user,
+        is_active=True,
+    ).first()
+
+
+def user_can_manage_customer_account(user, customer_account):
+    if user.is_superuser:
+        return True
+    membership = customer_account_membership_for_user(user, customer_account)
+    return bool(membership and membership.role in ('owner', 'admin', 'manager'))
+
+
+def account_workspaces_for_user(user, workspace):
+    """Sibling workspace calendars visible through the same customer account."""
+    if not user.is_authenticated or not workspace:
+        return Workspace.objects.none()
+    if user.is_superuser:
+        if workspace.customer_account_id:
+            return Workspace.objects.filter(customer_account=workspace.customer_account)
+        return Workspace.objects.all()
+    account = workspace.customer_account
+    if not account or not customer_account_membership_for_user(user, account):
+        return Workspace.objects.filter(members__user=user, members__is_active=True).distinct()
+    return Workspace.objects.filter(
+        customer_account=account,
+        members__user=user,
+        members__is_active=True,
+    ).distinct()
 
 
 def workspace_membership_for_user(user, workspace):

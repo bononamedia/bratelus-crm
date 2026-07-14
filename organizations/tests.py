@@ -3,7 +3,14 @@ from django.test import TestCase
 from django.urls import reverse
 
 from finance.models import SeatPricingTier, SubscriptionPlan, WorkspaceSubscription
-from organizations.models import Skill, WorkerProfile, Workspace, WorkspaceMember
+from organizations.models import (
+    CustomerAccount,
+    CustomerAccountMember,
+    Skill,
+    WorkerProfile,
+    Workspace,
+    WorkspaceMember,
+)
 from organizations.permissions import (
     user_can_export_data,
     user_can_manage_people,
@@ -30,8 +37,38 @@ class WorkspaceOnboardingTests(TestCase):
         self.assertRedirects(response, reverse('billing_overview'))
         user = User.objects.get(email='owner@example.com')
         workspace = Workspace.objects.get(created_by=user)
+        self.assertIsNotNone(workspace.customer_account)
+        self.assertTrue(CustomerAccountMember.objects.filter(account=workspace.customer_account, user=user, role='owner').exists())
         self.assertTrue(WorkspaceMember.objects.filter(workspace=workspace, user=user, role='admin').exists())
         self.assertTrue(WorkspaceSubscription.objects.filter(workspace=workspace, seat_count=1).exists())
+
+
+class AccountTeamTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user('account-owner@example.com', password='StrongPass123!')
+        self.account = CustomerAccount.objects.create(name='Parent Company', owner=self.owner)
+        CustomerAccountMember.objects.create(account=self.account, user=self.owner, role='owner', can_work_jobs=True)
+        self.first = Workspace.objects.create(name='Brand One', slug='brand-one', customer_account=self.account, created_by=self.owner)
+        self.second = Workspace.objects.create(name='Brand Two', slug='brand-two', customer_account=self.account, created_by=self.owner)
+        for workspace in (self.first, self.second):
+            WorkspaceMember.objects.create(workspace=workspace, user=self.owner, role='admin')
+        self.employee = User.objects.create_user('team@example.com', password='StrongPass123!')
+        self.member = CustomerAccountMember.objects.create(account=self.account, user=self.employee, role='employee')
+        WorkspaceMember.objects.create(workspace=self.first, user=self.employee, role='employee')
+        self.client.force_login(self.owner)
+
+    def test_owner_assigns_office_user_as_field_capable_across_workspaces(self):
+        response = self.client.post(reverse('workforce'), {
+            'account_member_id': self.member.id,
+            'role': 'employee',
+            'can_work_jobs': 'yes',
+            'workspace_ids': [str(self.first.id), str(self.second.id)],
+        })
+        self.assertRedirects(response, reverse('workforce'))
+        self.member.refresh_from_db()
+        self.assertTrue(self.member.can_work_jobs)
+        self.assertEqual(WorkspaceMember.objects.filter(user=self.employee, is_active=True).count(), 2)
+        self.assertEqual(WorkerProfile.objects.get(user=self.employee).workspaces.count(), 2)
 
     def test_authenticated_user_can_create_another_workspace(self):
         user = User.objects.create_user('existing@example.com', password='VeryStrongPass123!')

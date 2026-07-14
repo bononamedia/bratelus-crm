@@ -12,6 +12,8 @@ from django.utils.text import slugify
 from fsm.models import JobAssignment
 
 from .models import (
+    CustomerAccount,
+    CustomerAccountMember,
     CustomField,
     FormLayout,
     ServiceZone,
@@ -139,12 +141,23 @@ def signup_view(request):
                 first_name=first_name,
                 last_name=last_name,
             )
+            customer_account = CustomerAccount.objects.create(name=company_name, owner=user)
+            CustomerAccountMember.objects.create(
+                account=customer_account,
+                user=user,
+                role='owner',
+                can_work_jobs=True,
+                can_view_billing=True,
+            )
             workspace = Workspace.objects.create(
                 name=company_name,
                 slug=unique_workspace_slug(company_name),
                 created_by=user,
+                customer_account=customer_account,
             )
             WorkspaceMember.objects.create(workspace=workspace, user=user, role='admin', is_active=True)
+            worker = WorkerProfile.objects.create(user=user, is_admin=True)
+            worker.workspaces.add(workspace)
             from finance.models import SubscriptionPlan, WorkspaceSubscription
 
             plan = SubscriptionPlan.objects.filter(is_active=True).first()
@@ -177,10 +190,29 @@ def create_workspace_view(request):
         if not name:
             messages.error(request, 'Workspace name is required.')
         else:
+            active_workspace = getattr(request, 'active_organization', None)
+            customer_account = getattr(active_workspace, 'customer_account', None)
+            if not customer_account:
+                account_membership = CustomerAccountMember.objects.filter(
+                    user=request.user,
+                    role__in=('owner', 'admin'),
+                    is_active=True,
+                ).select_related('account').first()
+                customer_account = account_membership.account if account_membership else None
+            if not customer_account:
+                customer_account = CustomerAccount.objects.create(name=name, owner=request.user)
+                CustomerAccountMember.objects.create(
+                    account=customer_account,
+                    user=request.user,
+                    role='owner',
+                    can_work_jobs=True,
+                    can_view_billing=True,
+                )
             workspace = Workspace.objects.create(
                 name=name,
                 slug=unique_workspace_slug(name),
                 created_by=request.user,
+                customer_account=customer_account,
             )
             WorkspaceMember.objects.create(
                 workspace=workspace,
@@ -188,6 +220,14 @@ def create_workspace_view(request):
                 role='admin',
                 is_active=True,
             )
+            if CustomerAccountMember.objects.filter(
+                account=customer_account,
+                user=request.user,
+                can_work_jobs=True,
+                is_active=True,
+            ).exists():
+                worker, _ = WorkerProfile.objects.get_or_create(user=request.user)
+                worker.workspaces.add(workspace)
             from finance.models import SubscriptionPlan, WorkspaceSubscription
 
             plan = SubscriptionPlan.objects.filter(is_active=True).first()
@@ -452,6 +492,18 @@ def admin_console_view(request):
                         role == 'manager' and request.POST.get('can_view_billing') == 'yes'
                     ),
                 )
+                account_role = {'admin': 'admin', 'manager': 'manager'}.get(role, 'employee')
+                if active_org.customer_account_id:
+                    CustomerAccountMember.objects.update_or_create(
+                        account=active_org.customer_account,
+                        user=user,
+                        defaults={
+                            'role': account_role,
+                            'can_work_jobs': role == 'field_worker',
+                            'can_view_billing': role == 'admin' or request.POST.get('can_view_billing') == 'yes',
+                            'is_active': True,
+                        },
+                    )
                 worker, _ = WorkerProfile.objects.get_or_create(user=user)
                 worker.workspaces.add(active_org)
                 worker.is_admin = role in {'admin', 'manager'}

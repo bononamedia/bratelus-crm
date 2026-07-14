@@ -92,7 +92,14 @@ def jobs_board_view(request):
         properties = Property.objects.filter(account__organization=active_org)
         skills = Skill.objects.filter(workspace=active_org)
         zones = ServiceZone.objects.filter(workspace=active_org)
-        workers = WorkerProfile.objects.filter(workspaces=active_org).select_related('user')
+        workers = WorkerProfile.objects.filter(workspaces=active_org)
+        if active_org.customer_account_id:
+            workers = workers.filter(
+                user__customer_accounts__account=active_org.customer_account,
+                user__customer_accounts__can_work_jobs=True,
+                user__customer_accounts__is_active=True,
+            )
+        workers = workers.select_related('user').distinct()
         contacts = Contact.objects.filter(organization=active_org).select_related('account').order_by('first_name', 'last_name')
     else:
         accounts = []

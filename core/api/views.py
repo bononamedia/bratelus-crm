@@ -505,7 +505,14 @@ class JobViewSet(BaseWorkspaceViewSet):
             )
 
         worker_id = request.data.get('worker_id')
-        worker = WorkerProfile.objects.filter(id=worker_id, workspaces=active_org).first()
+        workers = WorkerProfile.objects.filter(id=worker_id, workspaces=active_org)
+        if active_org.customer_account_id:
+            workers = workers.filter(
+                user__customer_accounts__account=active_org.customer_account,
+                user__customer_accounts__can_work_jobs=True,
+                user__customer_accounts__is_active=True,
+            )
+        worker = workers.first()
         if not worker:
             return Response(
                 {'worker_id': 'Worker must belong to the active organization.'},
@@ -602,8 +609,13 @@ class WorkerViewSet(viewsets.ReadOnlyModelViewSet):
                 .select_related('user')
             )
 
-        return (
-            WorkerProfile.objects.filter(workspaces=active_org)
-            .select_related('user')
-            .order_by('user__first_name', 'user__last_name', 'user__username')
+        workers = WorkerProfile.objects.filter(workspaces=active_org)
+        if active_org.customer_account_id:
+            workers = workers.filter(
+                user__customer_accounts__account=active_org.customer_account,
+                user__customer_accounts__can_work_jobs=True,
+                user__customer_accounts__is_active=True,
+            )
+        return workers.select_related('user').distinct().order_by(
+            'user__first_name', 'user__last_name', 'user__username'
         )

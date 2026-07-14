@@ -1,12 +1,14 @@
 import json
+from datetime import timedelta
 from unittest.mock import patch
 
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from crm.models.contacts import Account, Contact, Property
-from organizations.models import WorkerProfile, Workspace, WorkspaceMember
+from organizations.models import CustomerAccount, CustomerAccountMember, WorkerProfile, Workspace, WorkspaceMember
 
 from .models import CompletionNotificationDelivery, FieldEvent, FieldShift, Job, JobAssignment, JobIssue, JobTask
 from .tasks import send_completion_notifications
@@ -184,3 +186,50 @@ class FieldWorkflowTests(TestCase):
         self.assertTrue(all(delivery.status == 'failed' for delivery in deliveries))
         self.assertTrue(all('Dear Maria' in delivery.message for delivery in deliveries))
         self.assertTrue(all('Field Test' in delivery.message for delivery in deliveries))
+
+
+class MultiWorkspaceCalendarTests(TestCase):
+    def setUp(self):
+        self.owner = User.objects.create_user('calendar-owner@example.com', password='StrongPass123!')
+        self.customer_account = CustomerAccount.objects.create(name='Calendar Company', owner=self.owner)
+        CustomerAccountMember.objects.create(account=self.customer_account, user=self.owner, role='owner', can_work_jobs=True)
+        self.one = Workspace.objects.create(name='Blue Brand', slug='blue-brand', customer_account=self.customer_account, created_by=self.owner)
+        self.two = Workspace.objects.create(name='Green Brand', slug='green-brand', customer_account=self.customer_account, created_by=self.owner)
+        for workspace in (self.one, self.two):
+            WorkspaceMember.objects.create(workspace=workspace, user=self.owner, role='admin')
+        self.worker = WorkerProfile.objects.create(user=self.owner)
+        self.worker.workspaces.add(self.one, self.two)
+        self.account_one = Account.objects.create(organization=self.one, name='Blue Customer')
+        self.account_two = Account.objects.create(organization=self.two, name='Green Customer')
+        self.client.force_login(self.owner)
+
+    def test_calendar_combines_authorized_workspace_events(self):
+        now = timezone.now().replace(minute=0, second=0, microsecond=0)
+        Job.objects.create(organization=self.one, account=self.account_one, title='Blue Job', scheduled_start=now)
+        Job.objects.create(organization=self.two, account=self.account_two, title='Green Job', scheduled_start=now + timedelta(hours=2))
+        response = self.client.get(reverse('api_calendar_jobs'), {
+            'start': (now - timedelta(days=1)).isoformat(),
+            'end': (now + timedelta(days=1)).isoformat(),
+            'workspaces': f'{self.one.id},{self.two.id}',
+        })
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual({event['title'] for event in response.json()}, {'Blue Job', 'Green Job'})
+
+    def test_calendar_slot_creates_and_assigns_job(self):
+        response = self.client.post(
+            reverse('api_calendar_jobs'),
+            data=json.dumps({
+                'workspace_id': str(self.two.id),
+                'title': 'Calendar Cleaning',
+                'scheduled_start': timezone.now().isoformat(),
+                'duration_minutes': 90,
+                'account_id': self.account_two.id,
+                'worker_ids': [self.worker.id],
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 201)
+        job = Job.objects.get(title='Calendar Cleaning')
+        self.assertEqual(job.organization, self.two)
+        self.assertEqual(job.estimated_duration_minutes, 90)
+        self.assertTrue(job.worker_assignments.filter(worker=self.worker).exists())

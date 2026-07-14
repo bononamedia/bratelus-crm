@@ -5,10 +5,55 @@ import uuid
 # ---------------------------------------------------------
 # CORE TENANT MODELS
 # ---------------------------------------------------------
+class CustomerAccount(models.Model):
+    """The paying Bratelus customer that owns one or more workspace brands."""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    name = models.CharField(max_length=255)
+    owner = models.ForeignKey(User, on_delete=models.PROTECT, related_name='owned_customer_accounts')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'workspaces_customeraccount'
+
+    def __str__(self):
+        return self.name
+
+
+class CustomerAccountMember(models.Model):
+    ROLE_CHOICES = [
+        ('owner', 'Owner'),
+        ('admin', 'Administrator'),
+        ('manager', 'Manager'),
+        ('employee', 'Employee'),
+    ]
+
+    account = models.ForeignKey(CustomerAccount, on_delete=models.CASCADE, related_name='members')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='customer_accounts')
+    role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='employee')
+    can_work_jobs = models.BooleanField(default=False)
+    can_view_billing = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        db_table = 'workspaces_customeraccountmember'
+        unique_together = ('account', 'user')
+
+    def __str__(self):
+        return f'{self.user} / {self.account} ({self.role})'
+
+
 class Workspace(models.Model):
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     slug = models.SlugField(unique=True)
+    customer_account = models.ForeignKey(
+        CustomerAccount,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='workspaces',
+    )
+    calendar_color = models.CharField(max_length=7, default='#2563eb')
     created_by = models.ForeignKey(
         User,
         on_delete=models.SET_NULL,

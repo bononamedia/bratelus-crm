@@ -1,5 +1,6 @@
 from django.contrib import admin
 from .models import (
+    CustomerAccount, CustomerAccountMember,
     Workspace, WorkspaceMember, WorkerProfile, CustomField, 
     FormLayout, DashboardWidget, Skill, WorkerSkill, ServiceZone,
     WorkspaceEmailDomain, WorkspaceEmailConnection
@@ -14,6 +15,26 @@ admin.site.has_permission = lambda request: request.user.is_active and request.u
 class WorkspaceMemberInline(admin.TabularInline):
     model = WorkspaceMember
     extra = 1
+
+
+class CustomerAccountMemberInline(admin.TabularInline):
+    model = CustomerAccountMember
+    extra = 0
+
+
+@admin.register(CustomerAccount)
+class CustomerAccountAdmin(admin.ModelAdmin):
+    list_display = ('name', 'owner', 'created_at')
+    search_fields = ('name', 'owner__email', 'owner__username')
+    autocomplete_fields = ('owner',)
+    inlines = [CustomerAccountMemberInline]
+
+
+@admin.register(CustomerAccountMember)
+class CustomerAccountMemberAdmin(admin.ModelAdmin):
+    list_display = ('user', 'account', 'role', 'can_work_jobs', 'can_view_billing', 'is_active')
+    list_filter = ('account', 'role', 'can_work_jobs', 'is_active')
+    search_fields = ('user__email', 'user__username', 'account__name')
 
 @admin.register(Workspace)
 class WorkspaceAdmin(admin.ModelAdmin):

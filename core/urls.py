@@ -29,6 +29,12 @@ from fsm.views import (
     field_job_view,
     field_operations_view,
 )
+from fsm.calendar_views import (
+    calendar_job_update_view,
+    calendar_jobs_view,
+    calendar_options_view,
+    job_calendar_view,
+)
 
 # Unified API ViewSets
 from core.api.views import AccountViewSet, ContactViewSet, JobViewSet, PaymentMethodViewSet, PropertyViewSet, WorkerViewSet
@@ -99,6 +105,7 @@ urlpatterns = [
     path('dashboard/', dashboard_view, name='dashboard'),
     path('leads/', leads_list_view, name='leads'),
     path('jobs/', jobs_board_view, name='jobs'),
+    path('jobs/calendar/', job_calendar_view, name='job_calendar'),
     path('accounts/', crm_accounts_view, name='accounts'),
     path('contacts/', crm_accounts_view, {'section': 'contacts'}, name='contacts'),
     path('properties/', crm_accounts_view, {'section': 'properties'}, name='properties'),
@@ -134,6 +141,9 @@ urlpatterns = [
     path('api/mobile/jobs/<int:job_id>/action/', FieldJobActionView.as_view(), name='api_field_job_action'),
     path('api/mobile/jobs/<int:job_id>/report-problem/', FieldIssueReportView.as_view(), name='api_field_report_problem'),
     path('api/field-issues/<int:issue_id>/status/', FieldIssueStatusView.as_view(), name='api_field_issue_status'),
+    path('api/calendar/options/', calendar_options_view, name='api_calendar_options'),
+    path('api/calendar/jobs/', calendar_jobs_view, name='api_calendar_jobs'),
+    path('api/calendar/jobs/<int:job_id>/', calendar_job_update_view, name='api_calendar_job_update'),
     path('api/passkeys/register/options/', passkey_registration_options, name='passkey_register_options'),
     path('api/passkeys/register/verify/', passkey_registration_verify, name='passkey_register_verify'),
     path('api/passkeys/login/options/', passkey_authentication_options, name='passkey_login_options'),
