@@ -49,6 +49,7 @@ from organizations.passkeys import (
     passkey_registration_options, passkey_registration_verify,
 )
 from workforce.views import employee_document_download_view, team_member_detail_view, workforce_view, work_activity_ledger_view
+from chat.views import chat_attach_job_view, chat_inbox_view, chat_message_view
 
 
 # ==========================================
@@ -113,6 +114,10 @@ urlpatterns = [
     path('payment-methods/', crm_accounts_view, {'section': 'payment_methods'}, name='payment_methods'),
     path('finance/', finance_overview_view, name='finance'),
     path('workforce/', workforce_view, name='workforce'),
+    path('chat/', chat_inbox_view, name='chat_inbox'),
+    path('chat/<uuid:conversation_id>/', chat_inbox_view, name='chat_conversation'),
+    path('chat/<uuid:conversation_id>/message/', chat_message_view, name='chat_message'),
+    path('chat/<uuid:conversation_id>/attach-job/', chat_attach_job_view, name='chat_attach_job'),
     path('workforce/activity/', work_activity_ledger_view, name='work_activity_ledger'),
     path('workforce/team/<int:member_id>/', team_member_detail_view, name='team_member_detail'),
     path('workforce/documents/<int:document_id>/download/', employee_document_download_view, name='employee_document_download'),

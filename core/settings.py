@@ -36,6 +36,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'channels',
     
     'rest_framework',  # <--- ADD THIS RIGHT HERE
     
@@ -44,6 +45,7 @@ INSTALLED_APPS = [
     'crm',
     'fsm',
     'finance',
+    'chat',
     'storages',
 ]
 
@@ -167,6 +169,13 @@ CACHES = {
 
 # Channels / WebSockets (for Daphne)
 ASGI_APPLICATION = 'core.asgi.application'
+
+CHANNEL_LAYERS = {
+    'default': {
+        'BACKEND': 'channels_redis.core.RedisChannelLayer',
+        'CONFIG': {'hosts': [('redis', 6379)]},
+    },
+}
 
 # Tell Django to trust form submissions coming from your actual domain
 CSRF_TRUSTED_ORIGINS = [

@@ -99,6 +99,11 @@
                 </div>
             </div>
 
+            <a href="{% url 'chat_inbox' %}" class="flex shrink-0 items-center rounded-lg border border-cyan-400/15 bg-cyan-400/10 px-3 py-2.5 text-sm font-medium text-slate-100 transition-colors hover:bg-cyan-400/15">
+                <span class="mr-3 flex h-8 w-8 items-center justify-center rounded-md bg-cyan-400/15 text-cyan-200"><svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a10.5 10.5 0 01-4.4-.95L3 20l1.25-3.35A7.26 7.26 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path></svg></span>
+                Team Chat
+            </a>
+
             <div class="nav-module rounded-lg border border-emerald-400/15 bg-emerald-400/10" data-module="dispatch">
                 <button type="button" class="nav-module-toggle flex w-full items-center gap-3 px-3 py-2.5 text-left" data-module-toggle="dispatch" aria-expanded="false">
                     <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-emerald-400/15 text-emerald-200">
@@ -216,6 +221,7 @@
                 </button>
                 <div class="nav-submenu hidden px-2 pb-2.5" data-module-panel="employee">
                     <a href="{% url 'field_operations' %}" class="nav-subitem">Field App</a>
+                    <a href="{% url 'chat_inbox' %}" class="nav-subitem">Team Chat</a>
                     <a href="{% url 'employee_profile' %}" class="nav-subitem">My Profile</a>
                 </div>
             </div>
