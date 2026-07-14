@@ -3,13 +3,15 @@ from asgiref.sync import async_to_sync
 from channels.testing import WebsocketCommunicator
 from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
+from unittest.mock import patch
 
 from crm.models.contacts import Account
 from fsm.models import Job
 from organizations.models import CustomerAccount, CustomerAccountMember, Workspace, WorkspaceMember
 
-from .models import ChatConversation, ChatMessage, ChatParticipant
+from .models import ChatConversation, ChatMessage, ChatParticipant, WebPushSubscription
 from .consumers import ChatConsumer
+from .tasks import send_chat_push
 
 
 class InternalChatTests(TestCase):
@@ -58,7 +60,8 @@ class InternalChatTests(TestCase):
         self.assertRedirects(response, reverse('chat_conversation', args=[conversation.id]))
         self.assertIsNone(conversation.workspace)
 
-    def test_participant_sends_message_and_attaches_transcript_to_job(self):
+    @patch('chat.views.send_chat_push.delay')
+    def test_participant_sends_message_and_attaches_transcript_to_job(self, push_delay):
         conversation = ChatConversation.objects.create(
             account=self.customer_account, workspace=self.workspace, title='Materials', created_by=self.owner,
         )
@@ -67,6 +70,25 @@ class InternalChatTests(TestCase):
         response = self.client.post(reverse('chat_message', args=[conversation.id]), {'body': 'Please bring the receipt.'})
         self.assertEqual(response.status_code, 201)
         self.assertTrue(ChatMessage.objects.filter(conversation=conversation, body='Please bring the receipt.').exists())
+        push_delay.assert_called_once()
+
+        owner_participant = ChatParticipant.objects.get(conversation=conversation, user=self.owner)
+        employee_participant = ChatParticipant.objects.get(conversation=conversation, user=self.employee)
+        self.assertEqual(owner_participant.unread_count, 0)
+        self.assertEqual(employee_participant.unread_count, 1)
+
+        self.client.force_login(self.employee)
+        session = self.client.session
+        session['active_org_id'] = str(self.workspace.id)
+        session.save()
+        self.client.get(reverse('chat_conversation', args=[conversation.id]))
+        employee_participant.refresh_from_db()
+        self.assertEqual(employee_participant.unread_count, 0)
+
+        self.client.force_login(self.owner)
+        session = self.client.session
+        session['active_org_id'] = str(self.workspace.id)
+        session.save()
 
         attach = self.client.post(reverse('chat_attach_job', args=[conversation.id]), {'job_id': self.job.id})
         self.assertRedirects(attach, reverse('chat_conversation', args=[conversation.id]))
@@ -74,6 +96,55 @@ class InternalChatTests(TestCase):
         self.assertEqual(conversation.job, self.job)
         self.assertIsNotNone(conversation.transcript_attached_at)
         self.assertTrue(conversation.messages.filter(message_type='system', body__contains=f'job #{self.job.id}').exists())
+
+    def test_user_can_register_and_remove_secure_push_subscription(self):
+        payload = {
+            'endpoint': 'https://push.example.test/device-1',
+            'keys': {'p256dh': 'public-key', 'auth': 'auth-secret'},
+        }
+        response = self.client.post(
+            reverse('chat_push_subscribe'), data=payload, content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        subscription = WebPushSubscription.objects.get(endpoint=payload['endpoint'])
+        self.assertEqual(subscription.user, self.owner)
+
+        response = self.client.post(
+            reverse('chat_push_unsubscribe'), data={'endpoint': payload['endpoint']},
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(WebPushSubscription.objects.exists())
+
+    def test_push_subscription_rejects_insecure_endpoint(self):
+        response = self.client.post(reverse('chat_push_subscribe'), data={
+            'endpoint': 'http://push.example.test/device-1',
+            'keys': {'p256dh': 'public-key', 'auth': 'auth-secret'},
+        }, content_type='application/json')
+        self.assertEqual(response.status_code, 400)
+
+    @override_settings(
+        CHAT_VAPID_PUBLIC_KEY='public-key', CHAT_VAPID_PRIVATE_KEY='private-key',
+        CHAT_VAPID_SUBJECT='mailto:support@bratelus.com',
+    )
+    @patch('chat.tasks.webpush')
+    def test_push_task_sends_to_other_participants(self, webpush_mock):
+        conversation = ChatConversation.objects.create(
+            account=self.customer_account, workspace=self.workspace, title='Push test', created_by=self.owner,
+        )
+        ChatParticipant.objects.create(conversation=conversation, user=self.owner)
+        ChatParticipant.objects.create(conversation=conversation, user=self.employee)
+        WebPushSubscription.objects.create(
+            user=self.employee, endpoint='https://push.example.test/device-2', p256dh='public-key', auth='auth-secret',
+        )
+        message = ChatMessage.objects.create(
+            conversation=conversation, sender=self.owner, sender_name='Avery', body='New assignment ready.',
+        )
+
+        result = send_chat_push(message.id)
+
+        self.assertEqual(result, {'status': 'sent', 'count': 1})
+        webpush_mock.assert_called_once()
 
     def test_nonparticipant_cannot_read_or_post_to_conversation(self):
         conversation = ChatConversation.objects.create(account=self.customer_account, title='Private', created_by=self.owner)
@@ -100,7 +171,8 @@ class ChatWebSocketTests(TransactionTestCase):
         self.conversation = ChatConversation.objects.create(account=self.account, title='Live coordination', created_by=self.user)
         ChatParticipant.objects.create(conversation=self.conversation, user=self.user)
 
-    def test_participant_receives_message_over_websocket(self):
+    @patch('chat.consumers.send_chat_push.delay')
+    def test_participant_receives_message_over_websocket(self, push_delay):
         async def scenario():
             communicator = WebsocketCommunicator(ChatConsumer.as_asgi(), f'/ws/chat/{self.conversation.id}/')
             communicator.scope['user'] = self.user
@@ -109,9 +181,12 @@ class ChatWebSocketTests(TransactionTestCase):
             self.assertTrue(connected)
             await communicator.send_json_to({'body': 'Live message'})
             response = await communicator.receive_json_from()
+            while response.get('type') != 'message':
+                response = await communicator.receive_json_from()
             self.assertEqual(response['body'], 'Live message')
             self.assertEqual(response['sender_id'], self.user.id)
             await communicator.disconnect()
 
         async_to_sync(scenario)()
         self.assertTrue(ChatMessage.objects.filter(conversation=self.conversation, body='Live message').exists())
+        push_delay.assert_called_once()

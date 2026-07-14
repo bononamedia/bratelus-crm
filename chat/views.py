@@ -1,8 +1,13 @@
 from django.contrib import messages
+import json
+
+from django.conf import settings
 from django.contrib.auth.decorators import login_required
+from django.core.cache import cache
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
-from django.http import JsonResponse
+from django.db.models import F
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
@@ -11,12 +16,13 @@ from fsm.models import Job
 from organizations.models import CustomerAccountMember
 from organizations.permissions import account_workspaces_for_user
 
-from .models import ChatConversation, ChatMessage, ChatParticipant
+from .models import ChatConversation, ChatMessage, ChatParticipant, WebPushSubscription
 from .permissions import account_for_request, user_in_account
+from .tasks import send_chat_push
 
 
 def _conversation_for_user(user, conversation_id, account):
-    conversations = ChatConversation.objects.filter(id=conversation_id, account=account)
+    conversations = ChatConversation.objects.filter(id=conversation_id, account=account).prefetch_related('participants__user')
     if not user.is_superuser:
         conversations = conversations.filter(participants__user=user)
     return get_object_or_404(conversations.distinct())
@@ -35,6 +41,14 @@ def chat_inbox_view(request, conversation_id=None):
     if request.user.is_superuser:
         conversations = ChatConversation.objects.filter(account=account).select_related('workspace', 'job').prefetch_related(
             'participants__user', 'messages'
+        )
+    conversations = list(conversations)
+    for conversation in conversations:
+        participant = next((item for item in conversation.participants.all() if item.user_id == request.user.id), None)
+        conversation.user_unread_count = participant.unread_count if participant else 0
+        conversation.online_count = sum(
+            1 for item in conversation.participants.all()
+            if item.user_id != request.user.id and cache.get(f'chat_online:{account.id}:{item.user_id}')
         )
 
     if request.method == 'POST':
@@ -68,7 +82,11 @@ def chat_inbox_view(request, conversation_id=None):
     if conversation_id:
         selected = _conversation_for_user(request.user, conversation_id, account)
         chat_messages = selected.messages.select_related('sender').all()
-        ChatParticipant.objects.filter(conversation=selected, user=request.user).update(last_read_at=timezone.now())
+        ChatParticipant.objects.filter(conversation=selected, user=request.user).update(
+            last_read_at=timezone.now(), unread_count=0,
+        )
+        for participant in selected.participants.all():
+            participant.is_online = bool(cache.get(f'chat_online:{account.id}:{participant.user_id}'))
     members = CustomerAccountMember.objects.filter(account=account, is_active=True).select_related('user').order_by(
         'user__first_name', 'user__last_name', 'user__username'
     )
@@ -82,6 +100,7 @@ def chat_inbox_view(request, conversation_id=None):
         'members': members,
         'workspaces': workspaces,
         'jobs': jobs,
+        'chat_vapid_public_key': settings.CHAT_VAPID_PUBLIC_KEY,
     })
 
 
@@ -120,7 +139,72 @@ def chat_message_view(request, conversation_id):
         sender_name=request.user.get_full_name() or request.user.username, body=body[:4000],
     )
     conversation.save(update_fields=['updated_at'])
+    ChatParticipant.objects.filter(conversation=conversation).exclude(user=request.user).update(
+        unread_count=F('unread_count') + 1,
+    )
+    ChatParticipant.objects.filter(conversation=conversation, user=request.user).update(
+        last_read_at=timezone.now(), unread_count=0,
+    )
+    send_chat_push.delay(message.id)
     return JsonResponse({
         'id': message.id, 'body': message.body, 'sender_name': message.sender_name,
         'sender_id': request.user.id, 'created_at': message.created_at.isoformat(),
     }, status=201)
+
+
+@login_required
+@require_POST
+def chat_push_subscribe_view(request):
+    try:
+        data = json.loads(request.body)
+        endpoint = data['endpoint']
+        p256dh = data['keys']['p256dh']
+        auth = data['keys']['auth']
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        return JsonResponse({'error': 'Invalid push subscription.'}, status=400)
+    if not endpoint.startswith('https://'):
+        return JsonResponse({'error': 'A secure push endpoint is required.'}, status=400)
+    WebPushSubscription.objects.update_or_create(
+        endpoint=endpoint,
+        defaults={
+            'user': request.user, 'p256dh': p256dh[:255], 'auth': auth[:255],
+            'user_agent': request.headers.get('User-Agent', '')[:500],
+        },
+    )
+    return JsonResponse({'status': 'subscribed'})
+
+
+@login_required
+@require_POST
+def chat_push_unsubscribe_view(request):
+    try:
+        endpoint = json.loads(request.body).get('endpoint', '')
+    except json.JSONDecodeError:
+        endpoint = ''
+    WebPushSubscription.objects.filter(user=request.user, endpoint=endpoint).delete()
+    return JsonResponse({'status': 'unsubscribed'})
+
+
+def chat_service_worker_view(request):
+    script = """
+self.addEventListener('push', event => {
+  const data = event.data ? event.data.json() : {};
+  event.waitUntil(self.registration.showNotification(data.title || 'Bratelus Team Chat', {
+    body: data.body || 'You have a new message.',
+    data: {url: data.url || '/chat/'},
+    tag: data.conversation_id || 'bratelus-chat'
+  }));
+});
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = new URL(event.notification.data.url || '/chat/', self.location.origin).href;
+  event.waitUntil(clients.matchAll({type: 'window', includeUncontrolled: true}).then(list => {
+    for (const client of list) { if (client.url === url && 'focus' in client) return client.focus(); }
+    return clients.openWindow ? clients.openWindow(url) : null;
+  }));
+});
+"""
+    response = HttpResponse(script, content_type='application/javascript')
+    response['Service-Worker-Allowed'] = '/'
+    response['Cache-Control'] = 'no-cache'
+    return response

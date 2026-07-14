@@ -37,6 +37,7 @@ class ChatParticipant(models.Model):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_participations')
     joined_at = models.DateTimeField(auto_now_add=True)
     last_read_at = models.DateTimeField(null=True, blank=True)
+    unread_count = models.PositiveIntegerField(default=0)
 
     class Meta:
         unique_together = ('conversation', 'user')
@@ -58,3 +59,19 @@ class ChatMessage(models.Model):
 
     def __str__(self):
         return f'{self.sender_name}: {self.body[:60]}'
+
+
+class WebPushSubscription(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_push_subscriptions')
+    endpoint = models.URLField(max_length=1000, unique=True)
+    p256dh = models.CharField(max_length=255)
+    auth = models.CharField(max_length=255)
+    user_agent = models.CharField(max_length=500, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ('-updated_at',)
+
+    def __str__(self):
+        return f'{self.user} / {self.endpoint[:60]}'

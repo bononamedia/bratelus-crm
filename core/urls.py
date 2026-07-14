@@ -49,7 +49,10 @@ from organizations.passkeys import (
     passkey_registration_options, passkey_registration_verify,
 )
 from workforce.views import employee_document_download_view, team_member_detail_view, workforce_view, work_activity_ledger_view
-from chat.views import chat_attach_job_view, chat_inbox_view, chat_message_view
+from chat.views import (
+    chat_attach_job_view, chat_inbox_view, chat_message_view,
+    chat_push_subscribe_view, chat_push_unsubscribe_view, chat_service_worker_view,
+)
 
 
 # ==========================================
@@ -115,6 +118,9 @@ urlpatterns = [
     path('finance/', finance_overview_view, name='finance'),
     path('workforce/', workforce_view, name='workforce'),
     path('chat/', chat_inbox_view, name='chat_inbox'),
+    path('chat/push/subscribe/', chat_push_subscribe_view, name='chat_push_subscribe'),
+    path('chat/push/unsubscribe/', chat_push_unsubscribe_view, name='chat_push_unsubscribe'),
+    path('chat/service-worker.js', chat_service_worker_view, name='chat_service_worker'),
     path('chat/<uuid:conversation_id>/', chat_inbox_view, name='chat_conversation'),
     path('chat/<uuid:conversation_id>/message/', chat_message_view, name='chat_message'),
     path('chat/<uuid:conversation_id>/attach-job/', chat_attach_job_view, name='chat_attach_job'),

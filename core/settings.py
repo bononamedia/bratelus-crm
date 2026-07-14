@@ -70,14 +70,15 @@ TEMPLATES = [
         'DIRS': [BASE_DIR / 'templates'], # Or however yours is formatted
         'APP_DIRS': True,
         'OPTIONS': {
-            'context_processors': [
+                'context_processors': [
                 'django.template.context_processors.debug',
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
                 
                 # --- BRATELUS GLOBAL VARIABLES ---
-                'core.context_processors.organization_context',
+                    'core.context_processors.organization_context',
+                    'chat.context_processors.chat_context',
             ],
         },
     },
@@ -192,3 +193,7 @@ STRIPE_WEBHOOK_SECRET = os.environ.get('STRIPE_WEBHOOK_SECRET', '')
 
 PASSKEY_RP_ID = os.environ.get('PASSKEY_RP_ID', 'app.bratelus.com')
 PASSKEY_ORIGIN = os.environ.get('PASSKEY_ORIGIN', 'https://app.bratelus.com')
+
+CHAT_VAPID_PUBLIC_KEY = os.environ.get('CHAT_VAPID_PUBLIC_KEY', '')
+CHAT_VAPID_PRIVATE_KEY = os.environ.get('CHAT_VAPID_PRIVATE_KEY', '/app/.vapid_private.pem')
+CHAT_VAPID_SUBJECT = os.environ.get('CHAT_VAPID_SUBJECT', 'mailto:support@bratelus.com')
