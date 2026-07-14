@@ -1,6 +1,7 @@
 from django.db.models import Q
+from django.shortcuts import redirect
 
-from organizations.models import Workspace
+from organizations.models import CustomerAccountMember, EmployeeDocument, WorkerProfile, Workspace
 
 class ActiveOrganizationMiddleware:
     def __init__(self, get_response):
@@ -30,6 +31,31 @@ class ActiveOrganizationMiddleware:
                     request.session['active_org_id'] = str(active_org.id)
 
             request.active_organization = active_org
+
+            onboarding_allowed_paths = (
+                '/me/',
+                '/accounts/logout/',
+                '/accounts/login/',
+                '/api/passkeys/',
+                '/static/',
+            )
+            if active_org and not request.path.startswith(onboarding_allowed_paths):
+                account_member = CustomerAccountMember.objects.filter(
+                    account=active_org.customer_account,
+                    user=request.user,
+                    is_active=True,
+                ).first()
+                worker = WorkerProfile.objects.filter(user=request.user).first()
+                if account_member and worker:
+                    photo_missing = account_member.photo_required and not worker.photo
+                    license_missing = account_member.drivers_license_required and not EmployeeDocument.objects.filter(
+                        account=active_org.customer_account,
+                        user=request.user,
+                        document_type='drivers_license',
+                        status__in=['pending', 'approved'],
+                    ).exists()
+                    if photo_missing or license_missing:
+                        return redirect('employee_profile')
         else:
             request.active_organization = None
 

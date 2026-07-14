@@ -46,12 +46,13 @@
             {% for member in account_members %}
             <form method="post" class="grid gap-4 p-4 lg:grid-cols-[minmax(220px,.8fr)_minmax(300px,1.2fr)_auto] lg:items-center">{% csrf_token %}<input type="hidden" name="account_member_id" value="{{ member.id }}">
                 <div class="flex min-w-0 items-center gap-3">
-                    <div class="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100 text-sm font-extrabold uppercase text-blue-700">
-                        {{ member.user.username|make_list|first }}
-                    </div>
+                    <a href="{% url 'team_member_detail' member.id %}" class="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-blue-100 text-sm font-semibold uppercase text-blue-700">
+                        {% if member.worker_profile.photo %}<img src="{{ member.worker_profile.photo.url }}" alt="" class="h-full w-full object-cover">{% else %}{{ member.user.username|make_list|first }}{% endif %}
+                    </a>
                     <div class="min-w-0">
-                        <p class="truncate font-semibold text-gray-950">{{ member.user.get_full_name|default:member.user.username }}</p>
+                        <a href="{% url 'team_member_detail' member.id %}" class="truncate font-semibold text-gray-950 hover:text-blue-700">{{ member.user.get_full_name|default:member.user.username }}</a>
                         <p class="truncate text-sm text-gray-500">{{ member.user.email|default:"No email" }}</p>
+                        <a href="{% url 'team_member_detail' member.id %}" class="mt-1 inline-flex text-xs font-medium text-blue-600">View profile</a>
                     </div>
                 </div>
                 <div class="space-y-3">
@@ -68,6 +69,20 @@
             {% empty %}
             <div class="p-8 text-center text-sm text-gray-500">No account users yet.</div>
             {% endfor %}
+        </div>
+    </section>
+
+    <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div class="border-b border-gray-200 px-5 py-4">
+            <h2 class="font-semibold text-gray-950">Labor Footprint</h2>
+            <p class="mt-1 text-sm text-gray-500">One employee record follows the work from assignment to payroll and job profitability.</p>
+        </div>
+        <div class="grid grid-cols-1 divide-y divide-gray-100 md:grid-cols-5 md:divide-x md:divide-y-0">
+            <div class="p-5"><span class="flex h-9 w-9 items-center justify-center rounded-md bg-violet-50 text-violet-700">1</span><h3 class="mt-3 font-medium text-gray-950">Account Team</h3><p class="mt-1 text-sm text-gray-500">Profile, skills, documents, and role.</p></div>
+            <div class="p-5"><span class="flex h-9 w-9 items-center justify-center rounded-md bg-blue-50 text-blue-700">2</span><h3 class="mt-3 font-medium text-gray-950">Workspace Access</h3><p class="mt-1 text-sm text-gray-500">Assign to one brand, several, or all.</p></div>
+            <div class="p-5"><span class="flex h-9 w-9 items-center justify-center rounded-md bg-emerald-50 text-emerald-700">3</span><h3 class="mt-3 font-medium text-gray-950">Job Clock</h3><p class="mt-1 text-sm text-gray-500">Arrival, task time, completion, and closeout.</p></div>
+            <div class="p-5"><span class="flex h-9 w-9 items-center justify-center rounded-md bg-amber-50 text-amber-700">4</span><h3 class="mt-3 font-medium text-gray-950">Job Cost</h3><p class="mt-1 text-sm text-gray-500">Hours and worker pay by job and workspace.</p></div>
+            <div class="p-5"><span class="flex h-9 w-9 items-center justify-center rounded-md bg-rose-50 text-rose-700">5</span><h3 class="mt-3 font-medium text-gray-950">Finance & Reports</h3><p class="mt-1 text-sm text-gray-500">Payroll summaries and margin reporting.</p></div>
         </div>
     </section>
 </div>

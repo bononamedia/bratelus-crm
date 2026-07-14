@@ -90,7 +90,10 @@ def jobs_board_view(request):
     if active_org:
         accounts = Account.objects.filter(organization=active_org)
         properties = Property.objects.filter(account__organization=active_org)
-        skills = Skill.objects.filter(workspace=active_org)
+        skills = (
+            Skill.objects.filter(customer_account=active_org.customer_account)
+            if active_org.customer_account_id else Skill.objects.filter(workspace=active_org)
+        )
         zones = ServiceZone.objects.filter(workspace=active_org)
         workers = WorkerProfile.objects.filter(workspaces=active_org)
         if active_org.customer_account_id:

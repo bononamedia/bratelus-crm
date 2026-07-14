@@ -32,6 +32,8 @@ class CustomerAccountMember(models.Model):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default='employee')
     can_work_jobs = models.BooleanField(default=False)
     can_view_billing = models.BooleanField(default=False)
+    photo_required = models.BooleanField(default=False)
+    drivers_license_required = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
 
     class Meta:
@@ -192,6 +194,9 @@ class WorkerProfile(models.Model):
     workspaces = models.ManyToManyField(Workspace, related_name='workers')
     
     phone = models.CharField(max_length=20, blank=True)
+    photo = models.ImageField(upload_to='employee_profiles/%Y/%m/', null=True, blank=True)
+    job_title = models.CharField(max_length=120, blank=True)
+    start_date = models.DateField(null=True, blank=True)
     is_admin = models.BooleanField(default=False)
     employment_type = models.CharField(max_length=20, choices=EMPLOYMENT_TYPE_CHOICES, blank=True)
     home_street = models.CharField(max_length=255, blank=True)
@@ -285,7 +290,14 @@ class DashboardWidget(models.Model):
 # ---------------------------------------------------------
 class Skill(models.Model):
     """The master list of services a tenant offers (e.g., 'Window Cleaning')"""
-    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='skills')
+    customer_account = models.ForeignKey(
+        CustomerAccount,
+        on_delete=models.CASCADE,
+        null=True,
+        blank=True,
+        related_name='team_skills',
+    )
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, null=True, blank=True, related_name='skills')
     name = models.CharField(max_length=100)
     description = models.TextField(blank=True)
 
@@ -293,7 +305,8 @@ class Skill(models.Model):
         db_table = 'workspaces_skill'
 
     def __str__(self):
-        return f"{self.name} ({self.workspace.name})"
+        owner = self.customer_account or self.workspace
+        return f"{self.name} ({owner})"
 
 class WorkerSkill(models.Model):
     """Maps a worker to a skill with a specific proficiency level"""
@@ -327,3 +340,62 @@ class ServiceZone(models.Model):
 
     def __str__(self):
         return f"{self.name} Zone"
+
+
+class EmployeeDocumentRequirement(models.Model):
+    DOCUMENT_TYPE_CHOICES = [
+        ('drivers_license', "Driver's license"),
+        ('identity', 'Identity document'),
+        ('certification', 'Certification / license'),
+        ('tax', 'Tax form'),
+        ('insurance', 'Insurance document'),
+        ('other', 'Other'),
+    ]
+
+    account = models.ForeignKey(CustomerAccount, on_delete=models.CASCADE, related_name='document_requirements')
+    requested_members = models.ManyToManyField(
+        CustomerAccountMember,
+        blank=True,
+        related_name='document_requests',
+    )
+    title = models.CharField(max_length=150)
+    document_type = models.CharField(max_length=30, choices=DOCUMENT_TYPE_CHOICES, default='other')
+    instructions = models.TextField(blank=True)
+    required_by_default = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = 'workspaces_employeedocumentrequirement'
+        ordering = ('title',)
+
+
+class EmployeeDocument(models.Model):
+    STATUS_CHOICES = [
+        ('pending', 'Pending review'),
+        ('approved', 'Approved'),
+        ('rejected', 'Needs replacement'),
+    ]
+
+    account = models.ForeignKey(CustomerAccount, on_delete=models.CASCADE, related_name='employee_documents')
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='employee_documents')
+    requirement = models.ForeignKey(
+        EmployeeDocumentRequirement,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='submissions',
+    )
+    document_type = models.CharField(max_length=30, choices=EmployeeDocumentRequirement.DOCUMENT_TYPE_CHOICES)
+    title = models.CharField(max_length=150)
+    file = models.FileField(upload_to='employee_documents/%Y/%m/')
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='pending')
+    expiration_date = models.DateField(null=True, blank=True)
+    uploaded_at = models.DateTimeField(auto_now_add=True)
+    reviewed_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='reviewed_employee_documents')
+    reviewed_at = models.DateTimeField(null=True, blank=True)
+    review_notes = models.TextField(blank=True)
+
+    class Meta:
+        db_table = 'workspaces_employeedocument'
+        ordering = ('-uploaded_at',)

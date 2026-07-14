@@ -1,17 +1,35 @@
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.http import FileResponse, Http404
 from django.db import transaction
-from django.shortcuts import redirect, render
+from django.db.models import Q
+from django.shortcuts import get_object_or_404, redirect, render
+from django.utils import timezone
+from django.utils.dateparse import parse_date
 
 from fsm.models import JobAssignment
-from organizations.models import CustomerAccountMember, Skill, ServiceZone, WorkerProfile, WorkspaceMember
+from organizations.models import (
+    CustomerAccountMember,
+    EmployeeDocument,
+    EmployeeDocumentRequirement,
+    Skill,
+    ServiceZone,
+    WorkerProfile,
+    WorkerSkill,
+    WorkspaceMember,
+)
 from organizations.permissions import (
     account_workspaces_for_user,
     customer_account_membership_for_user,
     user_can_manage_people,
     worker_profile_for_workspace,
 )
+from .services import workforce_ledger
+
+
+def _valid_profile_photo(upload):
+    return bool(upload and upload.size <= 15 * 1024 * 1024 and (upload.content_type or '').startswith('image/'))
 
 
 @login_required
@@ -95,7 +113,9 @@ def workforce_view(request):
         active_assignments = JobAssignment.objects.filter(
             job__organization__in=account_workspaces,
         ).exclude(job__status__in=['completed', 'canceled'])
-        skills = Skill.objects.filter(workspace__in=account_workspaces)
+        skills = Skill.objects.filter(
+            Q(customer_account=customer_account) | Q(workspace__in=account_workspaces)
+        ).distinct()
         zones = ServiceZone.objects.filter(workspace__in=account_workspaces)
     else:
         account_members = CustomerAccountMember.objects.none()
@@ -105,7 +125,12 @@ def workforce_view(request):
         zones = ServiceZone.objects.none()
 
     account_members = list(account_members)
+    profiles_by_user = {
+        profile.user_id: profile
+        for profile in WorkerProfile.objects.filter(user_id__in=[member.user_id for member in account_members])
+    }
     for member in account_members:
+        member.worker_profile = profiles_by_user.get(member.user_id)
         member.assigned_workspace_ids = {
             str(workspace_member.workspace_id)
             for workspace_member in member.user.workspaces.all()
@@ -127,3 +152,153 @@ def workforce_view(request):
         },
     }
     return render(request, 'workforce.html', context)
+
+
+@login_required
+def team_member_detail_view(request, member_id):
+    active_org = getattr(request, 'active_organization', None)
+    if not user_can_manage_people(request.user, active_org):
+        raise PermissionDenied('Manager access is required to view employee records.')
+    customer_account = getattr(active_org, 'customer_account', None)
+    member = get_object_or_404(
+        CustomerAccountMember.objects.select_related('user', 'account'),
+        id=member_id,
+        account=customer_account,
+        is_active=True,
+    )
+    worker, _ = WorkerProfile.objects.get_or_create(user=member.user)
+    account_workspaces = customer_account.workspaces.order_by('name')
+    worker.workspaces.add(*account_workspaces.filter(members__user=member.user, members__is_active=True).distinct())
+    skills = Skill.objects.filter(
+        Q(customer_account=customer_account) | Q(workspace__customer_account=customer_account)
+    ).distinct().order_by('name')
+    requirements = EmployeeDocumentRequirement.objects.filter(account=customer_account, is_active=True)
+
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'update_profile':
+            email = request.POST.get('email', '').strip().lower()
+            if not email or '@' not in email:
+                messages.error(request, 'Enter a valid employee email address.')
+            elif member.user.__class__.objects.filter(email__iexact=email).exclude(id=member.user_id).exists():
+                messages.error(request, 'That email address is already in use.')
+            else:
+                member.user.first_name = request.POST.get('first_name', '').strip()
+                member.user.last_name = request.POST.get('last_name', '').strip()
+                member.user.email = email
+                member.user.save(update_fields=['first_name', 'last_name', 'email'])
+                worker.phone = request.POST.get('phone', '').strip()
+                worker.job_title = request.POST.get('job_title', '').strip()
+                worker.start_date = parse_date(request.POST.get('start_date', ''))
+                worker.home_street = request.POST.get('home_street', '').strip()
+                worker.home_city = request.POST.get('home_city', '').strip()
+                worker.home_state = request.POST.get('home_state', '').strip()
+                worker.home_postal_code = request.POST.get('home_postal_code', '').strip()
+                worker.home_country = request.POST.get('home_country', '').strip() or 'United States'
+                worker.emergency_contact_name = request.POST.get('emergency_contact_name', '').strip()
+                worker.emergency_contact_phone = request.POST.get('emergency_contact_phone', '').strip()
+                employment_type = request.POST.get('employment_type', '')
+                worker.employment_type = employment_type if employment_type in dict(WorkerProfile.EMPLOYMENT_TYPE_CHOICES) else ''
+                photo = request.FILES.get('photo')
+                if photo:
+                    if not _valid_profile_photo(photo):
+                        messages.error(request, 'Profile photo must be an image no larger than 15 MB.')
+                        return redirect('team_member_detail', member_id=member.id)
+                    worker.photo = photo
+                worker.save()
+                member.photo_required = request.POST.get('photo_required') == 'yes'
+                member.drivers_license_required = request.POST.get('drivers_license_required') == 'yes'
+                member.save(update_fields=['photo_required', 'drivers_license_required'])
+                messages.success(request, 'Employee profile updated.')
+
+        elif action == 'update_skills':
+            selected_ids = {int(value) for value in request.POST.getlist('skill_ids') if value.isdigit()}
+            allowed = {item.id: item for item in skills}
+            worker.skills.filter(skill_id__in=set(allowed) - selected_ids).delete()
+            for skill_id in selected_ids & set(allowed):
+                level = request.POST.get(f'skill_level_{skill_id}', '2')
+                level = int(level) if level in {'1', '2', '3'} else 2
+                WorkerSkill.objects.update_or_create(
+                    worker=worker,
+                    skill=allowed[skill_id],
+                    defaults={'proficiency_level': level},
+                )
+            messages.success(request, 'Employee skills updated across the account.')
+
+        elif action == 'create_document_requirement':
+            title = request.POST.get('title', '').strip()
+            document_type = request.POST.get('document_type', 'other')
+            if title and document_type in dict(EmployeeDocumentRequirement.DOCUMENT_TYPE_CHOICES):
+                requirement = EmployeeDocumentRequirement.objects.create(
+                    account=customer_account,
+                    title=title,
+                    document_type=document_type,
+                    instructions=request.POST.get('instructions', '').strip(),
+                )
+                requirement.requested_members.add(member)
+                messages.success(request, f'Document request “{title}” added.')
+            else:
+                messages.error(request, 'Enter a document request title and type.')
+
+        elif action == 'update_document_requests':
+            selected_ids = {int(value) for value in request.POST.getlist('requirement_ids') if value.isdigit()}
+            for requirement in requirements:
+                if requirement.id in selected_ids:
+                    requirement.requested_members.add(member)
+                else:
+                    requirement.requested_members.remove(member)
+            messages.success(request, 'Document requests updated.')
+
+        elif action == 'review_document':
+            document = get_object_or_404(EmployeeDocument, id=request.POST.get('document_id'), account=customer_account, user=member.user)
+            new_status = request.POST.get('status')
+            if new_status in dict(EmployeeDocument.STATUS_CHOICES):
+                document.status = new_status
+                document.review_notes = request.POST.get('review_notes', '').strip()
+                document.reviewed_by = request.user
+                document.reviewed_at = timezone.now()
+                document.save(update_fields=['status', 'review_notes', 'reviewed_by', 'reviewed_at'])
+                messages.success(request, 'Document review saved.')
+        return redirect('team_member_detail', member_id=member.id)
+
+    assignments = JobAssignment.objects.filter(
+        worker=worker,
+        job__organization__customer_account=customer_account,
+    ).select_related('job', 'job__organization', 'job__account', 'job__property').order_by('-job__scheduled_start', '-id')[:250]
+    ledger = workforce_ledger(assignments)
+    assigned_skill_ids = {
+        item.skill_id: item.proficiency_level
+        for item in worker.skills.filter(skill__in=skills)
+    }
+    requested_requirement_ids = set(member.document_requests.values_list('id', flat=True))
+    for skill in skills:
+        skill.assigned_level = assigned_skill_ids.get(skill.id)
+    for requirement in requirements:
+        requirement.is_requested = requirement.id in requested_requirement_ids
+    documents = EmployeeDocument.objects.filter(account=customer_account, user=member.user).select_related('requirement', 'reviewed_by')
+    return render(request, 'team_member_detail.html', {
+        'member': member,
+        'worker': worker,
+        'account_workspaces': account_workspaces,
+        'skills': skills,
+        'proficiency_choices': WorkerSkill.PROFICIENCY_CHOICES,
+        'requirements': requirements,
+        'documents': documents,
+        'document_types': EmployeeDocumentRequirement.DOCUMENT_TYPE_CHOICES,
+        'employment_type_choices': WorkerProfile.EMPLOYMENT_TYPE_CHOICES,
+        'document_status_choices': EmployeeDocument.STATUS_CHOICES,
+        'ledger': ledger,
+    })
+
+
+@login_required
+def employee_document_download_view(request, document_id):
+    document = get_object_or_404(EmployeeDocument.objects.select_related('account', 'user'), id=document_id)
+    active_org = getattr(request, 'active_organization', None)
+    same_account = active_org and active_org.customer_account_id == document.account_id
+    if request.user.id != document.user_id and not (same_account and user_can_manage_people(request.user, active_org)):
+        raise PermissionDenied('You cannot access this employee document.')
+    try:
+        return FileResponse(document.file.open('rb'), as_attachment=True, filename=document.file.name.rsplit('/', 1)[-1])
+    except FileNotFoundError as exc:
+        raise Http404('Document file is unavailable.') from exc

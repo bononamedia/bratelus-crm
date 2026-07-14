@@ -47,7 +47,7 @@ from organizations.passkeys import (
     passkey_authentication_options, passkey_authentication_verify,
     passkey_registration_options, passkey_registration_verify,
 )
-from workforce.views import workforce_view
+from workforce.views import employee_document_download_view, team_member_detail_view, workforce_view
 
 
 # ==========================================
@@ -112,6 +112,8 @@ urlpatterns = [
     path('payment-methods/', crm_accounts_view, {'section': 'payment_methods'}, name='payment_methods'),
     path('finance/', finance_overview_view, name='finance'),
     path('workforce/', workforce_view, name='workforce'),
+    path('workforce/team/<int:member_id>/', team_member_detail_view, name='team_member_detail'),
+    path('workforce/documents/<int:document_id>/download/', employee_document_download_view, name='employee_document_download'),
     path('reports/', reports_view, name='reports'),
     path('settings/', admin_console_view, name='admin_console'),
     path('workspaces/new/', create_workspace_view, name='workspace_create'),

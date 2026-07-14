@@ -1,4 +1,5 @@
 from django.contrib.auth.models import User
+from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 
@@ -6,6 +7,8 @@ from finance.models import SeatPricingTier, SubscriptionPlan, WorkspaceSubscript
 from organizations.models import (
     CustomerAccount,
     CustomerAccountMember,
+    EmployeeDocument,
+    EmployeeDocumentRequirement,
     Skill,
     WorkerProfile,
     Workspace,
@@ -69,6 +72,69 @@ class AccountTeamTests(TestCase):
         self.assertTrue(self.member.can_work_jobs)
         self.assertEqual(WorkspaceMember.objects.filter(user=self.employee, is_active=True).count(), 2)
         self.assertEqual(WorkerProfile.objects.get(user=self.employee).workspaces.count(), 2)
+
+    def test_owner_manages_account_wide_employee_profile_and_skills(self):
+        skill = Skill.objects.create(customer_account=self.account, name='Floor Care')
+        detail = self.client.get(reverse('team_member_detail', args=[self.member.id]))
+        self.assertEqual(detail.status_code, 200)
+        self.assertContains(detail, 'Employee Profile')
+        response = self.client.post(reverse('team_member_detail', args=[self.member.id]), {
+            'action': 'update_profile',
+            'first_name': 'Team',
+            'last_name': 'Member',
+            'email': 'team@example.com',
+            'phone': '555-100-2000',
+            'job_title': 'Lead Technician',
+            'employment_type': 'w2',
+            'photo_required': 'yes',
+            'drivers_license_required': 'yes',
+        })
+        self.assertRedirects(response, reverse('team_member_detail', args=[self.member.id]))
+        self.member.refresh_from_db()
+        profile = WorkerProfile.objects.get(user=self.employee)
+        self.assertEqual(profile.job_title, 'Lead Technician')
+        self.assertTrue(self.member.photo_required)
+        self.assertTrue(self.member.drivers_license_required)
+
+        response = self.client.post(reverse('team_member_detail', args=[self.member.id]), {
+            'action': 'update_skills',
+            'skill_ids': [str(skill.id)],
+            f'skill_level_{skill.id}': '3',
+        })
+        self.assertRedirects(response, reverse('team_member_detail', args=[self.member.id]))
+        self.assertTrue(profile.skills.filter(skill=skill, proficiency_level=3).exists())
+
+    def test_employee_uploads_requested_document(self):
+        profile = WorkerProfile.objects.create(user=self.employee)
+        profile.workspaces.add(self.first)
+        requirement = EmployeeDocumentRequirement.objects.create(
+            account=self.account,
+            title="Driver's license",
+            document_type='drivers_license',
+        )
+        requirement.requested_members.add(self.member)
+        self.client.force_login(self.employee)
+        response = self.client.post(reverse('employee_profile'), {
+            'action': 'upload_document',
+            'requirement_id': requirement.id,
+            'document': SimpleUploadedFile('license.jpg', b'fake-image', content_type='image/jpeg'),
+        })
+        self.assertRedirects(response, reverse('employee_profile'))
+        self.assertTrue(EmployeeDocument.objects.filter(
+            account=self.account,
+            user=self.employee,
+            requirement=requirement,
+            status='pending',
+        ).exists())
+
+    def test_required_photo_redirects_employee_to_onboarding(self):
+        profile = WorkerProfile.objects.create(user=self.employee)
+        profile.workspaces.add(self.first)
+        self.member.photo_required = True
+        self.member.save(update_fields=['photo_required'])
+        self.client.force_login(self.employee)
+        response = self.client.get(reverse('dashboard'))
+        self.assertRedirects(response, reverse('employee_profile'))
 
     def test_authenticated_user_can_create_another_workspace(self):
         user = User.objects.create_user('existing@example.com', password='VeryStrongPass123!')

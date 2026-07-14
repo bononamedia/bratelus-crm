@@ -256,8 +256,12 @@ class JobSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'property': 'Property must belong to the active organization.'})
 
         skill = attrs.get('required_skill') or getattr(self.instance, 'required_skill', None)
-        if skill and skill.workspace_id != active_org.id:
-            raise serializers.ValidationError({'required_skill': 'Skill must belong to the active organization.'})
+        skill_matches = not skill or (
+            skill.customer_account_id == active_org.customer_account_id
+            if active_org.customer_account_id else skill.workspace_id == active_org.id
+        )
+        if not skill_matches:
+            raise serializers.ValidationError({'required_skill': 'Skill must belong to the active customer account.'})
 
         zone = attrs.get('service_zone') or getattr(self.instance, 'service_zone', None)
         if zone and zone.workspace_id != active_org.id:

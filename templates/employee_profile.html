@@ -4,7 +4,7 @@
 <div class="mx-auto max-w-6xl space-y-5">
     <header class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex min-w-0 items-center gap-4">
-            <div class="flex h-14 w-14 shrink-0 items-center justify-center rounded-lg bg-blue-100 text-xl font-semibold uppercase text-blue-700">{{ request.user.first_name|default:request.user.username|first }}</div>
+            <div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-blue-100 text-xl font-semibold uppercase text-blue-700">{% if worker_profile.photo %}<img src="{{ worker_profile.photo.url }}" alt="" class="h-full w-full object-cover">{% else %}{{ request.user.first_name|default:request.user.username|first }}{% endif %}</div>
             <div class="min-w-0">
                 <p class="text-xs font-semibold uppercase tracking-wide text-blue-600">{{ active_role_label }}</p>
                 <h1 class="truncate text-2xl font-semibold text-gray-950 sm:text-3xl">{{ request.user.get_full_name|default:request.user.username }}</h1>
@@ -20,6 +20,12 @@
     </header>
 
     {% if messages %}{% for message in messages %}<div class="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{{ message }}</div>{% endfor %}{% endif %}
+
+    {% if photo_onboarding_required or license_onboarding_required %}
+    <section class="rounded-lg border border-amber-300 bg-amber-50 p-5 text-amber-950">
+        <div class="flex items-start gap-3"><span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-amber-100 font-semibold">!</span><div><h2 class="font-semibold">Complete your company onboarding</h2><p class="mt-1 text-sm">Your manager requires {% if photo_onboarding_required %}a current profile photo{% endif %}{% if photo_onboarding_required and license_onboarding_required %} and {% endif %}{% if license_onboarding_required %}a driver's license upload{% endif %} before field work.</p><div class="mt-3 flex flex-wrap gap-2">{% if photo_onboarding_required %}<a href="#profile" class="rounded-md bg-amber-900 px-3 py-2 text-sm font-semibold text-white">Take profile photo</a>{% endif %}{% if license_onboarding_required %}<a href="#documents" class="rounded-md border border-amber-400 bg-white px-3 py-2 text-sm font-semibold">Upload license</a>{% endif %}</div></div></div>
+    </section>
+    {% endif %}
 
     {% if not worker_profile %}
     <div class="rounded-lg border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">Your login is active, but no employee profile is attached to this workspace yet.</div>
@@ -64,7 +70,8 @@
 
         <section id="profile" class="self-start rounded-lg border border-gray-200 bg-white shadow-sm">
             <div class="flex items-center gap-3 border-b border-gray-200 px-4 py-3"><span class="flex h-9 w-9 items-center justify-center rounded-md bg-violet-50 text-violet-600"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 21a8 8 0 10-16 0m8-10a4 4 0 100-8 4 4 0 000 8z"></path></svg></span><div><h2 class="font-semibold text-gray-950">Personal Profile</h2><p class="text-xs text-gray-500">Private information visible to you and authorized management.</p></div></div>
-            <form method="post" class="space-y-4 p-4">{% csrf_token %}
+            <form method="post" enctype="multipart/form-data" class="space-y-4 p-4">{% csrf_token %}<input type="hidden" name="action" value="update_profile">
+                <label class="block text-sm font-medium text-gray-700">Profile photo<input type="file" name="photo" accept="image/*" capture="user" class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"><span class="mt-1 block text-xs font-normal text-gray-500">On a phone, this opens the front camera.</span></label>
                 <div class="grid grid-cols-2 gap-3"><label class="text-sm font-medium text-gray-700">First name<input name="first_name" value="{{ request.user.first_name }}" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></label><label class="text-sm font-medium text-gray-700">Last name<input name="last_name" value="{{ request.user.last_name }}" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></label></div>
                 <label class="block text-sm font-medium text-gray-700">Phone<input name="phone" value="{{ worker_profile.phone }}" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="(555) 000-0000"></label>
                 <label class="block text-sm font-medium text-gray-700">Work classification<select name="employment_type" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"><option value="">Not specified</option>{% for value, label in employment_type_choices %}<option value="{{ value }}" {% if worker_profile.employment_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
@@ -79,6 +86,26 @@
             </form>
         </section>
     </div>
+
+    <section id="documents" class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div class="border-b border-gray-200 px-5 py-4"><h2 class="font-semibold text-gray-950">My Documents</h2><p class="mt-1 text-sm text-gray-500">Uploads are private and available only to you and authorized management.</p></div>
+        <div class="grid gap-5 p-5 lg:grid-cols-2">
+            <div class="space-y-3">
+                <h3 class="text-xs font-semibold uppercase text-gray-500">Requested</h3>
+                {% for requirement in requested_requirements %}
+                <form method="post" enctype="multipart/form-data" class="rounded-lg border {% if requirement.has_submission %}border-emerald-200 bg-emerald-50{% else %}border-amber-200 bg-amber-50{% endif %} p-4">{% csrf_token %}<input type="hidden" name="action" value="upload_document"><input type="hidden" name="requirement_id" value="{{ requirement.id }}"><div class="flex items-start justify-between gap-3"><div><p class="font-medium text-gray-950">{{ requirement.title }}</p><p class="mt-1 text-xs text-gray-500">{{ requirement.instructions|default:requirement.get_document_type_display }}</p></div>{% if requirement.has_submission %}<span class="rounded-full bg-emerald-100 px-2 py-1 text-xs font-medium text-emerald-800">Submitted</span>{% endif %}</div><div class="mt-3 flex flex-col gap-2 sm:flex-row"><input type="file" name="document" accept="image/*,application/pdf" capture="environment" required class="min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"><button class="rounded-md bg-gray-900 px-3 py-2 text-sm font-semibold text-white">Upload</button></div></form>
+                {% empty %}<p class="rounded-lg bg-gray-50 p-4 text-sm text-gray-500">No additional documents requested.</p>{% endfor %}
+                {% if license_onboarding_required %}<form method="post" enctype="multipart/form-data" class="rounded-lg border border-amber-300 bg-amber-50 p-4">{% csrf_token %}<input type="hidden" name="action" value="upload_document"><input type="hidden" name="document_type" value="drivers_license"><p class="font-medium text-gray-950">Driver's license</p><p class="mt-1 text-xs text-gray-500">Photograph the front clearly or upload a PDF.</p><div class="mt-3 flex flex-col gap-2 sm:flex-row"><input type="file" name="document" accept="image/*,application/pdf" capture="environment" required class="min-w-0 flex-1 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"><button class="rounded-md bg-gray-900 px-3 py-2 text-sm font-semibold text-white">Upload</button></div></form>{% endif %}
+            </div>
+            <div><h3 class="text-xs font-semibold uppercase text-gray-500">Submission history</h3><div class="mt-3 divide-y divide-gray-100 rounded-lg border border-gray-200">{% for document in documents %}<div class="flex items-center justify-between gap-3 p-3"><div class="min-w-0"><a href="{% url 'employee_document_download' document.id %}" class="truncate font-medium text-blue-700">{{ document.title }}</a><p class="text-xs text-gray-500">{{ document.uploaded_at|date:'M j, Y' }}</p></div><span class="rounded-full px-2 py-1 text-xs font-medium {% if document.status == 'approved' %}bg-emerald-50 text-emerald-700{% elif document.status == 'rejected' %}bg-rose-50 text-rose-700{% else %}bg-amber-50 text-amber-700{% endif %}">{{ document.get_status_display }}</span></div>{% empty %}<p class="p-4 text-sm text-gray-500">No documents uploaded.</p>{% endfor %}</div></div>
+        </div>
+    </section>
+
+    <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div class="border-b border-gray-200 px-5 py-4"><h2 class="font-semibold text-gray-950">My Time & Earnings</h2><p class="mt-1 text-sm text-gray-500">Clocked job time across every workspace assigned to your account.</p></div>
+        <div class="grid gap-4 border-b border-gray-100 p-5 md:grid-cols-3"><div><p class="text-xs font-semibold uppercase text-gray-500">Hours</p><p class="mt-1 text-2xl font-semibold">{{ ledger.total_hours }}</p></div><div><p class="text-xs font-semibold uppercase text-gray-500">Calculated pay</p><p class="mt-1 text-2xl font-semibold">${{ ledger.total_earnings }}</p></div><div><p class="text-xs font-semibold uppercase text-gray-500">Jobs</p><p class="mt-1 text-2xl font-semibold">{{ ledger.job_count }}</p></div></div>
+        <div class="grid gap-4 p-5 lg:grid-cols-2">{% for summary in ledger.workspace_summaries %}<div><div class="flex justify-between gap-3 text-sm"><span class="font-medium">{{ summary.workspace.name }}</span><span>{{ summary.hours }}h / ${{ summary.earnings }}</span></div><div class="mt-2 h-2 overflow-hidden rounded-full bg-gray-100"><div class="h-full" style="width:{{ summary.width_percent }}%;background:{{ summary.workspace.calendar_color }}"></div></div><p class="mt-1 text-xs text-gray-500">{{ summary.jobs }} job{{ summary.jobs|pluralize }}</p></div>{% empty %}<p class="text-sm text-gray-500">No clocked job time yet.</p>{% endfor %}</div>
+    </section>
     {% endif %}
 </div>
 <script>

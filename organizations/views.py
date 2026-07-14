@@ -6,7 +6,7 @@ from django.contrib.auth.decorators import login_required
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
 from django.core.exceptions import PermissionDenied
-from django.db import transaction
+from django.db import models, transaction
 from django.shortcuts import redirect, render
 from django.utils.text import slugify
 from fsm.models import JobAssignment
@@ -14,6 +14,8 @@ from fsm.models import JobAssignment
 from .models import (
     CustomerAccount,
     CustomerAccountMember,
+    EmployeeDocument,
+    EmployeeDocumentRequirement,
     CustomField,
     FormLayout,
     ServiceZone,
@@ -400,14 +402,19 @@ def admin_console_view(request):
                 messages.error(request, 'Skill name is required.')
             else:
                 Skill.objects.create(
-                    workspace=active_org,
+                    customer_account=active_org.customer_account,
+                    workspace=None if active_org.customer_account_id else active_org,
                     name=name,
                     description=request.POST.get('description', '').strip(),
                 )
                 messages.success(request, f'Skill "{name}" added.')
 
         elif action == 'delete_skill':
-            Skill.objects.filter(workspace=active_org, id=request.POST.get('id')).delete()
+            skill_scope = (
+                {'customer_account': active_org.customer_account}
+                if active_org.customer_account_id else {'workspace': active_org}
+            )
+            Skill.objects.filter(id=request.POST.get('id'), **skill_scope).delete()
             messages.success(request, 'Skill removed.')
 
         elif action == 'create_service_zone':
@@ -432,10 +439,11 @@ def admin_console_view(request):
                 workspaces=active_org,
                 id=request.POST.get('worker_id'),
             ).first()
-            skill = Skill.objects.filter(
-                workspace=active_org,
-                id=request.POST.get('skill_id'),
-            ).first()
+            skill_scope = (
+                {'customer_account': active_org.customer_account}
+                if active_org.customer_account_id else {'workspace': active_org}
+            )
+            skill = Skill.objects.filter(id=request.POST.get('skill_id'), **skill_scope).first()
 
             if not worker or not skill:
                 messages.error(request, 'Choose a valid worker and skill.')
@@ -448,11 +456,17 @@ def admin_console_view(request):
                 messages.success(request, 'Worker skill updated.')
 
         elif action == 'delete_worker_skill':
-            WorkerSkill.objects.filter(
-                worker__workspaces=active_org,
-                skill__workspace=active_org,
-                id=request.POST.get('id'),
-            ).delete()
+            worker_skill_scope = (
+                {
+                    'worker__user__customer_accounts__account': active_org.customer_account,
+                    'skill__customer_account': active_org.customer_account,
+                }
+                if active_org.customer_account_id else {
+                    'worker__workspaces': active_org,
+                    'skill__workspace': active_org,
+                }
+            )
+            WorkerSkill.objects.filter(id=request.POST.get('id'), **worker_skill_scope).delete()
             messages.success(request, 'Worker skill removed.')
 
         elif action == 'invite_member':
@@ -591,7 +605,10 @@ def admin_console_view(request):
     email_connections = WorkspaceEmailConnection.objects.filter(
         workspace=active_org,
     ).select_related('domain', 'created_by').order_by('from_email')
-    skills = Skill.objects.filter(workspace=active_org).order_by('name')
+    skills = (
+        Skill.objects.filter(customer_account=active_org.customer_account)
+        if active_org.customer_account_id else Skill.objects.filter(workspace=active_org)
+    ).order_by('name')
     service_zones = ServiceZone.objects.filter(workspace=active_org).order_by('name')
     workers = WorkerProfile.objects.filter(workspaces=active_org).select_related('user').order_by(
         'user__first_name',
@@ -599,9 +616,9 @@ def admin_console_view(request):
         'user__username',
     )
     worker_skills = WorkerSkill.objects.filter(
+        skill__in=skills,
         worker__workspaces=active_org,
-        skill__workspace=active_org,
-    ).select_related('worker__user', 'skill').order_by('worker__user__username', 'skill__name')
+    ).select_related('worker__user', 'skill').distinct().order_by('worker__user__username', 'skill__name')
     members = WorkspaceMember.objects.filter(workspace=active_org).select_related(
         'user',
         'user__workerprofile',
@@ -677,34 +694,84 @@ def admin_console_view(request):
 @login_required
 def employee_profile_view(request):
     active_org = getattr(request, 'active_organization', None)
+    customer_account = getattr(active_org, 'customer_account', None)
+    account_member = CustomerAccountMember.objects.filter(
+        account=customer_account,
+        user=request.user,
+        is_active=True,
+    ).first()
     worker_profile = worker_profile_for_workspace(request.user, active_org)
+    if not worker_profile and account_member and WorkspaceMember.objects.filter(
+        workspace=active_org,
+        user=request.user,
+        is_active=True,
+    ).exists():
+        worker_profile, _ = WorkerProfile.objects.get_or_create(user=request.user)
+        worker_profile.workspaces.add(active_org)
 
     if request.method == 'POST':
         if not worker_profile:
             raise PermissionDenied('No field profile is attached to this workspace.')
-        request.user.first_name = request.POST.get('first_name', '').strip()
-        request.user.last_name = request.POST.get('last_name', '').strip()
-        request.user.save(update_fields=['first_name', 'last_name'])
-        worker_profile.phone = request.POST.get('phone', '').strip()
-        employment_type = request.POST.get('employment_type', '').strip()
-        worker_profile.employment_type = (
-            employment_type
-            if employment_type in dict(WorkerProfile.EMPLOYMENT_TYPE_CHOICES)
-            else ''
-        )
-        worker_profile.home_street = request.POST.get('home_street', '').strip()
-        worker_profile.home_city = request.POST.get('home_city', '').strip()
-        worker_profile.home_state = request.POST.get('home_state', '').strip()
-        worker_profile.home_postal_code = request.POST.get('home_postal_code', '').strip()
-        worker_profile.home_country = request.POST.get('home_country', '').strip() or 'United States'
-        worker_profile.emergency_contact_name = request.POST.get('emergency_contact_name', '').strip()
-        worker_profile.emergency_contact_phone = request.POST.get('emergency_contact_phone', '').strip()
-        worker_profile.save(update_fields=[
-            'phone', 'employment_type', 'home_street', 'home_city', 'home_state',
-            'home_postal_code', 'home_country', 'emergency_contact_name',
-            'emergency_contact_phone',
-        ])
-        messages.success(request, 'Your employee profile has been updated.')
+        action = request.POST.get('action', 'update_profile')
+        if action == 'upload_document':
+            upload = request.FILES.get('document')
+            requirement = EmployeeDocumentRequirement.objects.filter(
+                id=request.POST.get('requirement_id'),
+                account=customer_account,
+                is_active=True,
+            ).first()
+            document_type = requirement.document_type if requirement else request.POST.get('document_type', 'other')
+            allowed_types = dict(EmployeeDocumentRequirement.DOCUMENT_TYPE_CHOICES)
+            content_type = (getattr(upload, 'content_type', '') or '').lower()
+            if not upload:
+                messages.error(request, 'Choose a photo or PDF to upload.')
+            elif upload.size > 20 * 1024 * 1024 or not (content_type.startswith('image/') or content_type == 'application/pdf'):
+                messages.error(request, 'Documents must be an image or PDF no larger than 20 MB.')
+            elif document_type not in allowed_types:
+                messages.error(request, 'Choose a valid document type.')
+            else:
+                EmployeeDocument.objects.create(
+                    account=customer_account,
+                    user=request.user,
+                    requirement=requirement,
+                    document_type=document_type,
+                    title=(requirement.title if requirement else allowed_types[document_type]),
+                    file=upload,
+                )
+                messages.success(request, 'Document uploaded securely for manager review.')
+        else:
+            request.user.first_name = request.POST.get('first_name', '').strip()
+            request.user.last_name = request.POST.get('last_name', '').strip()
+            request.user.save(update_fields=['first_name', 'last_name'])
+            worker_profile.phone = request.POST.get('phone', '').strip()
+            employment_type = request.POST.get('employment_type', '').strip()
+            worker_profile.employment_type = (
+                employment_type
+                if employment_type in dict(WorkerProfile.EMPLOYMENT_TYPE_CHOICES)
+                else ''
+            )
+            worker_profile.home_street = request.POST.get('home_street', '').strip()
+            worker_profile.home_city = request.POST.get('home_city', '').strip()
+            worker_profile.home_state = request.POST.get('home_state', '').strip()
+            worker_profile.home_postal_code = request.POST.get('home_postal_code', '').strip()
+            worker_profile.home_country = request.POST.get('home_country', '').strip() or 'United States'
+            worker_profile.emergency_contact_name = request.POST.get('emergency_contact_name', '').strip()
+            worker_profile.emergency_contact_phone = request.POST.get('emergency_contact_phone', '').strip()
+            update_fields = [
+                'phone', 'employment_type', 'home_street', 'home_city', 'home_state',
+                'home_postal_code', 'home_country', 'emergency_contact_name',
+                'emergency_contact_phone',
+            ]
+            photo = request.FILES.get('photo')
+            if photo:
+                content_type = (getattr(photo, 'content_type', '') or '').lower()
+                if photo.size > 15 * 1024 * 1024 or not content_type.startswith('image/'):
+                    messages.error(request, 'Profile photo must be an image no larger than 15 MB.')
+                    return redirect('employee_profile')
+                worker_profile.photo = photo
+                update_fields.append('photo')
+            worker_profile.save(update_fields=update_fields)
+            messages.success(request, 'Your employee profile has been updated.')
         return redirect('employee_profile')
 
     assignments = JobAssignment.objects.none()
@@ -721,11 +788,48 @@ def employee_profile_view(request):
     open_assignments = assignments.exclude(job__status__in=['completed', 'canceled'])
     completed_assignments = assignments.filter(job__status='completed')[:8]
 
+    account_assignments = JobAssignment.objects.none()
+    requested_requirements = EmployeeDocumentRequirement.objects.none()
+    documents = EmployeeDocument.objects.none()
+    if customer_account and worker_profile:
+        account_assignments = JobAssignment.objects.filter(
+            worker=worker_profile,
+            job__organization__customer_account=customer_account,
+        ).select_related('job', 'job__organization', 'job__account', 'job__property').order_by('-job__scheduled_start', '-id')[:250]
+        requested_requirements = EmployeeDocumentRequirement.objects.filter(
+            account=customer_account,
+            is_active=True,
+        ).filter(
+            models.Q(required_by_default=True) | models.Q(requested_members=account_member)
+        ).distinct().order_by('title')
+        documents = EmployeeDocument.objects.filter(
+            account=customer_account,
+            user=request.user,
+        ).select_related('requirement')
+
+    from workforce.services import workforce_ledger
+
+    ledger = workforce_ledger(account_assignments)
+    submitted_requirement_ids = set(documents.exclude(requirement=None).values_list('requirement_id', flat=True))
+    for requirement in requested_requirements:
+        requirement.has_submission = requirement.id in submitted_requirement_ids
+    license_submitted = documents.filter(
+        document_type='drivers_license',
+        status__in=['pending', 'approved'],
+    ).exists()
+
     context = {
         'worker_profile': worker_profile,
         'open_assignments': open_assignments,
         'completed_assignments': completed_assignments,
         'employment_type_choices': WorkerProfile.EMPLOYMENT_TYPE_CHOICES,
+        'account_member': account_member,
+        'requested_requirements': requested_requirements,
+        'documents': documents,
+        'document_types': EmployeeDocumentRequirement.DOCUMENT_TYPE_CHOICES,
+        'ledger': ledger,
+        'photo_onboarding_required': bool(account_member and account_member.photo_required and not worker_profile.photo),
+        'license_onboarding_required': bool(account_member and account_member.drivers_license_required and not license_submitted),
         'stats': {
             'open_jobs': open_assignments.count(),
             'completed_jobs': assignments.filter(job__status='completed').count(),
