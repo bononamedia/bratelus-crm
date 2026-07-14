@@ -40,7 +40,8 @@ def chat_inbox_view(request, conversation_id=None):
     if request.method == 'POST':
         title = request.POST.get('title', '').strip()
         participant_ids = set(request.POST.getlist('participant_ids'))
-        selected_workspace = workspaces.filter(id=request.POST.get('workspace_id')).first()
+        workspace_id = request.POST.get('workspace_id', '').strip()
+        selected_workspace = workspaces.filter(id=workspace_id).first() if workspace_id else None
         if not title:
             messages.error(request, 'Enter a conversation title.')
             return redirect('chat_inbox')

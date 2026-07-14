@@ -48,6 +48,16 @@ class InternalChatTests(TestCase):
         )
         self.assertTrue(conversation.messages.filter(message_type='system').exists())
 
+    def test_owner_can_create_conversation_with_account_wide_context(self):
+        response = self.client.post(reverse('chat_inbox'), {
+            'title': 'All brands coordination',
+            'workspace_id': '',
+            'participant_ids': [str(self.employee.id)],
+        })
+        conversation = ChatConversation.objects.get()
+        self.assertRedirects(response, reverse('chat_conversation', args=[conversation.id]))
+        self.assertIsNone(conversation.workspace)
+
     def test_participant_sends_message_and_attaches_transcript_to_job(self):
         conversation = ChatConversation.objects.create(
             account=self.customer_account, workspace=self.workspace, title='Materials', created_by=self.owner,
