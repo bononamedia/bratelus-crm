@@ -1,9 +1,13 @@
+import json
+
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase
 from django.urls import reverse
 
 from finance.models import SeatPricingTier, SubscriptionPlan, WorkspaceSubscription
+from crm.models.contacts import Account
+from fsm.models import Job, JobAssignment
 from organizations.models import (
     CustomerAccount,
     CustomerAccountMember,
@@ -82,6 +86,7 @@ class AccountTeamTests(TestCase):
             'action': 'update_profile',
             'first_name': 'Team',
             'last_name': 'Member',
+            'username': 'team-member',
             'email': 'team@example.com',
             'phone': '555-100-2000',
             'job_title': 'Lead Technician',
@@ -93,6 +98,8 @@ class AccountTeamTests(TestCase):
         self.member.refresh_from_db()
         profile = WorkerProfile.objects.get(user=self.employee)
         self.assertEqual(profile.job_title, 'Lead Technician')
+        self.employee.refresh_from_db()
+        self.assertEqual(self.employee.username, 'team-member')
         self.assertTrue(self.member.photo_required)
         self.assertTrue(self.member.drivers_license_required)
 
@@ -103,6 +110,60 @@ class AccountTeamTests(TestCase):
         })
         self.assertRedirects(response, reverse('team_member_detail', args=[self.member.id]))
         self.assertTrue(profile.skills.filter(skill=skill, proficiency_level=3).exists())
+
+    def test_owner_can_unassign_worker_after_workspace_access_was_removed(self):
+        worker = WorkerProfile.objects.create(user=self.employee)
+        worker.workspaces.add(self.first)
+        account = Account.objects.create(organization=self.first, name='Dispatch Customer')
+        job = Job.objects.create(organization=self.first, account=account, title='Dispatch Job', status='dispatched')
+        JobAssignment.objects.create(job=job, worker=worker, is_primary_worker=True)
+        worker.workspaces.remove(self.first)
+        session = self.client.session
+        session['active_org_id'] = str(self.first.id)
+        session.save()
+
+        response = self.client.post(
+            reverse('api-job-unassign-worker', args=[job.id]),
+            data=json.dumps({'worker_id': worker.id}),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(JobAssignment.objects.filter(job=job, worker=worker).exists())
+        job.refresh_from_db()
+        self.assertEqual(job.status, 'pending')
+
+    def test_owner_removes_employee_access_without_deleting_history(self):
+        profile = WorkerProfile.objects.create(user=self.employee)
+        profile.workspaces.add(self.first)
+
+        response = self.client.post(reverse('team_member_detail', args=[self.member.id]), {
+            'action': 'remove_employee',
+        })
+
+        self.assertRedirects(response, reverse('workforce'))
+        self.member.refresh_from_db()
+        self.employee.refresh_from_db()
+        self.assertFalse(self.member.is_active)
+        self.assertFalse(self.employee.is_active)
+        self.assertTrue(WorkerProfile.objects.filter(id=profile.id).exists())
+        self.assertFalse(WorkspaceMember.objects.get(workspace=self.first, user=self.employee).is_active)
+
+    def test_employee_with_active_job_must_be_unassigned_before_removal(self):
+        profile = WorkerProfile.objects.create(user=self.employee)
+        profile.workspaces.add(self.first)
+        account = Account.objects.create(organization=self.first, name='Active Customer')
+        job = Job.objects.create(organization=self.first, account=account, title='Active Job', status='dispatched')
+        JobAssignment.objects.create(job=job, worker=profile)
+
+        response = self.client.post(reverse('team_member_detail', args=[self.member.id]), {
+            'action': 'remove_employee',
+        })
+
+        self.assertRedirects(response, reverse('team_member_detail', args=[self.member.id]))
+        self.member.refresh_from_db()
+        self.assertTrue(self.member.is_active)
+        self.assertTrue(JobAssignment.objects.filter(job=job, worker=profile).exists())
 
     def test_employee_uploads_requested_document(self):
         profile = WorkerProfile.objects.create(user=self.employee)

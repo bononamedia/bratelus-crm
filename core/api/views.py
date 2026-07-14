@@ -567,7 +567,6 @@ class JobViewSet(BaseWorkspaceViewSet):
         assignment = JobAssignment.objects.filter(
             job=job,
             worker_id=worker_id,
-            worker__workspaces=active_org,
         ).first()
 
         if not assignment:

@@ -703,7 +703,7 @@
             if (!response.ok) {
                 const err = await response.json();
                 console.error("Unassignment failed:", err);
-                alert("Error removing worker. Crew cannot be removed from jobs already in progress or completed.");
+                alert(err.detail || err.worker_id || "Unable to remove this worker from the job.");
                 return;
             }
 

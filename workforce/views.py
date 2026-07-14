@@ -166,6 +166,10 @@ def team_member_detail_view(request, member_id):
         account=customer_account,
         is_active=True,
     )
+    account_membership = customer_account_membership_for_user(request.user, customer_account)
+    can_manage_account_team = request.user.is_superuser or bool(
+        account_membership and account_membership.role in ('owner', 'admin')
+    )
     worker, _ = WorkerProfile.objects.get_or_create(user=member.user)
     account_workspaces = customer_account.workspaces.order_by('name')
     worker.workspaces.add(*account_workspaces.filter(members__user=member.user, members__is_active=True).distinct())
@@ -177,16 +181,22 @@ def team_member_detail_view(request, member_id):
     if request.method == 'POST':
         action = request.POST.get('action')
         if action == 'update_profile':
+            username = request.POST.get('username', '').strip()
             email = request.POST.get('email', '').strip().lower()
-            if not email or '@' not in email:
+            if not username:
+                messages.error(request, 'Enter a username for this employee.')
+            elif member.user.__class__.objects.filter(username__iexact=username).exclude(id=member.user_id).exists():
+                messages.error(request, 'That username is already in use.')
+            elif not email or '@' not in email:
                 messages.error(request, 'Enter a valid employee email address.')
             elif member.user.__class__.objects.filter(email__iexact=email).exclude(id=member.user_id).exists():
                 messages.error(request, 'That email address is already in use.')
             else:
                 member.user.first_name = request.POST.get('first_name', '').strip()
                 member.user.last_name = request.POST.get('last_name', '').strip()
+                member.user.username = username
                 member.user.email = email
-                member.user.save(update_fields=['first_name', 'last_name', 'email'])
+                member.user.save(update_fields=['first_name', 'last_name', 'username', 'email'])
                 worker.phone = request.POST.get('phone', '').strip()
                 worker.job_title = request.POST.get('job_title', '').strip()
                 worker.start_date = parse_date(request.POST.get('start_date', ''))
@@ -210,6 +220,38 @@ def team_member_detail_view(request, member_id):
                 member.drivers_license_required = request.POST.get('drivers_license_required') == 'yes'
                 member.save(update_fields=['photo_required', 'drivers_license_required'])
                 messages.success(request, 'Employee profile updated.')
+
+        elif action == 'remove_employee':
+            if not can_manage_account_team:
+                raise PermissionDenied('Only the account owner or an account administrator can remove employees.')
+            if member.role == 'owner' or member.user_id == customer_account.owner_id:
+                messages.error(request, 'The customer account owner cannot be removed.')
+            else:
+                active_assignments = JobAssignment.objects.filter(
+                    worker=worker,
+                    job__organization__customer_account=customer_account,
+                ).exclude(job__status__in=['completed', 'canceled'])
+                if active_assignments.exists():
+                    messages.error(
+                        request,
+                        f'Unassign this employee from {active_assignments.count()} active job(s) before removing access.',
+                    )
+                else:
+                    with transaction.atomic():
+                        member.is_active = False
+                        member.can_work_jobs = False
+                        member.can_view_billing = False
+                        member.save(update_fields=['is_active', 'can_work_jobs', 'can_view_billing'])
+                        WorkspaceMember.objects.filter(
+                            workspace__customer_account=customer_account,
+                            user=member.user,
+                        ).update(is_active=False)
+                        worker.workspaces.remove(*customer_account.workspaces.all())
+                        if not CustomerAccountMember.objects.filter(user=member.user, is_active=True).exists():
+                            member.user.is_active = False
+                            member.user.save(update_fields=['is_active'])
+                    messages.success(request, 'Employee access removed. Historical work records were preserved.')
+                    return redirect('workforce')
 
         elif action == 'update_skills':
             selected_ids = {int(value) for value in request.POST.getlist('skill_ids') if value.isdigit()}
@@ -288,6 +330,7 @@ def team_member_detail_view(request, member_id):
         'employment_type_choices': WorkerProfile.EMPLOYMENT_TYPE_CHOICES,
         'document_status_choices': EmployeeDocument.STATUS_CHOICES,
         'ledger': ledger,
+        'can_manage_account_team': can_manage_account_team,
     })
 
 
