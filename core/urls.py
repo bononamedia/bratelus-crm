@@ -23,6 +23,7 @@ from fsm.views import (
     TrackLocationPingView,
     LiveFleetLocationsView,
     FieldJobActionView,
+    FieldWorkActivityView,
     FieldIssueReportView,
     FieldIssueStatusView,
     FieldShiftView,
@@ -47,7 +48,7 @@ from organizations.passkeys import (
     passkey_authentication_options, passkey_authentication_verify,
     passkey_registration_options, passkey_registration_verify,
 )
-from workforce.views import employee_document_download_view, team_member_detail_view, workforce_view
+from workforce.views import employee_document_download_view, team_member_detail_view, workforce_view, work_activity_ledger_view
 
 
 # ==========================================
@@ -112,6 +113,7 @@ urlpatterns = [
     path('payment-methods/', crm_accounts_view, {'section': 'payment_methods'}, name='payment_methods'),
     path('finance/', finance_overview_view, name='finance'),
     path('workforce/', workforce_view, name='workforce'),
+    path('workforce/activity/', work_activity_ledger_view, name='work_activity_ledger'),
     path('workforce/team/<int:member_id>/', team_member_detail_view, name='team_member_detail'),
     path('workforce/documents/<int:document_id>/download/', employee_document_download_view, name='employee_document_download'),
     path('reports/', reports_view, name='reports'),
@@ -141,6 +143,7 @@ urlpatterns = [
     path('api/mobile/track-location/', TrackLocationPingView.as_view(), name='api_track_location'),
     path('api/mobile/shift/', FieldShiftView.as_view(), name='api_field_shift'),
     path('api/mobile/jobs/<int:job_id>/action/', FieldJobActionView.as_view(), name='api_field_job_action'),
+    path('api/mobile/jobs/<int:job_id>/activity/', FieldWorkActivityView.as_view(), name='api_field_work_activity'),
     path('api/mobile/jobs/<int:job_id>/report-problem/', FieldIssueReportView.as_view(), name='api_field_report_problem'),
     path('api/field-issues/<int:issue_id>/status/', FieldIssueStatusView.as_view(), name='api_field_issue_status'),
     path('api/calendar/options/', calendar_options_view, name='api_calendar_options'),

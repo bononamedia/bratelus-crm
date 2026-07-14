@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Job, JobTask, WorkerLocation, JobAssignment, JobEvidence
+from .models import Job, JobTask, WorkerLocation, JobAssignment, JobEvidence, MaterialRun, WorkActivity
 
 class JobAssignmentInline(admin.TabularInline):
     model = JobAssignment
@@ -42,3 +42,5 @@ class JobAdmin(admin.ModelAdmin):
 admin.site.register(JobTask)
 admin.site.register(WorkerLocation)
 admin.site.register(JobEvidence) # Added your new Evidence model
+admin.site.register(MaterialRun)
+admin.site.register(WorkActivity)

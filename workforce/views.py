@@ -8,7 +8,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.utils.dateparse import parse_date
 
-from fsm.models import JobAssignment
+from fsm.models import JobAssignment, WorkActivity
 from organizations.models import (
     CustomerAccountMember,
     EmployeeDocument,
@@ -26,6 +26,7 @@ from organizations.permissions import (
     worker_profile_for_workspace,
 )
 from .services import workforce_ledger
+from .activity_services import activity_ledger
 
 
 def _valid_profile_photo(upload):
@@ -152,6 +153,56 @@ def workforce_view(request):
         },
     }
     return render(request, 'workforce.html', context)
+
+
+@login_required
+def work_activity_ledger_view(request):
+    active_org = getattr(request, 'active_organization', None)
+    if not user_can_manage_people(request.user, active_org):
+        raise PermissionDenied('Manager access is required to view work activity.')
+
+    workspaces = account_workspaces_for_user(request.user, active_org).order_by('name')
+    activities = WorkActivity.objects.filter(workspace__in=workspaces).select_related(
+        'workspace', 'worker__user', 'job', 'assignment', 'material_run',
+    )
+    selected_workspace = request.GET.get('workspace', '')
+    selected_worker = request.GET.get('worker', '')
+    selected_type = request.GET.get('activity_type', '')
+    start_date = parse_date(request.GET.get('start_date', ''))
+    end_date = parse_date(request.GET.get('end_date', ''))
+    allowed_workspace_ids = {str(item.id) for item in workspaces}
+    if selected_workspace in allowed_workspace_ids:
+        activities = activities.filter(workspace_id=selected_workspace)
+    else:
+        selected_workspace = ''
+    if selected_worker.isdigit():
+        activities = activities.filter(worker_id=int(selected_worker))
+    else:
+        selected_worker = ''
+    if selected_type in dict(WorkActivity.ACTIVITY_TYPE_CHOICES):
+        activities = activities.filter(activity_type=selected_type)
+    else:
+        selected_type = ''
+    if start_date:
+        activities = activities.filter(started_at__date__gte=start_date)
+    if end_date:
+        activities = activities.filter(started_at__date__lte=end_date)
+
+    workers = WorkerProfile.objects.filter(work_activities__workspace__in=workspaces).select_related('user').distinct().order_by(
+        'user__first_name', 'user__last_name', 'user__username',
+    )
+    ledger = activity_ledger(list(activities.order_by('-started_at', '-id')[:500]))
+    return render(request, 'work_activity_ledger.html', {
+        'ledger': ledger,
+        'workspaces': workspaces,
+        'workers': workers,
+        'activity_types': WorkActivity.ACTIVITY_TYPE_CHOICES,
+        'selected_workspace': selected_workspace,
+        'selected_worker': selected_worker,
+        'selected_type': selected_type,
+        'start_date': start_date,
+        'end_date': end_date,
+    })
 
 
 @login_required

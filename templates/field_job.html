@@ -28,6 +28,20 @@
         </div>
     </section>
 
+    {% if assignment.clocked_in_at and not assignment.clocked_out_at %}
+    <section class="border-t border-gray-200 py-5">
+        <div class="border border-blue-200 bg-blue-50 p-4">
+            <div class="flex items-start justify-between gap-3"><div><p class="text-xs font-semibold uppercase tracking-wide text-blue-700">Work activity</p><h2 class="mt-1 text-lg font-semibold text-gray-950">{% if current_activity %}{{ current_activity.get_activity_type_display }}{% else %}Activity not started{% endif %}</h2>{% if current_activity %}<p class="mt-1 text-sm text-gray-600">Since {{ current_activity.started_at|date:'g:i A' }} · {% if current_activity.is_paid %}Paid time{% else %}Unpaid time{% endif %}</p>{% endif %}</div><span class="mt-1 h-3 w-3 rounded-full {% if current_activity %}bg-emerald-500{% else %}bg-gray-300{% endif %}"></span></div>
+            {% if current_activity.activity_type == 'material_travel_out' %}<button onclick="activityAction('arrive_vendor')" class="mt-4 min-h-12 w-full rounded-lg bg-amber-500 px-4 py-3 font-semibold text-amber-950">I arrived at the store</button>
+            {% elif current_activity.activity_type == 'material_shopping' %}<button onclick="activityAction('leave_vendor')" class="mt-4 min-h-12 w-full rounded-lg bg-amber-500 px-4 py-3 font-semibold text-amber-950">Materials purchased · leave store</button>
+            {% elif current_activity.activity_type == 'material_travel_return' %}<button onclick="openMaterialReturn()" class="mt-4 min-h-12 w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white">I am back at the job</button>
+            {% elif current_activity and current_activity.activity_type != 'onsite_work' %}<button onclick="activityAction('resume_onsite')" class="mt-4 min-h-12 w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white">Resume onsite work</button>
+            {% elif current_activity %}<button onclick="openActivityMenu()" class="mt-4 min-h-12 w-full rounded-lg border border-blue-300 bg-white px-4 py-3 font-semibold text-blue-700">Leave site or change activity</button>
+            {% endif %}
+        </div>
+    </section>
+    {% endif %}
+
     {% if assignment.clocked_in_at and not assignment.work_completed_at %}
     <section class="border-t border-gray-200 py-5">
         <div class="flex items-end justify-between"><div><h2 class="font-semibold text-gray-950">{% if job.completion_mode == 'tasks' %}Task checklist{% else %}Project requirements{% endif %}</h2><p class="mt-1 text-sm text-gray-500">Evidence marked required must be uploaded first.</p></div><span class="text-xs font-semibold uppercase text-gray-500">{{ job.get_completion_mode_display }}</span></div>
@@ -74,6 +88,22 @@
     </section>
 </div>
 
+<div id="activity-menu" class="fixed inset-0 z-[85] hidden bg-gray-950/60">
+    <section class="absolute inset-x-0 bottom-0 max-h-[92dvh] overflow-y-auto rounded-t-lg bg-white sm:inset-y-8 sm:left-1/2 sm:bottom-auto sm:max-w-lg sm:-translate-x-1/2 sm:rounded-lg">
+        <div class="sticky top-0 flex items-center justify-between border-b border-gray-200 bg-white px-5 py-4"><div><p class="text-xs font-semibold uppercase tracking-wide text-blue-600">Time and cost tracking</p><h2 class="text-xl font-semibold text-gray-950">Change work activity</h2></div><button type="button" onclick="closeActivityMenu()" class="h-10 w-10 text-2xl text-gray-500" aria-label="Close">×</button></div>
+        <div class="space-y-3 p-5">
+            <button onclick="showMaterialForm()" class="flex min-h-14 w-full items-center justify-between rounded-lg border border-amber-200 bg-amber-50 px-4 text-left"><span><strong class="block text-amber-950">Get materials</strong><small class="text-amber-700">Tracks driving, shopping, cost, and mileage</small></span><span aria-hidden="true">›</span></button>
+            <button onclick="activityAction('start_waiting')" class="flex min-h-14 w-full items-center justify-between rounded-lg border border-sky-200 bg-sky-50 px-4 text-left"><span><strong class="block text-sky-950">Waiting</strong><small class="text-sky-700">Paid job-related waiting time</small></span><span aria-hidden="true">›</span></button>
+            <div class="grid grid-cols-2 gap-3"><button onclick="activityAction('start_paid_break')" class="min-h-14 rounded-lg border border-emerald-200 bg-emerald-50 px-3 text-sm font-semibold text-emerald-800">Paid break</button><button onclick="activityAction('start_unpaid_break')" class="min-h-14 rounded-lg border border-gray-300 bg-gray-50 px-3 text-sm font-semibold text-gray-700">Unpaid break</button></div>
+            <button onclick="activityAction('start_other', activityNote())" class="min-h-12 w-full rounded-lg border border-gray-300 px-4 text-sm font-semibold text-gray-700">Other paid work</button>
+            <textarea id="activity-note" rows="2" placeholder="Optional note for the manager" class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></textarea>
+        </div>
+        <form id="material-start-form" class="hidden space-y-4 border-t border-gray-200 p-5" onsubmit="startMaterialRun(event)"><h3 class="font-semibold text-gray-950">Material run details</h3><label class="block text-sm font-semibold text-gray-700">Store or vendor<input name="vendor_name" required placeholder="Home Depot" class="mt-1 w-full rounded-lg border-gray-300"></label><label class="block text-sm font-semibold text-gray-700">Destination<input name="destination_address" placeholder="Store address or location" class="mt-1 w-full rounded-lg border-gray-300"></label><label class="block text-sm font-semibold text-gray-700">Shopping list<textarea name="shopping_list" rows="3" placeholder="Items needed" class="mt-1 w-full rounded-lg border-gray-300"></textarea></label><button class="min-h-12 w-full rounded-lg bg-amber-500 px-4 py-3 font-semibold text-amber-950">Start trip to vendor</button></form>
+    </section>
+</div>
+
+<div id="material-return" class="fixed inset-0 z-[85] hidden bg-gray-950/60"><section class="absolute inset-x-0 bottom-0 rounded-t-lg bg-white p-5 sm:inset-y-8 sm:left-1/2 sm:bottom-auto sm:h-fit sm:max-w-lg sm:-translate-x-1/2 sm:rounded-lg"><div class="flex items-center justify-between"><h2 class="text-xl font-semibold text-gray-950">Complete material run</h2><button onclick="closeMaterialReturn()" class="h-10 w-10 text-2xl text-gray-500">×</button></div><form class="mt-4 space-y-4" onsubmit="completeMaterialRun(event)"><div class="grid grid-cols-2 gap-3"><label class="text-sm font-semibold text-gray-700">Material cost<input name="material_cost" type="number" min="0" step="0.01" value="0" class="mt-1 w-full rounded-lg border-gray-300"></label><label class="text-sm font-semibold text-gray-700">Mileage<input name="mileage" type="number" min="0" step="0.01" value="0" class="mt-1 w-full rounded-lg border-gray-300"></label></div><label class="block text-sm font-semibold text-gray-700">Receipt<input name="receipt" type="file" accept="image/*,application/pdf" capture="environment" class="mt-2 block w-full text-sm"></label><label class="block text-sm font-semibold text-gray-700">Note<textarea name="note" rows="2" class="mt-1 w-full rounded-lg border-gray-300"></textarea></label><button class="min-h-12 w-full rounded-lg bg-emerald-600 px-4 py-3 font-semibold text-white">Save and resume onsite work</button></form></section></div>
+
 <script>
 let fieldLocation = null;
 let watchId = null;
@@ -97,6 +127,19 @@ async function jobAction(action, extra={}) {
         if (action === 'close_job') window.location.href='{% url "field_operations" %}'; else window.location.reload();
     } finally { busy(false); }
 }
+function openActivityMenu(){document.getElementById('activity-menu').classList.remove('hidden');document.body.classList.add('overflow-hidden');}
+function closeActivityMenu(){document.getElementById('activity-menu').classList.add('hidden');document.body.classList.remove('overflow-hidden');}
+function showMaterialForm(){document.getElementById('material-start-form').classList.remove('hidden');document.getElementById('material-start-form').scrollIntoView({behavior:'smooth'});}
+function activityNote(){return {note:document.getElementById('activity-note')?.value||''};}
+async function activityAction(action, extra={}) {
+    if(!fieldLocation) return alert('Waiting for precise location.');
+    const body=new FormData(); body.append('action',action); body.append('latitude',fieldLocation.latitude); body.append('longitude',fieldLocation.longitude); body.append('accuracy',fieldLocation.accuracy); Object.entries(extra).forEach(([key,value])=>body.append(key,value));
+    busy(true); try{const response=await fetch('{% url "api_field_work_activity" job.id %}',{method:'POST',headers:{'X-CSRFToken':csrfToken()},body});const data=await response.json();if(!response.ok)return alert(data.error||'Unable to update activity.');window.location.reload();}finally{busy(false);}
+}
+function startMaterialRun(event){event.preventDefault();const values=Object.fromEntries(new FormData(event.target).entries());activityAction('start_material_run',values);}
+function openMaterialReturn(){document.getElementById('material-return').classList.remove('hidden');document.body.classList.add('overflow-hidden');}
+function closeMaterialReturn(){document.getElementById('material-return').classList.add('hidden');document.body.classList.remove('overflow-hidden');}
+async function completeMaterialRun(event){event.preventDefault();if(!fieldLocation)return alert('Waiting for precise location.');const body=new FormData(event.target);body.append('action','return_to_job');body.append('latitude',fieldLocation.latitude);body.append('longitude',fieldLocation.longitude);body.append('accuracy',fieldLocation.accuracy);busy(true);try{const response=await fetch('{% url "api_field_work_activity" job.id %}',{method:'POST',headers:{'X-CSRFToken':csrfToken()},body});const data=await response.json();if(!response.ok)return alert(data.error||'Unable to complete material run.');window.location.reload();}finally{busy(false);}}
 function completeTask(taskId) { jobAction('complete_task', {task_id: taskId}); }
 function saveNote() { const el=document.getElementById('field-note'); if (!el.value.trim()) return; jobAction('add_note', {note:el.value.trim()}); }
 function closeJob() { const confirmed=document.getElementById('closeout-confirmed')?.checked; const note=document.getElementById('closeout-note')?.value || ''; jobAction('close_job', {confirmed, note}); }

@@ -1,5 +1,8 @@
+from decimal import Decimal
+
 from django.db import models
 from django.contrib.auth.models import User
+from django.utils import timezone
 from organizations.models import Workspace, WorkerProfile, Skill, ServiceZone
 from crm.models.contacts import Account, Contact, Property
 
@@ -228,6 +231,101 @@ class FieldShift(models.Model):
     @property
     def is_active(self):
         return self.ended_at is None
+
+
+class MaterialRun(models.Model):
+    STATUS_CHOICES = [
+        ('outbound', 'Traveling to vendor'),
+        ('shopping', 'Purchasing materials'),
+        ('returning', 'Returning to job'),
+        ('completed', 'Returned to job'),
+        ('canceled', 'Canceled'),
+    ]
+
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='material_runs')
+    worker = models.ForeignKey(WorkerProfile, on_delete=models.PROTECT, related_name='material_runs')
+    job = models.ForeignKey(Job, on_delete=models.SET_NULL, null=True, blank=True, related_name='material_runs')
+    assignment = models.ForeignKey(JobAssignment, on_delete=models.SET_NULL, null=True, blank=True, related_name='material_runs')
+    vendor_name = models.CharField(max_length=160, blank=True)
+    destination_address = models.CharField(max_length=255, blank=True)
+    shopping_list = models.TextField(blank=True)
+    notes = models.TextField(blank=True)
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='outbound')
+    material_cost = models.DecimalField(max_digits=10, decimal_places=2, default=0)
+    mileage = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    receipt = models.FileField(upload_to='material_receipts/%Y/%m/%d/', blank=True)
+    started_at = models.DateTimeField(auto_now_add=True)
+    completed_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        ordering = ('-started_at',)
+
+    def __str__(self):
+        return f'Material run #{self.id} / {self.worker}'
+
+
+class WorkActivity(models.Model):
+    ACTIVITY_TYPE_CHOICES = [
+        ('onsite_work', 'Onsite work'),
+        ('material_travel_out', 'Material travel - outbound'),
+        ('material_shopping', 'Purchasing materials'),
+        ('material_travel_return', 'Material travel - return'),
+        ('travel_to_job', 'Travel to job'),
+        ('reassignment_travel', 'Travel after reassignment'),
+        ('waiting', 'Waiting'),
+        ('paid_break', 'Paid break'),
+        ('unpaid_break', 'Unpaid break'),
+        ('other', 'Other work'),
+    ]
+
+    workspace = models.ForeignKey(Workspace, on_delete=models.CASCADE, related_name='work_activities')
+    worker = models.ForeignKey(WorkerProfile, on_delete=models.PROTECT, related_name='work_activities')
+    job = models.ForeignKey(Job, on_delete=models.SET_NULL, null=True, blank=True, related_name='work_activities')
+    assignment = models.ForeignKey(JobAssignment, on_delete=models.SET_NULL, null=True, blank=True, related_name='work_activities')
+    field_shift = models.ForeignKey(FieldShift, on_delete=models.SET_NULL, null=True, blank=True, related_name='work_activities')
+    material_run = models.ForeignKey(MaterialRun, on_delete=models.SET_NULL, null=True, blank=True, related_name='activities')
+    activity_type = models.CharField(max_length=30, choices=ACTIVITY_TYPE_CHOICES)
+    is_paid = models.BooleanField(default=True)
+    started_at = models.DateTimeField(default=timezone.now)
+    ended_at = models.DateTimeField(null=True, blank=True)
+    start_lat = models.DecimalField(max_digits=9, decimal_places=6)
+    start_lng = models.DecimalField(max_digits=9, decimal_places=6)
+    start_accuracy = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    end_lat = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    end_lng = models.DecimalField(max_digits=9, decimal_places=6, null=True, blank=True)
+    end_accuracy = models.DecimalField(max_digits=8, decimal_places=2, default=0)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ('-started_at', '-id')
+        indexes = [
+            models.Index(fields=('workspace', 'started_at'), name='fsm_activity_workspace_time'),
+            models.Index(fields=('worker', 'started_at'), name='fsm_activity_worker_time'),
+            models.Index(fields=('job', 'started_at'), name='fsm_activity_job_time'),
+        ]
+        constraints = [
+            models.UniqueConstraint(
+                fields=('worker',), condition=models.Q(ended_at__isnull=True),
+                name='fsm_one_open_activity_worker',
+            ),
+        ]
+
+    @property
+    def duration_seconds(self):
+        end = self.ended_at or timezone.now()
+        return max(int((end - self.started_at).total_seconds()), 0)
+
+    @property
+    def duration_hours(self):
+        return (Decimal(self.duration_seconds) / Decimal('3600')).quantize(Decimal('0.01'))
+
+    @property
+    def is_open(self):
+        return self.ended_at is None
+
+    def __str__(self):
+        return f'{self.worker} / {self.get_activity_type_display()}'
 
 
 class FieldEvent(models.Model):

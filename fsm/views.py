@@ -16,7 +16,10 @@ from rest_framework import status
 from rest_framework.permissions import IsAuthenticated
 
 # Local Models & Tasks
-from .models import FieldEvent, FieldShift, Job, JobTask, JobEvidence, JobAssignment, JobIssue, JobIssueMedia
+from .models import (
+    FieldEvent, FieldShift, Job, JobTask, JobEvidence, JobAssignment,
+    JobIssue, JobIssueMedia, MaterialRun, WorkActivity,
+)
 from .tasks import send_completion_notifications, translate_field_note, verify_photo_evidence
 from .translation import note_needs_translation
 from .tasks import calculate_distance
@@ -25,6 +28,7 @@ from .tasks import calculate_distance
 from organizations.models import Skill, ServiceZone, WorkerProfile
 from organizations.permissions import user_can_manage_workspace, worker_profile_for_workspace
 from crm.models.contacts import Account, Contact, Property
+from workforce.activity_services import active_activity, close_activity, start_activity
 
 
 def _location_from_request(data):
@@ -153,6 +157,7 @@ def field_job_view(request, job_id):
         job_id=job_id,
         job__organization=active_org,
     )
+    current_activity = active_activity(worker)
     return render(request, 'field_job.html', {
         'assignment': assignment,
         'job': assignment.job,
@@ -160,6 +165,8 @@ def field_job_view(request, job_id):
         'events': assignment.job.field_events.filter(worker=worker)[:30],
         'issues': assignment.job.issues.filter(worker=worker).prefetch_related('media')[:20],
         'active_shift': _active_shift(worker, active_org),
+        'current_activity': current_activity,
+        'active_material_run': current_activity.material_run if current_activity and current_activity.material_run_id else None,
     })
 
 
@@ -262,6 +269,8 @@ class FieldShiftView(APIView):
                 return Response({'error': 'No active field shift was found.'}, status=status.HTTP_400_BAD_REQUEST)
             if JobAssignment.objects.filter(worker=worker, clocked_in_at__isnull=False, clocked_out_at__isnull=True).exists():
                 return Response({'error': 'Close your active job before ending the shift.'}, status=status.HTTP_400_BAD_REQUEST)
+            if active_activity(worker):
+                return Response({'error': 'Finish your active work activity before ending the shift.'}, status=status.HTTP_400_BAD_REQUEST)
             lat, lng, _ = location
             shift.ended_at = timezone.now()
             shift.end_lat = lat
@@ -432,12 +441,21 @@ class FieldJobActionView(APIView):
             return Response({'error': 'Record arrival before starting work.'}, status=status.HTTP_400_BAD_REQUEST)
 
         if action == 'start_work':
+            current = active_activity(worker)
+            if current and current.assignment_id != assignment.id:
+                return Response({'error': 'Finish the activity on your other job before starting this one.'}, status=status.HTTP_400_BAD_REQUEST)
             if not assignment.clocked_in_at:
                 assignment.clocked_in_at = now
                 assignment.save(update_fields=['clocked_in_at'])
             job.status = 'in_progress'
             job.clocked_in_at = job.clocked_in_at or now
             job.save(update_fields=['status', 'clocked_in_at'])
+            if not current:
+                start_activity(
+                    worker=worker, workspace=workspace, activity_type='onsite_work',
+                    location=location, job=job, assignment=assignment,
+                    field_shift=_active_shift(worker, workspace), started_at=now,
+                )
             _record_field_event(worker, workspace, 'work_started', location, job=job)
             return Response({'message': 'Work timer started.'})
 
@@ -485,6 +503,11 @@ class FieldJobActionView(APIView):
                 return Response({'error': 'Complete the required work before closeout.'}, status=status.HTTP_400_BAD_REQUEST)
             if job.require_closeout_confirmation and request.data.get('confirmed') not in [True, 'true', '1', 1, 'yes']:
                 return Response({'error': 'Confirm the closeout instruction before closing the job.'}, status=status.HTTP_400_BAD_REQUEST)
+            current = active_activity(worker)
+            if current and current.assignment_id == assignment.id and current.activity_type != 'onsite_work':
+                return Response({'error': 'Return to onsite work before closing this job.'}, status=status.HTTP_400_BAD_REQUEST)
+            if current and current.assignment_id == assignment.id:
+                close_activity(current, location, ended_at=now, note='Job closeout completed.')
             assignment.closeout_confirmed_at = now
             assignment.clocked_out_at = now
             assignment.save(update_fields=['closeout_confirmed_at', 'clocked_out_at'])
@@ -501,6 +524,141 @@ class FieldJobActionView(APIView):
             return Response({'message': 'Job closed. Your next assignment is ready.', 'job_completed': job.status == 'completed'})
 
         return Response({'error': 'Unknown field action.'}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class FieldWorkActivityView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = (MultiPartParser, FormParser)
+
+    @transaction.atomic
+    def post(self, request, job_id):
+        workspace, worker = _worker_for_request(request)
+        location = _location_from_request(request.data)
+        if not worker:
+            return Response({'error': 'Field-work profile required.'}, status=status.HTTP_403_FORBIDDEN)
+        if not location:
+            return Response({'error': 'Location must be enabled to update work activity.'}, status=status.HTTP_400_BAD_REQUEST)
+        shift = _active_shift(worker, workspace)
+        if not shift:
+            return Response({'error': 'Check in as available before updating work activity.'}, status=status.HTTP_400_BAD_REQUEST)
+        assignment = get_object_or_404(
+            JobAssignment.objects.select_for_update().select_related('job'),
+            worker=worker, job_id=job_id, job__organization=workspace,
+        )
+        if not assignment.clocked_in_at or assignment.clocked_out_at:
+            return Response({'error': 'The job must be clocked in and open.'}, status=status.HTTP_400_BAD_REQUEST)
+
+        action = request.data.get('action', '').strip()
+        current = active_activity(worker)
+        if current and current.assignment_id != assignment.id:
+            return Response({'error': 'Finish the activity on your other job first.'}, status=status.HTTP_400_BAD_REQUEST)
+        now = timezone.now()
+
+        if action == 'start_material_run':
+            if current and current.activity_type != 'onsite_work':
+                return Response({'error': 'Finish the current activity before starting a material run.'}, status=status.HTTP_400_BAD_REQUEST)
+            if current:
+                close_activity(current, location, ended_at=now)
+            material_run = MaterialRun.objects.create(
+                workspace=workspace, worker=worker, job=assignment.job, assignment=assignment,
+                vendor_name=request.data.get('vendor_name', '').strip(),
+                destination_address=request.data.get('destination_address', '').strip(),
+                shopping_list=request.data.get('shopping_list', '').strip(),
+                notes=request.data.get('note', '').strip(),
+            )
+            activity = start_activity(
+                worker=worker, workspace=workspace, activity_type='material_travel_out',
+                location=location, job=assignment.job, assignment=assignment,
+                field_shift=shift, material_run=material_run,
+                note=f'Travel to {material_run.vendor_name or "material vendor"}.', started_at=now,
+            )
+            return Response({'message': 'Material run started.', 'activity_id': activity.id})
+
+        material_run = current.material_run if current and current.material_run_id else None
+        if action in {'arrive_vendor', 'leave_vendor', 'return_to_job'}:
+            expected = {
+                'arrive_vendor': 'material_travel_out',
+                'leave_vendor': 'material_shopping',
+                'return_to_job': 'material_travel_return',
+            }[action]
+            if not current or current.activity_type != expected or not material_run:
+                return Response({'error': 'This material-run step is not currently available.'}, status=status.HTTP_400_BAD_REQUEST)
+            material_cost = mileage = None
+            receipt = None
+            if action == 'return_to_job':
+                try:
+                    material_cost = Decimal(request.data.get('material_cost') or '0')
+                    mileage = Decimal(request.data.get('mileage') or '0')
+                except InvalidOperation:
+                    return Response({'error': 'Enter valid material cost and mileage amounts.'}, status=status.HTTP_400_BAD_REQUEST)
+                if material_cost < 0 or mileage < 0:
+                    return Response({'error': 'Material cost and mileage cannot be negative.'}, status=status.HTTP_400_BAD_REQUEST)
+                receipt = request.FILES.get('receipt')
+                if receipt and receipt.size > 20 * 1024 * 1024:
+                    return Response({'error': 'The receipt must be 20 MB or smaller.'}, status=status.HTTP_400_BAD_REQUEST)
+            close_activity(current, location, ended_at=now)
+            if action == 'arrive_vendor':
+                material_run.status = 'shopping'
+                next_type, message = 'material_shopping', 'Shopping time started.'
+            elif action == 'leave_vendor':
+                material_run.status = 'returning'
+                next_type, message = 'material_travel_return', 'Return travel started.'
+            else:
+                material_run.material_cost = material_cost
+                material_run.mileage = mileage
+                material_run.status = 'completed'
+                material_run.completed_at = now
+                if receipt:
+                    material_run.receipt = receipt
+                material_run.notes = '\n'.join(filter(None, [material_run.notes, request.data.get('note', '').strip()]))
+                material_run.save()
+                activity = start_activity(
+                    worker=worker, workspace=workspace, activity_type='onsite_work',
+                    location=location, job=assignment.job, assignment=assignment,
+                    field_shift=shift, note='Returned from material run.', started_at=now,
+                )
+                return Response({'message': 'Material run completed. Onsite work resumed.', 'activity_id': activity.id})
+            material_run.save(update_fields=['status'])
+            activity = start_activity(
+                worker=worker, workspace=workspace, activity_type=next_type,
+                location=location, job=assignment.job, assignment=assignment,
+                field_shift=shift, material_run=material_run, started_at=now,
+            )
+            return Response({'message': message, 'activity_id': activity.id})
+
+        activity_map = {
+            'start_waiting': ('waiting', True, 'Waiting'),
+            'start_paid_break': ('paid_break', True, 'Paid break'),
+            'start_unpaid_break': ('unpaid_break', False, 'Unpaid break'),
+            'start_other': ('other', True, 'Other work'),
+        }
+        if action in activity_map:
+            if current and current.activity_type != 'onsite_work':
+                return Response({'error': 'Resume onsite work before choosing another activity.'}, status=status.HTTP_400_BAD_REQUEST)
+            if current:
+                close_activity(current, location, ended_at=now)
+            activity_type, is_paid, label = activity_map[action]
+            activity = start_activity(
+                worker=worker, workspace=workspace, activity_type=activity_type,
+                location=location, job=assignment.job, assignment=assignment,
+                field_shift=shift, is_paid=is_paid, note=request.data.get('note', '').strip(), started_at=now,
+            )
+            return Response({'message': f'{label} started.', 'activity_id': activity.id})
+
+        if action == 'resume_onsite':
+            if not current:
+                return Response({'error': 'No active activity was found.'}, status=status.HTTP_400_BAD_REQUEST)
+            if current.material_run_id:
+                return Response({'error': 'Complete the material run before resuming onsite work.'}, status=status.HTTP_400_BAD_REQUEST)
+            close_activity(current, location, ended_at=now)
+            activity = start_activity(
+                worker=worker, workspace=workspace, activity_type='onsite_work',
+                location=location, job=assignment.job, assignment=assignment,
+                field_shift=shift, note='Onsite work resumed.', started_at=now,
+            )
+            return Response({'message': 'Onsite work resumed.', 'activity_id': activity.id})
+
+        return Response({'error': 'Choose a valid work activity.'}, status=status.HTTP_400_BAD_REQUEST)
 
 
 # ==========================================
@@ -531,6 +689,10 @@ class MobileClockInView(APIView):
         if assignment.clocked_in_at:
             return Response({"error": "You are already clocked in to this job."}, status=status.HTTP_400_BAD_REQUEST)
 
+        current = active_activity(worker_profile)
+        if current and current.assignment_id != assignment.id:
+            return Response({'error': 'Finish the activity on your other job first.'}, status=status.HTTP_400_BAD_REQUEST)
+
         now = timezone.now()
         assignment.clocked_in_at = now
         assignment.save()
@@ -540,6 +702,13 @@ class MobileClockInView(APIView):
             if not job.clocked_in_at:
                 job.clocked_in_at = now
             job.save()
+
+        if not current:
+            start_activity(
+                worker=worker_profile, workspace=job.organization, activity_type='onsite_work',
+                location=location, job=job, assignment=assignment,
+                field_shift=_active_shift(worker_profile, job.organization), started_at=now,
+            )
 
         return Response({
             "message": "Clock in successful.",
@@ -571,9 +740,15 @@ class MobileClockOutView(APIView):
         if not assignment.work_completed_at or not assignment.closeout_confirmed_at:
             return Response({"error": "Complete the work and closeout confirmation before clocking out."}, status=status.HTTP_400_BAD_REQUEST)
 
+        current = active_activity(worker_profile)
+        if current and current.assignment_id == assignment.id and current.activity_type != 'onsite_work':
+            return Response({'error': 'Return to onsite work before clocking out.'}, status=status.HTTP_400_BAD_REQUEST)
+
         now = timezone.now()
         assignment.clocked_out_at = now
         assignment.save()
+        if current and current.assignment_id == assignment.id:
+            close_activity(current, location, ended_at=now, note='Job clocked out.')
 
         active_assignments = job.worker_assignments.filter(clocked_out_at__isnull=True)
         if not active_assignments.exists():

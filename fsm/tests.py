@@ -10,7 +10,10 @@ from django.utils import timezone
 from crm.models.contacts import Account, Contact, Property
 from organizations.models import CustomerAccount, CustomerAccountMember, WorkerProfile, Workspace, WorkspaceMember
 
-from .models import CompletionNotificationDelivery, FieldEvent, FieldShift, Job, JobAssignment, JobIssue, JobTask
+from .models import (
+    CompletionNotificationDelivery, FieldEvent, FieldShift, Job, JobAssignment,
+    JobIssue, JobTask, MaterialRun, WorkActivity,
+)
 from .tasks import send_completion_notifications
 from .translation import translate_note_to_english
 
@@ -58,6 +61,18 @@ class FieldWorkflowTests(TestCase):
             content_type='application/json',
         )
 
+    def post_activity(self, action, **extra):
+        return self.client.post(
+            reverse('api_field_work_activity', args=[self.job.id]),
+            data={**self.location, 'action': action, **extra},
+        )
+
+    def start_job(self):
+        self.start_shift()
+        self.post_action('accept')
+        self.post_action('arrive')
+        return self.post_action('start_work')
+
     def test_worker_must_follow_full_location_workflow(self):
         self.assertEqual(self.post_action('accept').status_code, 400)
         self.assertEqual(self.start_shift().status_code, 200)
@@ -75,6 +90,42 @@ class FieldWorkflowTests(TestCase):
         self.assertTrue(self.task.is_completed)
         self.assertIsNotNone(self.assignment.closeout_confirmed_at)
         self.assertEqual(FieldEvent.objects.filter(job=self.job, worker=self.worker).count(), 6)
+        activity = WorkActivity.objects.get(worker=self.worker)
+        self.assertEqual(activity.activity_type, 'onsite_work')
+        self.assertIsNotNone(activity.ended_at)
+
+    def test_material_run_tracks_travel_shopping_cost_and_resumes_work(self):
+        self.assertEqual(self.start_job().status_code, 200)
+        self.assertEqual(self.post_activity(
+            'start_material_run', vendor_name='Home Depot',
+            destination_address='200 Supply Road', shopping_list='Drywall and screws',
+        ).status_code, 200)
+        self.assertEqual(self.post_activity('arrive_vendor').status_code, 200)
+        self.assertEqual(self.post_activity('leave_vendor').status_code, 200)
+        self.assertEqual(self.post_activity('return_to_job', material_cost='84.25', mileage='12.4').status_code, 200)
+
+        material_run = MaterialRun.objects.get(worker=self.worker)
+        self.assertEqual(material_run.status, 'completed')
+        self.assertEqual(str(material_run.material_cost), '84.25')
+        self.assertEqual(str(material_run.mileage), '12.40')
+        activities = WorkActivity.objects.filter(worker=self.worker).order_by('started_at', 'id')
+        self.assertEqual(
+            list(activities.values_list('activity_type', flat=True)),
+            ['onsite_work', 'material_travel_out', 'material_shopping', 'material_travel_return', 'onsite_work'],
+        )
+        self.assertEqual(activities.filter(ended_at__isnull=True).count(), 1)
+        self.assertEqual(activities.filter(ended_at__isnull=True).get().activity_type, 'onsite_work')
+
+    def test_job_close_is_blocked_until_non_onsite_activity_is_finished(self):
+        self.start_job()
+        self.post_action('complete_task', task_id=self.task.id)
+        self.assertEqual(self.post_activity('start_unpaid_break').status_code, 200)
+        blocked = self.post_action('close_job', confirmed=True)
+        self.assertEqual(blocked.status_code, 400)
+        self.assertIn('Return to onsite work', blocked.json()['error'])
+        self.assertEqual(self.post_activity('resume_onsite').status_code, 200)
+        self.assertEqual(self.post_action('close_job', confirmed=True).status_code, 200)
+        self.assertFalse(WorkActivity.objects.filter(worker=self.worker, ended_at__isnull=True).exists())
 
     def test_safari_field_pages_render_for_assigned_worker(self):
         dashboard = self.client.get(reverse('field_operations'))

@@ -150,6 +150,7 @@
                 </button>
                 <div class="nav-submenu hidden px-2 pb-2.5" data-module-panel="workforce">
                     <a href="{% url 'workforce' %}" class="nav-subitem">Employee Directory</a>
+                    <a href="{% url 'work_activity_ledger' %}" class="nav-subitem">Work Activity</a>
                     <a href="{% url 'admin_console' %}#team" class="nav-subitem">Users & Roles</a>
                     {% if can_manage_setup %}
                     <a href="{% url 'admin_console' %}#skills" class="nav-subitem">Skills & Zones</a>
