@@ -197,3 +197,18 @@ PASSKEY_ORIGIN = os.environ.get('PASSKEY_ORIGIN', 'https://app.bratelus.com')
 CHAT_VAPID_PUBLIC_KEY = os.environ.get('CHAT_VAPID_PUBLIC_KEY', '')
 CHAT_VAPID_PRIVATE_KEY = os.environ.get('CHAT_VAPID_PRIVATE_KEY', '/app/.vapid_private.pem')
 CHAT_VAPID_SUBJECT = os.environ.get('CHAT_VAPID_SUBJECT', 'mailto:support@bratelus.com')
+
+# Platform transactional email. Workspace email connections remain separate.
+EMAIL_HOST = os.environ.get('EMAIL_HOST', '')
+EMAIL_PORT = int(os.environ.get('EMAIL_PORT', '587'))
+EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
+EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
+EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'true').lower() in ('1', 'true', 'yes')
+EMAIL_TIMEOUT = 15
+EMAIL_BACKEND = os.environ.get(
+    'EMAIL_BACKEND',
+    'django.core.mail.backends.smtp.EmailBackend' if EMAIL_HOST else 'django.core.mail.backends.console.EmailBackend',
+)
+DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Bratelus <support@bratelus.com>')
+SUPPORT_EMAIL = os.environ.get('SUPPORT_EMAIL', 'support@bratelus.com')
+APP_BASE_URL = os.environ.get('APP_BASE_URL', 'https://app.bratelus.com')

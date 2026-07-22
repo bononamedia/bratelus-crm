@@ -3,15 +3,15 @@ from .models.contacts import Account, Contact, Property, PaymentMethod
 
 @admin.register(Account)
 class AccountAdmin(admin.ModelAdmin):
-    list_display = ('name', 'organization', 'phone')
-    list_filter = ('organization',)
+    list_display = ('name', 'organization', 'phone', 'archived_at')
+    list_filter = ('organization', 'archived_at')
     search_fields = ('name', 'phone', 'billing_address', 'organization__name')
     autocomplete_fields = ('organization',)
 
 @admin.register(Contact)
 class ContactAdmin(admin.ModelAdmin):
-    list_display = ('first_name', 'last_name', 'email', 'organization', 'account', 'status')
-    list_filter = ('organization', 'status', 'external_source', 'email_opt_out', 'sms_opt_out')
+    list_display = ('first_name', 'last_name', 'email', 'organization', 'account', 'status', 'archived_at')
+    list_filter = ('organization', 'status', 'external_source', 'email_opt_out', 'sms_opt_out', 'archived_at')
     search_fields = ('first_name', 'last_name', 'email', 'phone', 'mobile', 'account__name', 'external_id')
     autocomplete_fields = ('organization', 'account')
 

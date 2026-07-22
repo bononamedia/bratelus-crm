@@ -60,3 +60,4 @@ django-redis>=5.4.0
 stripe>=11.0.0
 webauthn==2.2.0
 pywebpush>=2.0,<3
+zipcodes>=3.0,<4

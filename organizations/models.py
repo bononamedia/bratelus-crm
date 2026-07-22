@@ -109,6 +109,19 @@ class UserPasskeyCredential(models.Model):
         ordering = ('-created_at',)
 
 
+class UserEmailVerification(models.Model):
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='email_verification')
+    sent_at = models.DateTimeField(null=True, blank=True)
+    verified_at = models.DateTimeField(null=True, blank=True)
+
+    class Meta:
+        db_table = 'workspaces_useremailverification'
+
+    @property
+    def is_verified(self):
+        return self.verified_at is not None
+
+
 # ---------------------------------------------------------
 # WORKSPACE CHANNELS (EMAIL / DOMAIN SETUP)
 # ---------------------------------------------------------

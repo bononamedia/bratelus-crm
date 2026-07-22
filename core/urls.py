@@ -12,7 +12,10 @@ from rest_framework.routers import DefaultRouter
 # ==========================================
 
 # CRM UI Views
-from crm.views import dashboard_view, leads_list_view, crm_accounts_view
+from crm.views import (
+    crm_accounts_view, crm_archive_view, dashboard_view, leads_list_view,
+    postal_code_lookup_view,
+)
 
 # FSM Views & APIs
 from fsm.views import (
@@ -43,7 +46,7 @@ from core.views import home_view, reports_view
 from finance.views import finance_overview_view
 from finance.billing_views import billing_overview_view, create_billing_portal_view, create_checkout_session_view, stripe_webhook_view
 from organizations.models import Workspace
-from organizations.views import admin_console_view, create_workspace_view, employee_profile_view, signup_view
+from organizations.views import admin_console_view, create_workspace_view, employee_profile_view, signup_view, verify_email_view
 from organizations.passkeys import (
     passkey_authentication_options, passkey_authentication_verify,
     passkey_registration_options, passkey_registration_verify,
@@ -103,6 +106,7 @@ urlpatterns = [
     # --- SYSTEM ---
     path('admin/', admin.site.urls),
     path('signup/', signup_view, name='signup'),
+    path('verify-email/<str:token>/', verify_email_view, name='verify_email'),
     path('api/switch-org/', switch_organization_view, name='switch_org'),
     
     # --- WEB UI DASHBOARDS ---
@@ -115,6 +119,7 @@ urlpatterns = [
     path('contacts/', crm_accounts_view, {'section': 'contacts'}, name='contacts'),
     path('properties/', crm_accounts_view, {'section': 'properties'}, name='properties'),
     path('payment-methods/', crm_accounts_view, {'section': 'payment_methods'}, name='payment_methods'),
+    path('crm/archive/', crm_archive_view, name='crm_archive'),
     path('finance/', finance_overview_view, name='finance'),
     path('workforce/', workforce_view, name='workforce'),
     path('chat/', chat_inbox_view, name='chat_inbox'),
@@ -143,6 +148,7 @@ urlpatterns = [
     
     # --- UNIFIED REST API ---
     path('api/v1/', include(router.urls)),
+    path('api/address/postal-code/', postal_code_lookup_view, name='postal_code_lookup'),
     
     # --- INTERNAL MAP DASHBOARD API ---
     path('api/fleet/live-locations/', LiveFleetLocationsView.as_view(), name='api_live_fleet'),

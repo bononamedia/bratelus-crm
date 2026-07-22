@@ -1,0 +1,17 @@
+Welcome to Bratelus, {{ user.first_name|default:user.username }}.
+
+Your workspace, {{ workspace.name }}, is ready and your trial is active.
+
+Verify your email:
+{{ verification_url }}
+
+Pricing reminder:
+- Full CRM and field operations platform: ${{ base_price }} per month
+- The first user is included
+- Additional users use the graduated pricing shown in Billing
+
+Review billing and trial information:
+{{ billing_url }}
+
+Bratelus Support
+support@bratelus.com

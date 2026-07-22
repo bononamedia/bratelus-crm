@@ -1,4 +1,6 @@
 from rest_framework import serializers
+from django.core.validators import URLValidator
+from django.core.exceptions import ValidationError as DjangoValidationError
 from django.contrib.auth.models import User
 from organizations.models import WorkerProfile, Skill, ServiceZone
 from crm.models.contacts import Account, Contact, PaymentMethod, Property
@@ -24,6 +26,7 @@ class WorkerSerializer(serializers.ModelSerializer):
 # 2 - CRM
 # ==========================================
 class AccountSerializer(serializers.ModelSerializer):
+    website = serializers.CharField(required=False, allow_blank=True, max_length=200)
     contact_count = serializers.SerializerMethodField()
     property_count = serializers.SerializerMethodField()
 
@@ -33,8 +36,19 @@ class AccountSerializer(serializers.ModelSerializer):
             'id', 'name', 'phone', 'email', 'website', 'billing_address',
             'billing_street', 'billing_city', 'billing_state', 'billing_postal_code', 'billing_country',
             'shipping_street', 'shipping_city', 'shipping_state', 'shipping_postal_code', 'shipping_country',
-            'custom_data', 'contact_count', 'property_count',
+            'custom_data', 'contact_count', 'property_count', 'archived_at', 'archived_by',
         ]
+        read_only_fields = ['archived_at', 'archived_by']
+
+    def validate_website(self, value):
+        from crm.utils import normalize_website
+        normalized = normalize_website(value)
+        if normalized:
+            try:
+                URLValidator()(normalized)
+            except DjangoValidationError:
+                raise serializers.ValidationError('Enter a valid website address.')
+        return normalized
 
     def get_contact_count(self, obj):
         return obj.contacts.count()
@@ -61,8 +75,9 @@ class ContactSerializer(serializers.ModelSerializer):
             'phone', 'mobile', 'mailing_street', 'mailing_city', 'mailing_state',
             'mailing_postal_code', 'mailing_country', 'lead_source', 'status', 'description',
             'email_opt_out', 'sms_opt_out', 'external_source', 'external_id', 'is_primary', 'custom_data',
+            'archived_at', 'archived_by',
         ]
-        read_only_fields = ['external_source', 'external_id']
+        read_only_fields = ['external_source', 'external_id', 'archived_at', 'archived_by']
 
 
 class PropertySerializer(serializers.ModelSerializer):

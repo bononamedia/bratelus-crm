@@ -6,10 +6,10 @@
         <h1 class="text-3xl font-extrabold text-gray-900 tracking-tight">Leads Pipeline</h1>
         <p class="text-gray-500 mt-1">Manage incoming requests and build your contact list.</p>
     </div>
-    <button onclick="toggleForm()" class="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-sm transition-all duration-200 focus:ring-4 focus:ring-blue-100">
+    <div class="flex gap-2"><a href="{% url 'crm_archive' %}" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2.5 font-medium text-gray-700 hover:bg-gray-50">Archive</a><button onclick="toggleForm()" class="inline-flex items-center justify-center bg-blue-600 hover:bg-blue-700 text-white px-5 py-2.5 rounded-lg font-medium shadow-sm transition-all duration-200 focus:ring-4 focus:ring-blue-100">
         <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
         Add New Lead
-    </button>
+    </button></div>
 </div>
 
 <div class="grid grid-cols-1 xl:grid-cols-3 gap-6 items-start">
@@ -173,7 +173,7 @@
                             <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded border border-blue-200">New Lead</span>
                         </td>
                         <td class="px-6 py-4 text-right">
-                            <a href="#" class="font-medium text-blue-600 hover:underline">Edit</a>
+                            <button type="button" onclick="archiveLead(${contact.id})" class="font-medium text-red-600 hover:underline">Archive</button>
                         </td>
                     </tr>
                 `;
@@ -193,6 +193,7 @@
             last_name: document.getElementById('last_name').value,
             email: document.getElementById('email').value,
             phone: document.getElementById('phone').value,
+            status: 'New Lead',
             is_primary: false
         };
 
@@ -218,6 +219,16 @@
         } catch (error) {
             console.error("Network Error:", error);
         }
+    }
+
+    async function archiveLead(id) {
+        if (!confirm('Move this lead to the CRM archive?')) return;
+        const response = await fetch(`/api/v1/contacts/${id}/`, {
+            method: 'DELETE',
+            headers: {'X-CSRFToken': getCookie('csrftoken')},
+        });
+        if (!response.ok) return alert('This lead could not be archived.');
+        loadContacts();
     }
 
     // Boot up the page!

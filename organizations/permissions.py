@@ -23,6 +23,23 @@ def user_can_manage_customer_account(user, customer_account):
     return bool(membership and membership.role in ('owner', 'admin', 'manager'))
 
 
+def user_is_customer_account_admin(user, customer_account):
+    if user.is_superuser:
+        return True
+    membership = customer_account_membership_for_user(user, customer_account)
+    return bool(membership and membership.role in ('owner', 'admin'))
+
+
+def user_can_purge_crm(user, workspace):
+    if not user.is_authenticated or not workspace:
+        return False
+    if user.is_superuser:
+        return True
+    if workspace.customer_account_id:
+        return user_is_customer_account_admin(user, workspace.customer_account)
+    return user_is_workspace_admin(user, workspace)
+
+
 def account_workspaces_for_user(user, workspace):
     """Sibling workspace calendars visible through the same customer account."""
     if not user.is_authenticated or not workspace:

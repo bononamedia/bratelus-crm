@@ -1,6 +1,9 @@
 import requests
+from django.conf import settings
 from django.db import models
 from organizations.models import Workspace
+
+from crm.utils import normalize_website
 
 # ==========================================
 # 1 - ACCOUNT & ORGANIZATION
@@ -27,10 +30,22 @@ class Account(models.Model):
     shipping_state = models.CharField(max_length=100, blank=True)
     shipping_postal_code = models.CharField(max_length=20, blank=True)
     shipping_country = models.CharField(max_length=100, blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    archived_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='archived_crm_accounts',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     
     # The bucket for infinite custom fields
     custom_data = models.JSONField(default=dict, blank=True)
+
+    def save(self, *args, **kwargs):
+        self.website = normalize_website(self.website)
+        super().save(*args, **kwargs)
 
     def __str__(self):
         return self.name
@@ -71,6 +86,14 @@ class Contact(models.Model):
     external_source = models.CharField(max_length=50, blank=True)
     external_id = models.CharField(max_length=100, blank=True)
     is_primary = models.BooleanField(default=False)
+    archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    archived_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='archived_crm_contacts',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     

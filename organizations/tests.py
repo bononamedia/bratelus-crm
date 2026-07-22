@@ -1,8 +1,8 @@
 import json
-
 from django.contrib.auth.models import User
 from django.core.files.uploadedfile import SimpleUploadedFile
-from django.test import TestCase
+from django.test import TestCase, override_settings
+from django.core import mail
 from django.urls import reverse
 
 from finance.models import SeatPricingTier, SubscriptionPlan, WorkspaceSubscription
@@ -17,7 +17,10 @@ from organizations.models import (
     WorkerProfile,
     Workspace,
     WorkspaceMember,
+    UserEmailVerification,
 )
+from organizations.emailing import email_verification_token
+from organizations.tasks import send_new_account_alert, send_signup_welcome_email
 from organizations.permissions import (
     user_can_export_data,
     user_can_manage_people,
@@ -48,6 +51,40 @@ class WorkspaceOnboardingTests(TestCase):
         self.assertTrue(CustomerAccountMember.objects.filter(account=workspace.customer_account, user=user, role='owner').exists())
         self.assertTrue(WorkspaceMember.objects.filter(workspace=workspace, user=user, role='admin').exists())
         self.assertTrue(WorkspaceSubscription.objects.filter(workspace=workspace, seat_count=1).exists())
+        self.assertTrue(UserEmailVerification.objects.filter(user=user, verified_at__isnull=True).exists())
+
+    def test_email_verification_link_marks_owner_verified(self):
+        user = User.objects.create_user('verify@example.com', email='verify@example.com', password='StrongPass123!')
+        UserEmailVerification.objects.create(user=user)
+        response = self.client.get(reverse('verify_email', args=[email_verification_token(user)]))
+        self.assertEqual(response.status_code, 200)
+        self.assertIsNotNone(UserEmailVerification.objects.get(user=user).verified_at)
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        DEFAULT_FROM_EMAIL='Bratelus <support@bratelus.com>',
+        SUPPORT_EMAIL='support@bratelus.com',
+        APP_BASE_URL='https://app.bratelus.com',
+    )
+    def test_signup_emails_reach_owner_and_support(self):
+        user = User.objects.create_user(
+            'mail-owner@example.com', email='mail-owner@example.com', password='StrongPass123!', first_name='Mail',
+        )
+        account = CustomerAccount.objects.create(name='Mail Company', owner=user)
+        workspace = Workspace.objects.create(
+            name='Mail Company', slug='mail-company', customer_account=account, created_by=user,
+        )
+        UserEmailVerification.objects.create(user=user)
+        plan = SubscriptionPlan.objects.filter(is_active=True).first()
+        WorkspaceSubscription.objects.create(
+            workspace=workspace, plan=plan, billing_email=user.email, seat_count=1, status='trialing',
+        )
+        send_signup_welcome_email(user.id, str(workspace.id), 'https://app.bratelus.com/verify-email/token/')
+        send_new_account_alert(user.id, str(workspace.id))
+        self.assertEqual(len(mail.outbox), 2)
+        self.assertEqual(mail.outbox[0].to, [user.email])
+        self.assertIn('verify your email', mail.outbox[0].subject.lower())
+        self.assertEqual(mail.outbox[1].to, ['support@bratelus.com'])
 
 
 class AccountTeamTests(TestCase):

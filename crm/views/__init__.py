@@ -1,6 +1,7 @@
 from django.shortcuts import render
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
+from django.db import models
 from django.shortcuts import redirect
 from fsm.models import Job
 from organizations.models import CustomField
@@ -11,6 +12,8 @@ from crm.models.contacts import Account, Contact, PaymentMethod, Property
 # Existing views
 from .dashboard import dashboard_view
 from .leads import leads_list_view
+from .archive import crm_archive_view
+from .address import postal_code_lookup_view
 
 # New views
 @login_required
@@ -27,10 +30,12 @@ def crm_accounts_view(request, section='accounts'):
         requested_section = 'accounts'
 
     if active_org:
-        accounts = Account.objects.filter(organization=active_org)
-        contacts = Contact.objects.filter(organization=active_org)
-        properties = Property.objects.filter(account__organization=active_org)
-        payment_methods = PaymentMethod.objects.filter(account__organization=active_org)
+        accounts = Account.objects.filter(organization=active_org, archived_at__isnull=True)
+        contacts = Contact.objects.filter(organization=active_org, archived_at__isnull=True).filter(
+            models.Q(account__isnull=True) | models.Q(account__archived_at__isnull=True)
+        )
+        properties = Property.objects.filter(account__organization=active_org, account__archived_at__isnull=True)
+        payment_methods = PaymentMethod.objects.filter(account__organization=active_org, account__archived_at__isnull=True)
         open_jobs = Job.objects.filter(organization=active_org).exclude(status__in=['completed', 'canceled'])
         custom_fields = CustomField.objects.filter(workspace=active_org).order_by('target_model', 'label')
     else:

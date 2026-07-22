@@ -3,6 +3,7 @@ import re
 from django.db import transaction
 from django.db.models import Q
 from django.utils.text import slugify
+from django.utils import timezone
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.pagination import PageNumberPagination
@@ -19,7 +20,7 @@ from .serializers import (
     WorkerSerializer,
 )
 from organizations.models import WorkerProfile, Workspace
-from organizations.permissions import user_can_manage_workspace
+from organizations.permissions import user_can_manage_workspace, user_can_purge_crm
 from crm.models.contacts import Account, Contact, PaymentMethod, Property
 from crm.services.contacts import duplicate_account_bundle, duplicate_contact
 from fsm.models import Job, JobAssignment
@@ -82,7 +83,7 @@ class AccountViewSet(BaseWorkspaceViewSet):
     def get_queryset(self):
         if not user_can_manage_workspace(self.request.user, getattr(self.request, 'active_organization', None)):
             return self.queryset.none()
-        return super().get_queryset().prefetch_related('contacts', 'properties')
+        return super().get_queryset().filter(archived_at__isnull=True).prefetch_related('contacts', 'properties')
 
     def perform_create(self, serializer):
         if not user_can_manage_workspace(self.request.user, self.request.active_organization):
@@ -90,6 +91,48 @@ class AccountViewSet(BaseWorkspaceViewSet):
 
         # Auto-attach the organization that the user currently has selected in the UI
         serializer.save(organization=self.request.active_organization)
+
+    def destroy(self, request, *args, **kwargs):
+        account = self.get_object()
+        account.archived_at = timezone.now()
+        account.archived_by = request.user
+        account.save(update_fields=['archived_at', 'archived_by'])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=['get'], url_path='archived')
+    def archived(self, request):
+        workspace = getattr(request, 'active_organization', None)
+        records = Account.objects.filter(organization=workspace, archived_at__isnull=False).select_related(
+            'archived_by',
+        ).prefetch_related('contacts', 'properties').order_by('-archived_at')
+        return Response(self.get_serializer(records, many=True).data)
+
+    def _archived_account(self, request, pk):
+        workspace = getattr(request, 'active_organization', None)
+        return Account.objects.filter(id=pk, organization=workspace, archived_at__isnull=False).first()
+
+    @action(detail=True, methods=['post'], url_path='restore')
+    def restore(self, request, pk=None):
+        account = self._archived_account(request, pk)
+        if not account:
+            return Response({'detail': 'Archived account not found.'}, status=status.HTTP_404_NOT_FOUND)
+        account.archived_at = None
+        account.archived_by = None
+        account.save(update_fields=['archived_at', 'archived_by'])
+        return Response(self.get_serializer(account).data)
+
+    @action(detail=True, methods=['delete'], url_path='purge')
+    def purge(self, request, pk=None):
+        workspace = getattr(request, 'active_organization', None)
+        if not user_can_purge_crm(request.user, workspace):
+            raise PermissionDenied('Only account owners and administrators can permanently delete CRM records.')
+        account = self._archived_account(request, pk)
+        if not account:
+            return Response({'detail': 'Archived account not found.'}, status=status.HTTP_404_NOT_FOUND)
+        if account.jobs.exists():
+            raise ValidationError({'detail': 'This account has job history and cannot be permanently deleted.'})
+        account.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     @action(detail=True, methods=['post'], url_path='duplicate-to-workspace')
     def duplicate_to_workspace(self, request, pk=None):
@@ -122,7 +165,8 @@ class ContactViewSet(BaseWorkspaceViewSet):
             return self.queryset.none()
             
         return (
-            Contact.objects.filter(organization=active_org)
+            Contact.objects.filter(organization=active_org, archived_at__isnull=True)
+            .filter(Q(account__isnull=True) | Q(account__archived_at__isnull=True))
             .filter(contact_search_query(self.request.query_params.get('search')))
             .select_related('account', 'organization')
             .order_by('last_name', 'first_name', 'id')
@@ -138,6 +182,49 @@ class ContactViewSet(BaseWorkspaceViewSet):
             raise ValidationError({'account': 'Account must belong to the active organization.'})
 
         serializer.save(organization=active_org)
+
+    def destroy(self, request, *args, **kwargs):
+        contact = self.get_object()
+        contact.archived_at = timezone.now()
+        contact.archived_by = request.user
+        contact.save(update_fields=['archived_at', 'archived_by'])
+        return Response(status=status.HTTP_204_NO_CONTENT)
+
+    @action(detail=False, methods=['get'], url_path='archived')
+    def archived(self, request):
+        workspace = getattr(request, 'active_organization', None)
+        records = Contact.objects.filter(
+            organization=workspace, archived_at__isnull=False,
+        ).select_related('account', 'organization', 'archived_by').order_by('-archived_at')
+        page = self.paginate_queryset(records)
+        if page is not None:
+            return self.get_paginated_response(self.get_serializer(page, many=True).data)
+        return Response(self.get_serializer(records, many=True).data)
+
+    def _archived_contact(self, request, pk):
+        workspace = getattr(request, 'active_organization', None)
+        return Contact.objects.filter(id=pk, organization=workspace, archived_at__isnull=False).first()
+
+    @action(detail=True, methods=['post'], url_path='restore')
+    def restore(self, request, pk=None):
+        contact = self._archived_contact(request, pk)
+        if not contact:
+            return Response({'detail': 'Archived contact not found.'}, status=status.HTTP_404_NOT_FOUND)
+        contact.archived_at = None
+        contact.archived_by = None
+        contact.save(update_fields=['archived_at', 'archived_by'])
+        return Response(self.get_serializer(contact).data)
+
+    @action(detail=True, methods=['delete'], url_path='purge')
+    def purge(self, request, pk=None):
+        workspace = getattr(request, 'active_organization', None)
+        if not user_can_purge_crm(request.user, workspace):
+            raise PermissionDenied('Only account owners and administrators can permanently delete CRM records.')
+        contact = self._archived_contact(request, pk)
+        if not contact:
+            return Response({'detail': 'Archived contact not found.'}, status=status.HTTP_404_NOT_FOUND)
+        contact.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
     def perform_update(self, serializer):
         active_org = getattr(self.request, 'active_organization', None)
@@ -195,7 +282,7 @@ class ContactViewSet(BaseWorkspaceViewSet):
         groups = {}
         blank = same_workspace = unknown = 0
         unknown_labels = set()
-        contacts = Contact.objects.filter(organization=source_workspace).select_related('organization')
+        contacts = Contact.objects.filter(organization=source_workspace, archived_at__isnull=True).select_related('organization')
         for contact in contacts.iterator(chunk_size=500):
             label = str(
                 ((contact.custom_data or {}).get('zoho_fields') or {}).get('Workspace') or ''
@@ -286,7 +373,7 @@ class ContactViewSet(BaseWorkspaceViewSet):
         if not user_can_manage_workspace(request.user, active_org):
             raise PermissionDenied('Only workspace admins can organize imported contacts.')
 
-        accountless = Contact.objects.filter(organization=active_org, account__isnull=True)
+        accountless = Contact.objects.filter(organization=active_org, account__isnull=True, archived_at__isnull=True)
         address_filter = (
             ~Q(mailing_street='') | ~Q(mailing_city='') | ~Q(mailing_state='') |
             ~Q(mailing_postal_code='') | ~Q(mailing_country='')
@@ -305,7 +392,7 @@ class ContactViewSet(BaseWorkspaceViewSet):
         with transaction.atomic():
             contacts = list(
                 Contact.objects.select_for_update()
-                .filter(organization=active_org, account__isnull=True)
+                .filter(organization=active_org, account__isnull=True, archived_at__isnull=True)
                 .order_by('id')
             )
             accounts = []
@@ -365,7 +452,9 @@ class ContactViewSet(BaseWorkspaceViewSet):
         if len(query) < 2:
             raise ValidationError({'search': 'Enter at least 2 characters for global search.'})
         queryset = (
-            Contact.objects.filter(contact_search_query(query))
+            Contact.objects.filter(archived_at__isnull=True)
+            .filter(Q(account__isnull=True) | Q(account__archived_at__isnull=True))
+            .filter(contact_search_query(query))
             .select_related('account', 'organization')
             .order_by('last_name', 'first_name', 'organization__name', 'id')
         )
@@ -384,7 +473,9 @@ class PropertyViewSet(BaseWorkspaceViewSet):
         if not active_org or not user_can_manage_workspace(self.request.user, active_org):
             return self.queryset.none()
 
-        return Property.objects.filter(account__organization=active_org).select_related('account')
+        return Property.objects.filter(
+            account__organization=active_org, account__archived_at__isnull=True,
+        ).select_related('account')
 
     def perform_create(self, serializer):
         active_org = getattr(self.request, 'active_organization', None)
@@ -408,7 +499,9 @@ class PaymentMethodViewSet(viewsets.ModelViewSet):
         if not active_org or not user_can_manage_workspace(self.request.user, active_org):
             return self.queryset.none()
 
-        return PaymentMethod.objects.filter(account__organization=active_org).select_related(
+        return PaymentMethod.objects.filter(
+            account__organization=active_org, account__archived_at__isnull=True,
+        ).select_related(
             'account',
             'assigned_property',
         )

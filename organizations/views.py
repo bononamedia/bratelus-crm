@@ -8,6 +8,9 @@ from django.core.exceptions import ValidationError
 from django.core.exceptions import PermissionDenied
 from django.db import models, transaction
 from django.shortcuts import redirect, render
+from django.urls import reverse
+from django.utils import timezone
+from django.core.signing import BadSignature, SignatureExpired
 from django.utils.text import slugify
 from fsm.models import JobAssignment
 
@@ -26,7 +29,10 @@ from .models import (
     WorkspaceEmailDomain,
     WorkspaceMember,
     Workspace,
+    UserEmailVerification,
 )
+from .emailing import email_verification_token, read_email_verification_token
+from .tasks import send_new_account_alert, send_signup_welcome_email
 from .permissions import (
     user_can_manage_people,
     user_can_manage_setup,
@@ -160,6 +166,7 @@ def signup_view(request):
             WorkspaceMember.objects.create(workspace=workspace, user=user, role='admin', is_active=True)
             worker = WorkerProfile.objects.create(user=user, is_admin=True)
             worker.workspaces.add(workspace)
+            UserEmailVerification.objects.create(user=user)
             from finance.models import SubscriptionPlan, WorkspaceSubscription
 
             plan = SubscriptionPlan.objects.filter(is_active=True).first()
@@ -171,10 +178,30 @@ def signup_view(request):
                     seat_count=1,
                     status='trialing',
                 )
+            token = email_verification_token(user)
+            verification_url = request.build_absolute_uri(reverse('verify_email', args=[token]))
+            transaction.on_commit(lambda: send_signup_welcome_email.delay(user.id, str(workspace.id), verification_url))
+            transaction.on_commit(lambda: send_new_account_alert.delay(user.id, str(workspace.id)))
             login(request, user)
             request.session['active_org_id'] = str(workspace.id)
             return redirect('billing_overview')
     return render(request, 'registration/signup.html')
+
+
+def verify_email_view(request, token):
+    try:
+        payload = read_email_verification_token(token, max_age=60 * 60 * 48)
+    except (BadSignature, SignatureExpired):
+        return render(request, 'registration/email_verification_result.html', {'verified': False}, status=400)
+    User = get_user_model()
+    user = User.objects.filter(id=payload.get('user_id'), email__iexact=payload.get('email', '')).first()
+    if not user:
+        return render(request, 'registration/email_verification_result.html', {'verified': False}, status=400)
+    verification, _ = UserEmailVerification.objects.get_or_create(user=user)
+    if not verification.verified_at:
+        verification.verified_at = timezone.now()
+        verification.save(update_fields=['verified_at'])
+    return render(request, 'registration/email_verification_result.html', {'verified': True})
 
 
 @login_required

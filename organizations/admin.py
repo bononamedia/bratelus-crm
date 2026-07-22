@@ -5,12 +5,19 @@ from .models import (
     FormLayout, DashboardWidget, Skill, WorkerSkill, ServiceZone,
     WorkspaceEmailDomain, WorkspaceEmailConnection,
     EmployeeDocument, EmployeeDocumentRequirement,
+    UserEmailVerification,
 )
 
 admin.site.site_header = 'Bratelus Superadmin'
 admin.site.site_title = 'Bratelus Admin'
 admin.site.index_title = 'Operations Control'
 admin.site.has_permission = lambda request: request.user.is_active and request.user.is_superuser
+
+
+@admin.register(UserEmailVerification)
+class UserEmailVerificationAdmin(admin.ModelAdmin):
+    list_display = ('user', 'sent_at', 'verified_at')
+    search_fields = ('user__email', 'user__username')
 
 
 class WorkspaceMemberInline(admin.TabularInline):

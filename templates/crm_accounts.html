@@ -9,6 +9,7 @@
             <p class="mt-1 text-sm text-gray-500">Accounts, contacts, properties, and the client data dispatch depends on.</p>
         </div>
         <div class="flex flex-col sm:flex-row gap-2">
+            <a href="{% url 'crm_archive' %}" class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50"><i data-lucide="archive" class="h-4 w-4"></i>Archive</a>
             {% if can_manage_active_org %}
             <a href="{% url 'admin_console' %}" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50">
                 Company Setup
@@ -259,6 +260,7 @@
                     <i data-lucide="copy-plus" class="h-4 w-4"></i>
                     <span id="detail-duplicate-label">Duplicate</span>
                 </button>
+                <button id="detail-archive-button" type="button" onclick="archiveCurrentRecord()" class="hidden inline-flex items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-50"><i data-lucide="archive" class="h-4 w-4"></i>Archive</button>
                 <button type="button" onclick="setDetailRelated('emails')" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-3 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Send Email</button>
                 <button type="button" onclick="setDetailRelated('twilio_sms')" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">SMS / Call</button>
                 <a href="{% url 'admin_console' %}#custom-fields" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Customize</a>
@@ -1027,6 +1029,7 @@
         document.getElementById('detail-avatar').innerText = recordInitial(type, record);
         document.getElementById('detail-type-badge').innerText = detailTypeMeta[type]?.badge || 'CRM';
         document.getElementById('detail-edit-button').classList.toggle('hidden', type !== 'contacts');
+        document.getElementById('detail-archive-button').classList.toggle('hidden', !['accounts', 'contacts'].includes(type));
         const duplicateButton = document.getElementById('detail-duplicate-button');
         const canDuplicate = ['accounts', 'contacts'].includes(type) && crmDuplicateWorkspaces.length > 0;
         duplicateButton.classList.toggle('hidden', !canDuplicate);
@@ -1047,6 +1050,15 @@
     function closeRecordDetail() {
         document.getElementById('detail-panel').classList.add('translate-x-full');
         document.getElementById('detail-overlay').classList.add('hidden');
+    }
+
+    async function archiveCurrentRecord() {
+        const type=crmState.detailType;const record=crmState.detailRecord;
+        if(!record||!['accounts','contacts'].includes(type))return;
+        if(!confirm(`Move ${recordName(type,record)} to the archive?`))return;
+        const response=await fetch(`/api/v1/${type}/${record.id}/`,{method:'DELETE',headers:{'X-CSRFToken':getCookie('csrftoken')}});
+        if(!response.ok)return alert('This record could not be archived.');
+        closeRecordDetail();await loadCrmData();
     }
 
     function accountOptions(allowNone = false) {
@@ -1086,6 +1098,25 @@
     function setFormValue(id, value) {
         const element = document.getElementById(id);
         if (element) element.value = value ?? '';
+    }
+
+    function bindPostalLookup(postalId, cityId, stateId, countryId) {
+        const postal=document.getElementById(postalId);
+        if(!postal)return;
+        postal.addEventListener('blur',async()=>{
+            const value=postal.value.trim();
+            if(!/^\d{5}(-\d{4})?$/.test(value))return;
+            try{
+                const response=await fetch(`/api/address/postal-code/?postal_code=${encodeURIComponent(value)}`);
+                if(!response.ok)return;
+                const match=await response.json();
+                postal.value=match.postal_code;
+                const city=document.getElementById(cityId);const state=document.getElementById(stateId);const country=document.getElementById(countryId);
+                if(city&&!city.value.trim())city.value=match.city;
+                if(state&&!state.value.trim())state.value=match.state;
+                if(country&&!country.value.trim())country.value=match.country;
+            }catch(error){console.debug('Postal lookup unavailable',error);}
+        });
     }
 
     function populateContactForm(contact) {
@@ -1129,11 +1160,12 @@
             fields.innerHTML = `
                 ${field('Account Name', 'record-name', 'required placeholder="Client or property name"')}
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Main Phone', 'record-phone', 'placeholder="(555) 000-0000"')}${field('Email', 'record-email', 'type="email"')}</div>
-                ${field('Website', 'record-website', 'type="url" placeholder="https://company.com"')}
+                ${field('Website', 'record-website', 'type="text" inputmode="url" placeholder="company.com or www.company.com"')}
                 <div class="border-t border-gray-200 pt-4"><h3 class="text-sm font-semibold text-gray-900">Billing address</h3></div>
                 ${field('Street', 'record-billing-street', 'placeholder="1170 N Federal Highway"')}
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('City', 'record-billing-city')}${field('State', 'record-billing-state')}</div>
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('ZIP / Postal code', 'record-billing-postal')}${field('Country', 'record-billing-country', 'value="United States"')}</div>`;
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('ZIP / Postal code', 'record-billing-postal', 'autocomplete="postal-code"')}${field('Country', 'record-billing-country', 'value="United States"')}</div>`;
+            bindPostalLookup('record-billing-postal','record-billing-city','record-billing-state','record-billing-country');
             return;
         }
 
@@ -1151,7 +1183,7 @@
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Phone', 'record-phone', 'placeholder="(555) 000-0000"')}${field('Mobile', 'record-mobile', 'placeholder="(555) 000-0000"')}</div>
                 ${field('Mailing Street', 'record-mailing-street')}
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Mailing City', 'record-mailing-city')}${field('Mailing State', 'record-mailing-state')}</div>
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Mailing ZIP', 'record-mailing-postal')}${field('Mailing Country', 'record-mailing-country')}</div>
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Mailing ZIP', 'record-mailing-postal', 'autocomplete="postal-code"')}${field('Mailing Country', 'record-mailing-country')}</div>
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Lead Source', 'record-lead-source')}${field('Status', 'record-status')}</div>
                 ${textareaField('Description / Notes', 'record-description')}
                 <div class="grid gap-2 sm:grid-cols-3">
@@ -1159,6 +1191,7 @@
                     <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700"><input id="record-email-opt-out" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">Email opt-out</label>
                     <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700"><input id="record-sms-opt-out" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">SMS opt-out</label>
                 </div>`;
+            bindPostalLookup('record-mailing-postal','record-mailing-city','record-mailing-state','record-mailing-country');
             if (editing) populateContactForm(editing);
             return;
         }

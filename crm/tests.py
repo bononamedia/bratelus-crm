@@ -1,10 +1,12 @@
 from django.contrib.auth.models import User
 from django.test import TestCase
 from django.urls import reverse
+from django.utils import timezone
 
 from crm.management.commands.import_zoho_contacts import fit_contact_field
 from crm.models.contacts import Account, Contact, PaymentMethod, Property
 from organizations.models import Workspace, WorkspaceMember
+from fsm.models import Job
 
 
 class AccountlessContactApiTests(TestCase):
@@ -364,3 +366,83 @@ class AccountlessContactApiTests(TestCase):
     def test_zoho_import_values_are_bounded_by_the_destination_field(self):
         self.assertEqual(len(fit_contact_field('phone', '1' * 80)), 50)
         self.assertEqual(fit_contact_field('description', 'Unbounded notes'), 'Unbounded notes')
+
+
+class CrmArchiveTests(TestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user('archive-admin@example.com', password='StrongPass123!')
+        self.manager = User.objects.create_user('archive-manager@example.com', password='StrongPass123!')
+        self.workspace = Workspace.objects.create(name='Archive Brand', slug='archive-brand', created_by=self.admin)
+        WorkspaceMember.objects.create(workspace=self.workspace, user=self.admin, role='admin')
+        WorkspaceMember.objects.create(workspace=self.workspace, user=self.manager, role='manager')
+        self.account = Account.objects.create(organization=self.workspace, name='Archive Me')
+        self.contact = Contact.objects.create(
+            organization=self.workspace, account=self.account, first_name='Casey', last_name='Customer',
+        )
+        self.property = Property.objects.create(account=self.account, name='Home', address='10 Main St')
+        self.client.force_login(self.admin)
+        session = self.client.session
+        session['active_org_id'] = str(self.workspace.id)
+        session.save()
+
+    def test_account_is_archived_restored_and_permanently_deleted(self):
+        response = self.client.delete(reverse('api-account-detail', args=[self.account.id]))
+        self.assertEqual(response.status_code, 204)
+        self.account.refresh_from_db()
+        self.assertIsNotNone(self.account.archived_at)
+        self.assertEqual(self.account.archived_by, self.admin)
+        self.assertEqual(self.client.get(reverse('api-account-list')).json(), [])
+        self.assertEqual(self.client.get(reverse('api-property-list')).json(), [])
+        self.assertEqual(self.client.get(reverse('api-contact-list')).json()['count'], 0)
+
+        archived = self.client.get(reverse('api-account-archived'))
+        self.assertEqual(archived.status_code, 200)
+        self.assertEqual(archived.json()[0]['id'], self.account.id)
+        restored = self.client.post(reverse('api-account-restore', args=[self.account.id]))
+        self.assertEqual(restored.status_code, 200)
+        self.assertEqual(self.client.get(reverse('api-contact-list')).json()['count'], 1)
+
+        self.client.delete(reverse('api-account-detail', args=[self.account.id]))
+        purged = self.client.delete(reverse('api-account-purge', args=[self.account.id]))
+        self.assertEqual(purged.status_code, 204)
+        self.assertFalse(Account.objects.filter(id=self.account.id).exists())
+
+    def test_manager_cannot_permanently_clean_archive(self):
+        self.account.archived_at = timezone.now()
+        self.account.save(update_fields=['archived_at'])
+        self.client.force_login(self.manager)
+        session = self.client.session
+        session['active_org_id'] = str(self.workspace.id)
+        session.save()
+        response = self.client.delete(reverse('api-account-purge', args=[self.account.id]))
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Account.objects.filter(id=self.account.id).exists())
+
+    def test_account_with_job_history_cannot_be_purged(self):
+        Job.objects.create(organization=self.workspace, account=self.account, property=self.property, title='Historic job')
+        self.account.archived_at = timezone.now()
+        self.account.save(update_fields=['archived_at'])
+        response = self.client.delete(reverse('api-account-purge', args=[self.account.id]))
+        self.assertEqual(response.status_code, 400)
+        self.assertTrue(Account.objects.filter(id=self.account.id).exists())
+
+    def test_contact_archive_is_used_by_contacts_and_leads(self):
+        response = self.client.delete(reverse('api-contact-detail', args=[self.contact.id]))
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(self.client.get(reverse('api-contact-list')).json()['count'], 0)
+        archived = self.client.get(reverse('api-contact-archived'), {'page_size': 'all'}).json()
+        self.assertEqual(archived['results'][0]['id'], self.contact.id)
+        self.client.post(reverse('api-contact-restore', args=[self.contact.id]))
+        self.contact.refresh_from_db()
+        self.assertIsNone(self.contact.archived_at)
+
+    def test_website_is_normalized_and_zip_fills_city_state(self):
+        response = self.client.post(reverse('api-account-list'), {
+            'name': 'Easy Entry', 'website': 'www.Example.COM/',
+        }, content_type='application/json')
+        self.assertEqual(response.status_code, 201, response.content)
+        self.assertEqual(response.json()['website'], 'https://example.com')
+        lookup = self.client.get(reverse('postal_code_lookup'), {'postal_code': '33301'})
+        self.assertEqual(lookup.status_code, 200)
+        self.assertEqual(lookup.json()['state'], 'FL')
+        self.assertTrue(lookup.json()['city'])
