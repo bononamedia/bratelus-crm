@@ -205,6 +205,7 @@ EMAIL_HOST_USER = os.environ.get('EMAIL_HOST_USER', '')
 EMAIL_HOST_PASSWORD = os.environ.get('EMAIL_HOST_PASSWORD', '')
 EMAIL_USE_TLS = os.environ.get('EMAIL_USE_TLS', 'true').lower() in ('1', 'true', 'yes')
 EMAIL_TIMEOUT = 15
+EMAIL_USE_SSL = os.environ.get('EMAIL_USE_SSL', 'false').lower() in ('1', 'true', 'yes')
 EMAIL_BACKEND = os.environ.get(
     'EMAIL_BACKEND',
     'django.core.mail.backends.smtp.EmailBackend' if EMAIL_HOST else 'django.core.mail.backends.console.EmailBackend',
@@ -212,3 +213,4 @@ EMAIL_BACKEND = os.environ.get(
 DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Bratelus <support@bratelus.com>')
 SUPPORT_EMAIL = os.environ.get('SUPPORT_EMAIL', 'support@bratelus.com')
 APP_BASE_URL = os.environ.get('APP_BASE_URL', 'https://app.bratelus.com')
+EMAIL_CREDENTIAL_ENCRYPTION_KEY = os.environ.get('EMAIL_CREDENTIAL_ENCRYPTION_KEY', '')

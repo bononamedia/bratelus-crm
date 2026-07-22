@@ -1,4 +1,6 @@
-from django.contrib import admin
+from django import forms
+from django.contrib import admin, messages
+from django.core.mail import EmailMultiAlternatives
 from .models import (
     CustomerAccount, CustomerAccountMember,
     Workspace, WorkspaceMember, WorkerProfile, CustomField, 
@@ -6,7 +8,9 @@ from .models import (
     WorkspaceEmailDomain, WorkspaceEmailConnection,
     EmployeeDocument, EmployeeDocumentRequirement,
     UserEmailVerification,
+    PlatformEmailSettings,
 )
+from .emailing import platform_email_delivery
 
 admin.site.site_header = 'Bratelus Superadmin'
 admin.site.site_title = 'Bratelus Admin'
@@ -18,6 +22,82 @@ admin.site.has_permission = lambda request: request.user.is_active and request.u
 class UserEmailVerificationAdmin(admin.ModelAdmin):
     list_display = ('user', 'sent_at', 'verified_at')
     search_fields = ('user__email', 'user__username')
+
+
+class PlatformEmailSettingsForm(forms.ModelForm):
+    smtp_password = forms.CharField(
+        label='SMTP password',
+        required=False,
+        widget=forms.PasswordInput(render_value=False),
+        help_text='Enter a new password to replace the saved credential. Leave blank to keep it unchanged.',
+    )
+
+    class Meta:
+        model = PlatformEmailSettings
+        exclude = ('smtp_password_encrypted',)
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get('is_active') and not cleaned.get('smtp_password') and not self.instance.password_configured:
+            self.add_error('smtp_password', 'A password is required while platform email is active.')
+        return cleaned
+
+    def save(self, commit=True):
+        instance = super().save(commit=False)
+        password = self.cleaned_data.get('smtp_password')
+        if password:
+            instance.set_smtp_password(password)
+        if commit:
+            instance.save()
+        return instance
+
+
+@admin.register(PlatformEmailSettings)
+class PlatformEmailSettingsAdmin(admin.ModelAdmin):
+    form = PlatformEmailSettingsForm
+    list_display = ('from_email', 'smtp_host', 'smtp_port', 'is_active', 'password_configured', 'updated_at')
+    readonly_fields = ('password_configured', 'updated_at')
+    actions = ('send_test_email',)
+    fieldsets = (
+        ('Sender', {'fields': ('display_name', 'from_email', 'support_email', 'is_active')}),
+        ('SMTP server', {'fields': ('smtp_host', 'smtp_port', 'smtp_username', 'smtp_password', 'password_configured')}),
+        ('Security', {'fields': ('use_tls', 'use_ssl')}),
+        ('Status', {'fields': ('updated_at',)}),
+    )
+
+    def has_add_permission(self, request):
+        return not PlatformEmailSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+    @admin.action(description='Send a test message to the support address')
+    def send_test_email(self, request, queryset):
+        config = queryset.first()
+        if not config:
+            self.message_user(request, 'Select the platform email settings record.', level=messages.ERROR)
+            return
+        if not config.is_active:
+            self.message_user(request, 'Activate platform email before sending a test.', level=messages.ERROR)
+            return
+        try:
+            connection, from_email, support_email = platform_email_delivery()
+            message = EmailMultiAlternatives(
+                'Bratelus platform email test',
+                'Your Bratelus platform SMTP configuration is working.',
+                from_email,
+                [support_email],
+                connection=connection,
+            )
+            message.attach_alternative(
+                '<div style="font-family:Arial,sans-serif;padding:24px"><h1 style="color:#1d4ed8">Bratelus email is ready.</h1><p>Your platform SMTP configuration is working.</p></div>',
+                'text/html',
+            )
+            message.send(fail_silently=False)
+        except Exception as exc:
+            self.message_user(request, f'Test email failed: {exc}', level=messages.ERROR)
+            return
+        self.message_user(request, f'Test email sent to {support_email}.', level=messages.SUCCESS)
 
 
 class WorkspaceMemberInline(admin.TabularInline):

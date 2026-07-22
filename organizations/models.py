@@ -122,6 +122,55 @@ class UserEmailVerification(models.Model):
         return self.verified_at is not None
 
 
+class PlatformEmailSettings(models.Model):
+    """Singleton SMTP configuration for Bratelus-owned transactional email."""
+
+    display_name = models.CharField(max_length=120, default='Bratelus Support')
+    from_email = models.EmailField(default='support@bratelus.com')
+    support_email = models.EmailField(default='support@bratelus.com')
+    smtp_host = models.CharField(max_length=255)
+    smtp_port = models.PositiveIntegerField(default=587)
+    smtp_username = models.CharField(max_length=255)
+    smtp_password_encrypted = models.TextField(blank=True, editable=False)
+    use_tls = models.BooleanField(default=True)
+    use_ssl = models.BooleanField(default=False)
+    is_active = models.BooleanField(default=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'workspaces_platformemailsettings'
+        verbose_name = 'Platform email settings'
+        verbose_name_plural = 'Platform email settings'
+
+    def clean(self):
+        from django.core.exceptions import ValidationError
+
+        super().clean()
+        if self.use_tls and self.use_ssl:
+            raise ValidationError('Choose TLS or SSL, not both.')
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    def set_smtp_password(self, password):
+        from .secrets import encrypt_secret
+
+        self.smtp_password_encrypted = encrypt_secret(password) if password else ''
+
+    def get_smtp_password(self):
+        from .secrets import decrypt_secret
+
+        return decrypt_secret(self.smtp_password_encrypted) if self.smtp_password_encrypted else ''
+
+    @property
+    def password_configured(self):
+        return bool(self.smtp_password_encrypted)
+
+    def __str__(self):
+        return f'{self.display_name} <{self.from_email}>'
+
+
 # ---------------------------------------------------------
 # WORKSPACE CHANNELS (EMAIL / DOMAIN SETUP)
 # ---------------------------------------------------------

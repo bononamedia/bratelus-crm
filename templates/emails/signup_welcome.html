@@ -1,1 +1,50 @@
-<!doctype html><html><body style="margin:0;background:#f4f7fb;font-family:Arial,sans-serif;color:#172033"><div style="max-width:620px;margin:0 auto;padding:32px 16px"><div style="background:#071126;padding:22px 26px;color:white"><strong style="font-size:24px">Bratelus<span style="color:#38bdf8">.</span></strong></div><div style="background:white;border:1px solid #dfe5ee;padding:30px 26px"><p style="margin:0;color:#2563eb;font-size:12px;font-weight:bold;text-transform:uppercase">Workspace ready</p><h1 style="margin:8px 0 12px;font-size:26px">Welcome, {{ user.first_name|default:user.username }}.</h1><p style="line-height:1.6;color:#526078">Your <strong>{{ workspace.name }}</strong> workspace is ready and your trial is active.</p><a href="{{ verification_url }}" style="display:inline-block;margin:12px 0 20px;background:#2563eb;color:white;text-decoration:none;padding:12px 18px;border-radius:6px;font-weight:bold">Verify email address</a><div style="border-top:1px solid #e5e7eb;padding-top:18px"><h2 style="font-size:16px">Pricing reminder</h2><p style="line-height:1.6;color:#526078">Full CRM and field operations starts at <strong>${{ base_price }}/month</strong> with the first user included. Additional users follow the graduated pricing shown in Billing.</p><a href="{{ billing_url }}" style="color:#2563eb;font-weight:bold">Review billing and trial information</a></div></div><p style="padding:16px 4px;color:#7b8798;font-size:12px">Bratelus Support · support@bratelus.com</p></div></body></html>
+<!doctype html>
+<html lang="en">
+<body style="margin:0;background:#eef2f7;font-family:Arial,Helvetica,sans-serif;color:#172033">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef2f7;padding:28px 12px">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border:1px solid #dce3ec">
+        <tr>
+          <td style="background:#071126;padding:24px 30px">
+            <span style="font-size:26px;font-weight:700;color:#ffffff">Bratelus<span style="color:#38bdf8">.</span></span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:34px 30px 12px">
+            <p style="margin:0 0 9px;color:#2563eb;font-size:12px;font-weight:700;text-transform:uppercase">Your workspace is ready</p>
+            <h1 style="margin:0 0 14px;font-size:28px;line-height:1.2;color:#0f172a">Welcome to Bratelus, {{ user.first_name|default:user.username }}.</h1>
+            <p style="margin:0;color:#526078;font-size:16px;line-height:1.65">Your <strong style="color:#172033">{{ workspace.name }}</strong> workspace is active. Verify your email to protect your account and complete setup.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:18px 30px 30px">
+            <a href="{{ verification_url }}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:13px 20px;border-radius:6px;font-size:15px;font-weight:700">Verify email address</a>
+            <p style="margin:13px 0 0;color:#7b8798;font-size:12px;line-height:1.5">This secure link expires in 48 hours.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 30px 30px">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f7f9fc;border:1px solid #e1e7ef">
+              <tr><td style="padding:22px 22px 10px"><h2 style="margin:0;font-size:18px;color:#172033">Your trial at a glance</h2></td></tr>
+              <tr>
+                <td style="padding:0 22px 22px;color:#526078;font-size:14px;line-height:1.65">
+                  <p style="margin:8px 0"><strong style="color:#172033">Full CRM included:</strong> accounts, contacts, properties, dispatch, workforce, finance, and reporting.</p>
+                  <p style="margin:8px 0"><strong style="color:#172033">Base subscription:</strong> ${{ base_price }}/month with the first user included.</p>
+                  <p style="margin:8px 0"><strong style="color:#172033">Additional users:</strong> graduated pricing is calculated automatically as your team grows.</p>
+                  <p style="margin:16px 0 0"><a href="{{ billing_url }}" style="color:#2563eb;font-weight:700;text-decoration:none">Review subscription and billing details &rarr;</a></p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="border-top:1px solid #e5eaf1;padding:22px 30px;color:#7b8798;font-size:12px;line-height:1.6">
+            Need help? Reply to this email or contact <a href="mailto:support@bratelus.com" style="color:#2563eb">support@bratelus.com</a>.<br>
+            Bratelus CRM and Field Operations
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

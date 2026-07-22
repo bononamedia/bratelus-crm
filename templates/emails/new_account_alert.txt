@@ -5,3 +5,8 @@ Workspace: {{ workspace.name }}
 Owner: {{ user.get_full_name|default:user.username }}
 Email: {{ user.email }}
 Workspace ID: {{ workspace.id }}
+
+Plan: {% if subscription %}{{ subscription.plan.name }} - {{ subscription.get_status_display }}{% else %}Not assigned{% endif %}
+
+Review in Bratelus Superadmin:
+{{ admin_url }}

@@ -18,8 +18,9 @@ from organizations.models import (
     Workspace,
     WorkspaceMember,
     UserEmailVerification,
+    PlatformEmailSettings,
 )
-from organizations.emailing import email_verification_token
+from organizations.emailing import email_verification_token, platform_email_delivery
 from organizations.tasks import send_new_account_alert, send_signup_welcome_email
 from organizations.permissions import (
     user_can_export_data,
@@ -85,6 +86,44 @@ class WorkspaceOnboardingTests(TestCase):
         self.assertEqual(mail.outbox[0].to, [user.email])
         self.assertIn('verify your email', mail.outbox[0].subject.lower())
         self.assertEqual(mail.outbox[1].to, ['support@bratelus.com'])
+
+
+class PlatformEmailSettingsTests(TestCase):
+    def test_smtp_password_is_encrypted_and_can_be_replaced(self):
+        config = PlatformEmailSettings(
+            smtp_host='mail.example.com',
+            smtp_username='support@example.com',
+        )
+        config.set_smtp_password('first-secret')
+        config.save()
+        self.assertNotIn('first-secret', config.smtp_password_encrypted)
+        self.assertEqual(config.get_smtp_password(), 'first-secret')
+
+        config.set_smtp_password('replacement-secret')
+        config.save()
+        self.assertEqual(config.get_smtp_password(), 'replacement-secret')
+
+    def test_active_database_configuration_overrides_environment_mailer(self):
+        config = PlatformEmailSettings(
+            display_name='Bratelus Mail',
+            from_email='platform@example.com',
+            support_email='alerts@example.com',
+            smtp_host='mail.example.com',
+            smtp_port=465,
+            smtp_username='platform@example.com',
+            use_tls=False,
+            use_ssl=True,
+        )
+        config.set_smtp_password('mail-secret')
+        config.save()
+
+        connection, from_email, support_email = platform_email_delivery()
+        self.assertEqual(connection.host, 'mail.example.com')
+        self.assertEqual(connection.port, 465)
+        self.assertEqual(connection.username, 'platform@example.com')
+        self.assertTrue(connection.use_ssl)
+        self.assertEqual(from_email, 'Bratelus Mail <platform@example.com>')
+        self.assertEqual(support_email, 'alerts@example.com')
 
 
 class AccountTeamTests(TestCase):

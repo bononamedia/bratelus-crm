@@ -1,1 +1,42 @@
-<!doctype html><html><body style="font-family:Arial,sans-serif;color:#172033"><h1 style="font-size:22px">New Bratelus account</h1><table cellpadding="8" cellspacing="0" style="border-collapse:collapse"><tr><td><strong>Company</strong></td><td>{{ workspace.customer_account.name }}</td></tr><tr><td><strong>Workspace</strong></td><td>{{ workspace.name }}</td></tr><tr><td><strong>Owner</strong></td><td>{{ user.get_full_name|default:user.username }}</td></tr><tr><td><strong>Email</strong></td><td>{{ user.email }}</td></tr><tr><td><strong>Workspace ID</strong></td><td>{{ workspace.id }}</td></tr></table></body></html>
+<!doctype html>
+<html lang="en">
+<body style="margin:0;background:#eef2f7;font-family:Arial,Helvetica,sans-serif;color:#172033">
+  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#eef2f7;padding:28px 12px">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width:640px;background:#ffffff;border:1px solid #dce3ec">
+        <tr>
+          <td style="background:#071126;padding:22px 28px">
+            <span style="font-size:24px;font-weight:700;color:#ffffff">Bratelus<span style="color:#38bdf8">.</span></span>
+            <span style="float:right;color:#9fb0c8;font-size:12px;padding-top:7px">PLATFORM NOTICE</span>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:32px 28px 18px">
+            <p style="margin:0 0 8px;color:#16a36a;font-size:12px;font-weight:700;text-transform:uppercase">New trial account</p>
+            <h1 style="margin:0 0 10px;font-size:26px;line-height:1.25;color:#0f172a">{{ workspace.customer_account.name }} joined Bratelus</h1>
+            <p style="margin:0;color:#526078;font-size:15px;line-height:1.6">A new owner completed registration and their workspace is ready for onboarding.</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 28px 28px">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="border:1px solid #e1e7ef;border-collapse:collapse">
+              <tr><td style="padding:12px 14px;background:#f7f9fc;color:#68758a;font-size:12px;font-weight:700;width:34%">COMPANY</td><td style="padding:12px 14px;font-size:14px;font-weight:700">{{ workspace.customer_account.name }}</td></tr>
+              <tr><td style="padding:12px 14px;background:#f7f9fc;color:#68758a;font-size:12px;font-weight:700;border-top:1px solid #e1e7ef">WORKSPACE</td><td style="padding:12px 14px;font-size:14px;border-top:1px solid #e1e7ef">{{ workspace.name }}</td></tr>
+              <tr><td style="padding:12px 14px;background:#f7f9fc;color:#68758a;font-size:12px;font-weight:700;border-top:1px solid #e1e7ef">OWNER</td><td style="padding:12px 14px;font-size:14px;border-top:1px solid #e1e7ef">{{ user.get_full_name|default:user.username }}</td></tr>
+              <tr><td style="padding:12px 14px;background:#f7f9fc;color:#68758a;font-size:12px;font-weight:700;border-top:1px solid #e1e7ef">EMAIL</td><td style="padding:12px 14px;font-size:14px;border-top:1px solid #e1e7ef"><a href="mailto:{{ user.email }}" style="color:#2563eb">{{ user.email }}</a></td></tr>
+              <tr><td style="padding:12px 14px;background:#f7f9fc;color:#68758a;font-size:12px;font-weight:700;border-top:1px solid #e1e7ef">PLAN</td><td style="padding:12px 14px;font-size:14px;border-top:1px solid #e1e7ef">{% if subscription %}{{ subscription.plan.name }} - {{ subscription.get_status_display }}{% else %}Not assigned{% endif %}</td></tr>
+              <tr><td style="padding:12px 14px;background:#f7f9fc;color:#68758a;font-size:12px;font-weight:700;border-top:1px solid #e1e7ef">WORKSPACE ID</td><td style="padding:12px 14px;font-size:12px;border-top:1px solid #e1e7ef;color:#68758a">{{ workspace.id }}</td></tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:0 28px 32px">
+            <a href="{{ admin_url }}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:12px 18px;border-radius:6px;font-size:14px;font-weight:700">Review account in Superadmin</a>
+          </td>
+        </tr>
+        <tr><td style="border-top:1px solid #e5eaf1;padding:18px 28px;color:#7b8798;font-size:12px">Automated Bratelus platform notification</td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>
