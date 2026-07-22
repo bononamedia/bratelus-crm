@@ -3,6 +3,7 @@ from email.utils import formataddr
 from django.conf import settings
 from django.core import signing
 from django.core.mail import get_connection
+from django.core.exceptions import ImproperlyConfigured
 
 
 EMAIL_VERIFICATION_SALT = 'bratelus-email-verification-v1'
@@ -24,9 +25,11 @@ def platform_email_delivery():
     """Return the active Bratelus SMTP connection and sender addresses."""
     from .models import PlatformEmailSettings
 
-    config = PlatformEmailSettings.objects.filter(is_active=True).first()
+    config = PlatformEmailSettings.objects.first()
     if not config:
         return get_connection(), settings.DEFAULT_FROM_EMAIL, settings.SUPPORT_EMAIL
+    if not config.is_active:
+        raise ImproperlyConfigured('Platform transactional email is disabled in Superadmin.')
 
     connection = get_connection(
         backend='django.core.mail.backends.smtp.EmailBackend',

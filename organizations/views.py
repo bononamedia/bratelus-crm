@@ -1,7 +1,7 @@
 import json
 
 from django.contrib import messages
-from django.contrib.auth import get_user_model, login
+from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError
@@ -12,6 +12,7 @@ from django.urls import reverse
 from django.utils import timezone
 from django.core.signing import BadSignature, SignatureExpired
 from django.utils.text import slugify
+from django.core.cache import cache
 from fsm.models import JobAssignment
 
 from .models import (
@@ -148,6 +149,7 @@ def signup_view(request):
                 password=password,
                 first_name=first_name,
                 last_name=last_name,
+                is_active=False,
             )
             customer_account = CustomerAccount.objects.create(name=company_name, owner=user)
             CustomerAccountMember.objects.create(
@@ -182,10 +184,34 @@ def signup_view(request):
             verification_url = request.build_absolute_uri(reverse('verify_email', args=[token]))
             transaction.on_commit(lambda: send_signup_welcome_email.delay(user.id, str(workspace.id), verification_url))
             transaction.on_commit(lambda: send_new_account_alert.delay(user.id, str(workspace.id)))
-            login(request, user)
-            request.session['active_org_id'] = str(workspace.id)
-            return redirect('billing_overview')
+            request.session['pending_verification_email'] = email
+            return redirect('email_verification_pending')
     return render(request, 'registration/signup.html')
+
+
+def email_verification_pending_view(request):
+    email = request.session.get('pending_verification_email', '')
+    if request.method == 'POST':
+        email = request.POST.get('email', email).strip().lower()
+        if email:
+            request.session['pending_verification_email'] = email
+        User = get_user_model()
+        user = User.objects.filter(email__iexact=email).first()
+        verification = UserEmailVerification.objects.filter(user=user, verified_at__isnull=True).first()
+        if verification:
+            throttle_key = f'email-verification-resend:{user.id}'
+            if cache.add(throttle_key, True, timeout=60):
+                workspace = Workspace.objects.filter(created_by=user).order_by('created_at').first()
+                if workspace:
+                    token = email_verification_token(user)
+                    verification_url = request.build_absolute_uri(reverse('verify_email', args=[token]))
+                    send_signup_welcome_email.delay(user.id, str(workspace.id), verification_url)
+            else:
+                messages.info(request, 'A verification email was requested recently. Please wait one minute before trying again.')
+                return redirect('email_verification_pending')
+        messages.success(request, 'If that address has a pending account, a new verification email has been requested.')
+        return redirect('email_verification_pending')
+    return render(request, 'registration/email_verification_pending.html', {'email': email})
 
 
 def verify_email_view(request, token):
@@ -201,6 +227,10 @@ def verify_email_view(request, token):
     if not verification.verified_at:
         verification.verified_at = timezone.now()
         verification.save(update_fields=['verified_at'])
+    if not user.is_active:
+        user.is_active = True
+        user.save(update_fields=['is_active'])
+    request.session.pop('pending_verification_email', None)
     return render(request, 'registration/email_verification_result.html', {'verified': True})
 
 

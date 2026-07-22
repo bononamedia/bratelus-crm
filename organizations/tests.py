@@ -4,6 +4,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from django.test import TestCase, override_settings
 from django.core import mail
 from django.urls import reverse
+from django.utils import timezone
 
 from finance.models import SeatPricingTier, SubscriptionPlan, WorkspaceSubscription
 from crm.models.contacts import Account
@@ -45,8 +46,10 @@ class WorkspaceOnboardingTests(TestCase):
             'email': 'owner@example.com',
             'password': 'VeryStrongPass123!',
         })
-        self.assertRedirects(response, reverse('billing_overview'))
+        self.assertRedirects(response, reverse('email_verification_pending'))
         user = User.objects.get(email='owner@example.com')
+        self.assertFalse(user.is_active)
+        self.assertNotIn('_auth_user_id', self.client.session)
         workspace = Workspace.objects.get(created_by=user)
         self.assertIsNotNone(workspace.customer_account)
         self.assertTrue(CustomerAccountMember.objects.filter(account=workspace.customer_account, user=user, role='owner').exists())
@@ -55,11 +58,40 @@ class WorkspaceOnboardingTests(TestCase):
         self.assertTrue(UserEmailVerification.objects.filter(user=user, verified_at__isnull=True).exists())
 
     def test_email_verification_link_marks_owner_verified(self):
-        user = User.objects.create_user('verify@example.com', email='verify@example.com', password='StrongPass123!')
+        user = User.objects.create_user(
+            'verify@example.com', email='verify@example.com', password='StrongPass123!', is_active=False,
+        )
         UserEmailVerification.objects.create(user=user)
         response = self.client.get(reverse('verify_email', args=[email_verification_token(user)]))
         self.assertEqual(response.status_code, 200)
+        user.refresh_from_db()
+        self.assertTrue(user.is_active)
         self.assertIsNotNone(UserEmailVerification.objects.get(user=user).verified_at)
+
+    def test_unverified_active_session_is_removed_before_workspace_access(self):
+        user = User.objects.create_user(
+            'legacy-unverified@example.com', email='legacy-unverified@example.com', password='StrongPass123!',
+        )
+        UserEmailVerification.objects.create(user=user)
+        self.client.force_login(user)
+        response = self.client.get(reverse('dashboard'))
+        self.assertRedirects(response, reverse('email_verification_pending'))
+        self.assertNotIn('_auth_user_id', self.client.session)
+
+    def test_verified_session_can_access_workspace(self):
+        user = User.objects.create_user(
+            'verified@example.com', email='verified@example.com', password='StrongPass123!',
+        )
+        UserEmailVerification.objects.create(user=user, verified_at=timezone.now())
+        account = CustomerAccount.objects.create(name='Verified Company', owner=user)
+        CustomerAccountMember.objects.create(account=account, user=user, role='owner')
+        workspace = Workspace.objects.create(
+            name='Verified Company', slug='verified-company', customer_account=account, created_by=user,
+        )
+        WorkspaceMember.objects.create(workspace=workspace, user=user, role='admin')
+        self.client.force_login(user)
+        response = self.client.get(reverse('dashboard'))
+        self.assertEqual(response.status_code, 200)
 
     @override_settings(
         EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',

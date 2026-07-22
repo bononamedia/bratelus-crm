@@ -1,7 +1,35 @@
 from django.db.models import Q
+from django.contrib.auth import logout
 from django.shortcuts import redirect
 
-from organizations.models import CustomerAccountMember, EmployeeDocument, WorkerProfile, Workspace
+from organizations.models import CustomerAccountMember, EmployeeDocument, UserEmailVerification, WorkerProfile, Workspace
+
+
+class EmailVerificationMiddleware:
+    """Prevent an authenticated session from bypassing owner email verification."""
+
+    allowed_paths = (
+        '/accounts/login/',
+        '/accounts/logout/',
+        '/signup/',
+        '/verification-pending/',
+        '/verify-email/',
+        '/static/',
+        '/media/',
+    )
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if request.user.is_authenticated and not request.user.is_superuser:
+            verification = UserEmailVerification.objects.filter(user=request.user).first()
+            if verification and not verification.is_verified and not request.path.startswith(self.allowed_paths):
+                email = request.user.email
+                logout(request)
+                request.session['pending_verification_email'] = email
+                return redirect('email_verification_pending')
+        return self.get_response(request)
 
 class ActiveOrganizationMiddleware:
     def __init__(self, get_response):

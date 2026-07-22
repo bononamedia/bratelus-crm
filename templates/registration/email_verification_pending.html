@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Verify Your Email - Bratelus</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-950">
+    <main class="mx-auto flex min-h-screen max-w-xl items-center px-5 py-10">
+        <section class="w-full overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+            <div class="bg-slate-950 px-7 py-6 text-white">
+                <p class="text-2xl font-semibold">Bratelus<span class="text-sky-400">.</span></p>
+            </div>
+            <div class="px-7 py-8 sm:px-9">
+                <div class="mb-6 flex h-12 w-12 items-center justify-center rounded-md bg-blue-50 text-blue-700">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" class="h-6 w-6" aria-hidden="true"><path d="M4 4h16v16H4z"/><path d="m4 6 8 6 8-6"/></svg>
+                </div>
+                <p class="mb-2 text-xs font-semibold uppercase text-blue-600">Account activation required</p>
+                <h1 class="text-2xl font-semibold">Check your email</h1>
+                {% if email %}
+                <p class="mt-3 leading-7 text-slate-600">We sent an activation link to <strong class="text-slate-900">{{ email }}</strong>. You must verify that address before entering your workspace.</p>
+                {% else %}
+                <p class="mt-3 leading-7 text-slate-600">Use the activation link sent during registration before signing in.</p>
+                {% endif %}
+
+                {% if messages %}
+                <div class="mt-5 space-y-2">
+                    {% for message in messages %}<p class="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-800">{{ message }}</p>{% endfor %}
+                </div>
+                {% endif %}
+
+                <form method="post" class="mt-7">{% csrf_token %}
+                    <label for="verification-email" class="mb-2 block text-sm font-medium text-slate-700">Email address</label>
+                    <input id="verification-email" type="email" name="email" value="{{ email }}" required autocomplete="email" class="w-full rounded-md border border-slate-300 px-4 py-3 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                    <button class="mt-3 w-full rounded-md bg-blue-600 px-5 py-3 text-sm font-semibold text-white hover:bg-blue-700">Resend verification email</button>
+                </form>
+                <div class="mt-3 flex flex-col gap-3 sm:flex-row">
+                    <a href="{% url 'login' %}" class="rounded-md border border-slate-300 px-5 py-3 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50">Return to sign in</a>
+                </div>
+                <p class="mt-6 text-sm text-slate-500">The verification link expires after 48 hours. Check your spam folder or contact support@bratelus.com.</p>
+            </div>
+        </section>
+    </main>
+</body>
+</html>

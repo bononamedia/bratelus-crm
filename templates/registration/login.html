@@ -47,6 +47,8 @@
             <input type="hidden" name="next" value="{{ next }}">
         </form>
 
+        <p class="mt-4 text-center text-sm text-gray-500">Waiting for account activation? <a href="{% url 'email_verification_pending' %}" class="font-semibold text-blue-600 hover:text-blue-700">Resend verification email</a></p>
+
         <div class="my-6 flex items-center gap-3"><span class="h-px flex-1 bg-gray-200"></span><span class="text-xs font-medium uppercase text-gray-400">Field team</span><span class="h-px flex-1 bg-gray-200"></span></div>
         <button type="button" onclick="signInWithPasskey()" class="flex w-full items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2.5 text-sm font-semibold text-gray-800 hover:bg-gray-50">
             <svg class="h-5 w-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 11a3 3 0 100-6 3 3 0 000 6zm0 0v10m-4-4h8M5 11a7 7 0 1114 0"/></svg>

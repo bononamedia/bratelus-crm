@@ -46,7 +46,7 @@ from core.views import home_view, reports_view
 from finance.views import finance_overview_view
 from finance.billing_views import billing_overview_view, create_billing_portal_view, create_checkout_session_view, stripe_webhook_view
 from organizations.models import Workspace
-from organizations.views import admin_console_view, create_workspace_view, employee_profile_view, signup_view, verify_email_view
+from organizations.views import admin_console_view, create_workspace_view, employee_profile_view, signup_view, verify_email_view, email_verification_pending_view
 from organizations.passkeys import (
     passkey_authentication_options, passkey_authentication_verify,
     passkey_registration_options, passkey_registration_verify,
@@ -106,6 +106,7 @@ urlpatterns = [
     # --- SYSTEM ---
     path('admin/', admin.site.urls),
     path('signup/', signup_view, name='signup'),
+    path('verification-pending/', email_verification_pending_view, name='email_verification_pending'),
     path('verify-email/<str:token>/', verify_email_view, name='verify_email'),
     path('api/switch-org/', switch_organization_view, name='switch_org'),
     
