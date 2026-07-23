@@ -5,11 +5,11 @@ from django.test import TestCase, TransactionTestCase, override_settings
 from django.urls import reverse
 from unittest.mock import patch
 
-from crm.models.contacts import Account
+from crm.models.contacts import Account, Contact
 from fsm.models import Job
 from organizations.models import CustomerAccount, CustomerAccountMember, Workspace, WorkspaceMember
 
-from .models import ChatConversation, ChatMessage, ChatParticipant, WebPushSubscription
+from .models import ChatConversation, ChatMessage, ChatParticipant, WebsiteChatWidget, WebPushSubscription
 from .consumers import ChatConsumer
 from .tasks import send_chat_push
 
@@ -160,6 +160,69 @@ class InternalChatTests(TestCase):
         self.client.force_login(self.outsider)
         response = self.client.get(reverse('chat_inbox'))
         self.assertEqual(response.status_code, 403)
+
+    def test_participant_archives_and_owner_closes_then_deletes_conversation(self):
+        conversation = ChatConversation.objects.create(
+            account=self.customer_account,
+            workspace=self.workspace,
+            title='Lifecycle',
+            created_by=self.owner,
+        )
+        ChatParticipant.objects.create(conversation=conversation, user=self.owner)
+        archive = self.client.post(
+            reverse('chat_conversation_action', args=[conversation.id]),
+            {'action': 'archive'},
+        )
+        self.assertRedirects(archive, reverse('chat_inbox'))
+        self.assertIsNotNone(ChatParticipant.objects.get(
+            conversation=conversation,
+            user=self.owner,
+        ).archived_at)
+
+        close = self.client.post(
+            reverse('chat_conversation_action', args=[conversation.id]),
+            {'action': 'close'},
+        )
+        self.assertRedirects(close, reverse('chat_conversation', args=[conversation.id]))
+        conversation.refresh_from_db()
+        self.assertEqual(conversation.status, 'closed')
+        delete = self.client.post(
+            reverse('chat_conversation_action', args=[conversation.id]),
+            {'action': 'delete'},
+        )
+        self.assertRedirects(delete, reverse('chat_inbox'))
+        self.assertFalse(ChatConversation.objects.filter(id=conversation.id).exists())
+
+    def test_website_widget_creates_crm_lead_and_staff_conversation(self):
+        widget = WebsiteChatWidget.objects.create(
+            workspace=self.workspace,
+            is_enabled=True,
+            greeting='Welcome to Chat Brand',
+        )
+        self.client.logout()
+        response = self.client.post(reverse('website_chat_widget', args=[widget.public_key]), {
+            'visitor_name': 'Jordan Customer',
+            'visitor_email': 'jordan@example.com',
+            'body': 'I need an estimate.',
+            'page_url': 'https://customer.example/services',
+        })
+        self.assertEqual(response.status_code, 201)
+        contact = Contact.objects.get(email='jordan@example.com')
+        self.assertEqual(contact.organization, self.workspace)
+        self.assertEqual(contact.status, 'Lead')
+        self.assertEqual(contact.lead_source, 'Website Chat')
+        conversation = ChatConversation.objects.get(origin='website')
+        self.assertEqual(conversation.contact, contact)
+        self.assertEqual(conversation.visitor_page_url, 'https://customer.example/services')
+        self.assertTrue(conversation.participants.filter(user=self.owner).exists())
+        self.assertTrue(conversation.messages.filter(body='I need an estimate.').exists())
+
+        poll = self.client.get(reverse('website_chat_widget', args=[widget.public_key]), {
+            'format': 'json',
+            'visitor_key': response.json()['visitor_key'],
+        })
+        self.assertEqual(poll.status_code, 200)
+        self.assertEqual(poll.json()['messages'][0]['body'], 'I need an estimate.')
 
 
 @override_settings(CHANNEL_LAYERS={'default': {'BACKEND': 'channels.layers.InMemoryChannelLayer'}})

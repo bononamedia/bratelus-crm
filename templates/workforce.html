@@ -47,7 +47,7 @@
             <form method="post" class="grid gap-4 p-4 lg:grid-cols-[minmax(220px,.8fr)_minmax(300px,1.2fr)_auto] lg:items-center">{% csrf_token %}<input type="hidden" name="account_member_id" value="{{ member.id }}">
                 <div class="flex min-w-0 items-center gap-3">
                     <a href="{% url 'team_member_detail' member.id %}" class="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-blue-100 text-sm font-semibold uppercase text-blue-700">
-                        {% if member.worker_profile.photo %}<img src="{{ member.worker_profile.photo.url }}" alt="" class="h-full w-full object-cover">{% else %}{{ member.user.username|make_list|first }}{% endif %}
+                        {% if member.worker_profile.photo %}<img src="{% url 'employee_photo' member.worker_profile.id %}" alt="" class="h-full w-full object-cover">{% else %}{{ member.user.username|make_list|first }}{% endif %}
                     </a>
                     <div class="min-w-0">
                         <a href="{% url 'team_member_detail' member.id %}" class="truncate font-semibold text-gray-950 hover:text-blue-700">{{ member.user.get_full_name|default:member.user.username }}</a>

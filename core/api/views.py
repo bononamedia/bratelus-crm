@@ -596,7 +596,7 @@ class JobViewSet(BaseWorkspaceViewSet):
         return (
             Job.objects.filter(organization=active_org)
             .select_related('account', 'property', 'required_skill', 'service_zone')
-            .prefetch_related('worker_assignments__worker__user')
+            .prefetch_related('worker_assignments__worker__user', 'tasks__assigned_worker__user')
         )
 
     def _require_manager(self):
@@ -609,18 +609,79 @@ class JobViewSet(BaseWorkspaceViewSet):
 
     def update(self, request, *args, **kwargs):
         self._require_manager()
+        self._validate_editable_job(request)
         return super().update(request, *args, **kwargs)
 
     def partial_update(self, request, *args, **kwargs):
         self._require_manager()
+        self._validate_editable_job(request)
         return super().partial_update(request, *args, **kwargs)
 
     def destroy(self, request, *args, **kwargs):
         self._require_manager()
+        job = self.get_object()
+        has_work_history = (
+            job.worker_assignments.exists()
+            or job.tasks.filter(is_completed=True).exists()
+            or job.field_events.exists()
+        )
+        if job.status != 'pending' or has_work_history:
+            return Response(
+                {'detail': 'Only an unassigned pending draft can be discarded. Cancel operational jobs instead.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
         return super().destroy(request, *args, **kwargs)
+
+    def _validate_editable_job(self, request):
+        job = self.get_object()
+        if job.status in {'completed', 'canceled'}:
+            raise ValidationError({'detail': 'Completed and canceled jobs are read-only.'})
+        if job.status == 'in_progress':
+            structural_fields = {
+                'title', 'description', 'account', 'property', 'required_skill',
+                'service_zone', 'scheduled_start', 'estimated_duration_minutes',
+                'completion_mode', 'tasks', 'worker_ids', 'require_location',
+                'arrival_radius_meters', 'closeout_instruction',
+            }
+            if structural_fields.intersection(request.data.keys()):
+                raise ValidationError({
+                    'detail': 'Clocked-in work cannot be structurally edited. Close the active work first.',
+                })
 
     def perform_create(self, serializer):
         serializer.save(organization=self.request.active_organization)
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        self._require_manager()
+        job = self.get_object()
+        if job.status not in {'pending', 'dispatched', 'accepted', 'en_route'}:
+            return Response(
+                {'detail': 'Only work that has not started can be canceled.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if job.worker_assignments.filter(clocked_in_at__isnull=False, clocked_out_at__isnull=True).exists():
+            return Response(
+                {'detail': 'A crew member is clocked in. Close active work before canceling this job.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        reason = str(request.data.get('reason', '')).strip()
+        if not reason:
+            return Response(
+                {'reason': 'Enter a cancellation reason for the audit history.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        audit = dict(job.custom_data or {})
+        audit['cancellation'] = {
+            'reason': reason[:500],
+            'canceled_at': timezone.now().isoformat(),
+            'canceled_by_id': request.user.id,
+            'canceled_by': request.user.get_full_name() or request.user.username,
+        }
+        job.custom_data = audit
+        job.status = 'canceled'
+        job.save(update_fields=['custom_data', 'status'])
+        return Response(self.get_serializer(job).data)
 
     @action(detail=True, methods=['post'], url_path='assign-worker')
     def assign_worker(self, request, pk=None):

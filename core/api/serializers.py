@@ -2,9 +2,10 @@ from rest_framework import serializers
 from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.contrib.auth.models import User
+from django.db import transaction
 from organizations.models import WorkerProfile, Skill, ServiceZone
 from crm.models.contacts import Account, Contact, PaymentMethod, Property
-from fsm.models import Job, JobTask
+from fsm.models import Job, JobAssignment, JobTask
 
 # ==========================================
 # 1 - TEAMS / WORKFORCE
@@ -150,6 +151,11 @@ class JobSerializer(serializers.ModelSerializer):
     skill_name = serializers.CharField(source='required_skill.name', read_only=True)
     zone_name = serializers.CharField(source='service_zone.name', read_only=True)
     tasks = serializers.ListField(child=serializers.DictField(), write_only=True, required=False)
+    worker_ids = serializers.ListField(
+        child=serializers.IntegerField(min_value=1),
+        write_only=True,
+        required=False,
+    )
     task_items = serializers.SerializerMethodField()
     open_issue_count = serializers.SerializerMethodField()
     latest_issue = serializers.SerializerMethodField()
@@ -161,10 +167,10 @@ class JobSerializer(serializers.ModelSerializer):
             'account', 'organization', 'property', 'required_skill', 'service_zone',
             'worker_name', 'worker_names', 'assigned_workers', 'location_address',
             'property_address', 'property_unit', # Added to output
-            'scheduled_start', 'skill_name', 'minimum_proficiency', 
+            'scheduled_start', 'estimated_duration_minutes', 'skill_name', 'minimum_proficiency',
             'zone_name', 'blocked_by', 'custom_data', 'completion_mode',
             'require_location', 'arrival_radius_meters', 'require_closeout_confirmation',
-            'closeout_instruction', 'tasks', 'task_items', 'completion_contact',
+            'closeout_instruction', 'tasks', 'task_items', 'worker_ids', 'completion_contact',
             'completion_notification_method', 'completion_message_override',
             'open_issue_count', 'latest_issue'
         ]
@@ -192,32 +198,87 @@ class JobSerializer(serializers.ModelSerializer):
                 'description': task.description,
                 'requires_evidence': task.requires_evidence,
                 'is_completed': task.is_completed,
+                'assigned_worker_id': task.assigned_worker_id,
+                'assigned_worker_name': (
+                    task.assigned_worker.user.get_full_name() or task.assigned_worker.user.username
+                    if task.assigned_worker else ''
+                ),
             }
-            for task in obj.tasks.all()
+            for task in obj.tasks.select_related('assigned_worker__user')
         ]
 
-    def _save_tasks(self, job, tasks):
+    def _eligible_workers(self, worker_ids, workspace):
+        workers = WorkerProfile.objects.filter(id__in=worker_ids, workspaces=workspace)
+        if workspace.customer_account_id:
+            workers = workers.filter(
+                user__customer_accounts__account=workspace.customer_account,
+                user__customer_accounts__can_work_jobs=True,
+                user__customer_accounts__is_active=True,
+            )
+        return list(workers.select_related('user').distinct())
+
+    def _save_tasks(self, job, tasks, worker_ids):
         for task in tasks:
             description = str(task.get('description', '')).strip()
             if description:
+                assigned_worker_id = task.get('assigned_worker_id') or None
+                try:
+                    assigned_worker_id = int(assigned_worker_id) if assigned_worker_id else None
+                except (TypeError, ValueError):
+                    raise serializers.ValidationError({'tasks': 'Choose a valid task owner.'})
+                if assigned_worker_id and assigned_worker_id not in worker_ids:
+                    raise serializers.ValidationError({
+                        'tasks': 'Every task owner must also be assigned to the job crew.',
+                    })
                 JobTask.objects.create(
                     job=job,
                     description=description[:255],
                     requires_evidence=bool(task.get('requires_evidence')),
+                    assigned_worker_id=assigned_worker_id,
                 )
 
+    @transaction.atomic
     def create(self, validated_data):
         tasks = validated_data.pop('tasks', [])
+        worker_ids = set(validated_data.pop('worker_ids', []))
+        workspace = self.context['request'].active_organization
+        workers = self._eligible_workers(worker_ids, workspace)
+        if len(workers) != len(worker_ids):
+            raise serializers.ValidationError({'worker_ids': 'Choose workers available to this workspace.'})
+        if workers and validated_data.get('status', 'pending') == 'pending':
+            validated_data['status'] = 'dispatched'
         job = super().create(validated_data)
-        self._save_tasks(job, tasks)
+        for index, worker in enumerate(workers):
+            JobAssignment.objects.create(job=job, worker=worker, is_primary_worker=index == 0)
+        self._save_tasks(job, tasks, worker_ids)
         return job
 
+    @transaction.atomic
     def update(self, instance, validated_data):
         tasks = validated_data.pop('tasks', None)
+        worker_ids = validated_data.pop('worker_ids', None)
         job = super().update(instance, validated_data)
+        if worker_ids is not None:
+            if job.status in {'in_progress', 'completed'}:
+                raise serializers.ValidationError({'worker_ids': 'Crew cannot change after work starts.'})
+            worker_ids = set(worker_ids)
+            workers = self._eligible_workers(worker_ids, job.organization)
+            if len(workers) != len(worker_ids):
+                raise serializers.ValidationError({'worker_ids': 'Choose workers available to this workspace.'})
+            job.worker_assignments.exclude(worker_id__in=worker_ids).delete()
+            for worker in workers:
+                JobAssignment.objects.get_or_create(job=job, worker=worker)
+            primary = job.worker_assignments.order_by('-is_primary_worker', 'id').first()
+            if primary and not primary.is_primary_worker:
+                primary.is_primary_worker = True
+                primary.save(update_fields=['is_primary_worker'])
+            if workers and job.status == 'pending':
+                job.status = 'dispatched'
+                job.save(update_fields=['status'])
         if tasks is not None and job.status not in {'in_progress', 'completed'}:
             job.tasks.all().delete()
-            self._save_tasks(job, tasks)
+            assigned_ids = set(job.worker_assignments.values_list('worker_id', flat=True))
+            self._save_tasks(job, tasks, assigned_ids)
         return job
 
     def get_worker_name(self, obj):
@@ -293,5 +354,19 @@ class JobSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError({'blocked_by': 'Dependency job must belong to the active organization.'})
         if blocked_by and self.instance and blocked_by.id == self.instance.id:
             raise serializers.ValidationError({'blocked_by': 'A job cannot depend on itself.'})
+
+        worker_ids = set(attrs.get('worker_ids') or [])
+        if self.instance and 'worker_ids' not in attrs:
+            worker_ids = set(self.instance.worker_assignments.values_list('worker_id', flat=True))
+        for task in attrs.get('tasks') or []:
+            assigned_worker_id = task.get('assigned_worker_id')
+            try:
+                assigned_worker_id = int(assigned_worker_id) if assigned_worker_id else None
+            except (TypeError, ValueError):
+                raise serializers.ValidationError({'tasks': 'Choose a valid task owner.'})
+            if assigned_worker_id and assigned_worker_id not in worker_ids:
+                raise serializers.ValidationError({
+                    'tasks': 'Assign each task owner to the job crew first.',
+                })
 
         return attrs

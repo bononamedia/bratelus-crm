@@ -4,16 +4,17 @@ from datetime import timedelta
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db import transaction
+from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_GET, require_http_methods
 
-from crm.models.contacts import Account, Property
-from organizations.models import WorkerProfile, Workspace
+from crm.models.contacts import Account, Contact, Property
+from organizations.models import ServiceZone, Skill, WorkerProfile, Workspace
 from organizations.permissions import account_workspaces_for_user, user_can_manage_workspace
 
-from .models import Job, JobAssignment
+from .models import Job, JobAssignment, JobTask
 
 
 def _visible_workspaces(request):
@@ -46,6 +47,15 @@ def calendar_options_view(request):
     workspace_ids = [workspace.id for workspace in workspaces]
     accounts = Account.objects.filter(organization_id__in=workspace_ids).order_by('name')
     properties = Property.objects.filter(account__organization_id__in=workspace_ids).select_related('account').order_by('name')
+    contacts = Contact.objects.filter(
+        organization_id__in=workspace_ids,
+        archived_at__isnull=True,
+    ).select_related('account').order_by('first_name', 'last_name')
+    customer_account_ids = [workspace.customer_account_id for workspace in workspaces if workspace.customer_account_id]
+    skills = Skill.objects.filter(
+        Q(customer_account_id__in=customer_account_ids) | Q(workspace_id__in=workspace_ids)
+    ).select_related('customer_account', 'workspace').distinct().order_by('name')
+    zones = ServiceZone.objects.filter(workspace_id__in=workspace_ids).order_by('name')
     worker_filters = {'workspaces__id__in': workspace_ids}
     customer_account = getattr(getattr(request, 'active_organization', None), 'customer_account', None)
     if customer_account:
@@ -83,6 +93,33 @@ def calendar_options_view(request):
                 'workspace_ids': [str(value) for value in item.workspaces.filter(id__in=workspace_ids).values_list('id', flat=True)],
             }
             for item in workers
+        ],
+        'skills': [
+            {
+                'id': item.id,
+                'name': item.name,
+                'workspace_ids': [
+                    str(workspace.id) for workspace in workspaces
+                    if (
+                        item.customer_account_id
+                        and workspace.customer_account_id == item.customer_account_id
+                    ) or item.workspace_id == workspace.id
+                ],
+            }
+            for item in skills
+        ],
+        'zones': [
+            {'id': item.id, 'name': item.name, 'workspace_id': str(item.workspace_id)}
+            for item in zones
+        ],
+        'contacts': [
+            {
+                'id': item.id,
+                'workspace_id': str(item.organization_id),
+                'account_id': item.account_id,
+                'name': item.first_name + ' ' + item.last_name,
+            }
+            for item in contacts
         ],
     })
 
@@ -141,11 +178,65 @@ def calendar_jobs_view(request):
         duration = max(15, min(int(data.get('duration_minutes', 60)), 1440))
     except (TypeError, ValueError):
         duration = 60
-    worker_ids = data.get('worker_ids') or []
+    try:
+        worker_ids = {int(value) for value in (data.get('worker_ids') or [])}
+    except (TypeError, ValueError):
+        return JsonResponse({'error': 'Choose valid crew members.'}, status=400)
     workers = list(WorkerProfile.objects.filter(id__in=worker_ids, workspaces=workspace).select_related('user').distinct())
+    if workspace.customer_account_id:
+        workers = [
+            worker for worker in workers
+            if worker.user.customer_accounts.filter(
+                account=workspace.customer_account,
+                can_work_jobs=True,
+                is_active=True,
+            ).exists()
+        ]
+    if len({worker.id for worker in workers}) != len(worker_ids):
+        return JsonResponse({'error': 'Choose workers available to this workspace.'}, status=400)
+
+    task_data = data.get('tasks') or []
+    worker_id_set = {worker.id for worker in workers}
+    for task in task_data:
+        assigned_worker_id = task.get('assigned_worker_id')
+        try:
+            assigned_worker_id = int(assigned_worker_id) if assigned_worker_id else None
+        except (TypeError, ValueError):
+            return JsonResponse({'error': 'Choose a valid task owner.'}, status=400)
+        if assigned_worker_id and assigned_worker_id not in worker_id_set:
+            return JsonResponse({'error': 'Assign each task owner to the job crew first.'}, status=400)
+        task['assigned_worker_id'] = assigned_worker_id
+
+    skill = None
+    if data.get('required_skill_id'):
+        skill_query = Skill.objects.filter(id=data['required_skill_id'])
+        skill_query = (
+            skill_query.filter(customer_account=workspace.customer_account)
+            if workspace.customer_account_id else skill_query.filter(workspace=workspace)
+        )
+        skill = get_object_or_404(skill_query)
+    zone = get_object_or_404(ServiceZone, id=data['service_zone_id'], workspace=workspace) if data.get('service_zone_id') else None
+    completion_contact = None
+    if data.get('completion_contact_id'):
+        completion_contact = get_object_or_404(
+            Contact,
+            id=data['completion_contact_id'],
+            organization=workspace,
+            account=account,
+        )
     title = str(data.get('title', '')).strip()
     if not title:
         return JsonResponse({'error': 'Job title is required.'}, status=400)
+    try:
+        arrival_radius = max(25, min(int(data.get('arrival_radius_meters', 250)), 5000))
+    except (TypeError, ValueError):
+        arrival_radius = 250
+    completion_mode = data.get('completion_mode', 'tasks')
+    if completion_mode not in dict(Job.COMPLETION_MODE_CHOICES):
+        return JsonResponse({'error': 'Choose a valid completion mode.'}, status=400)
+    notification_method = data.get('completion_notification_method', 'none')
+    if notification_method not in dict(Job.COMPLETION_NOTIFICATION_CHOICES):
+        return JsonResponse({'error': 'Choose a valid customer notification method.'}, status=400)
     with transaction.atomic():
         job = Job.objects.create(
             organization=workspace,
@@ -157,9 +248,28 @@ def calendar_jobs_view(request):
             estimated_duration_minutes=duration,
             job_type='scheduled',
             status='dispatched' if workers else 'pending',
+            required_skill=skill,
+            service_zone=zone,
+            completion_mode=completion_mode,
+            require_location=bool(data.get('require_location', True)),
+            arrival_radius_meters=arrival_radius,
+            require_closeout_confirmation=True,
+            closeout_instruction=str(data.get('closeout_instruction', '')).strip()[:255],
+            completion_contact=completion_contact,
+            completion_notification_method=notification_method,
+            completion_message_override=str(data.get('completion_message_override', '')).strip(),
         )
         for index, worker in enumerate(workers):
             JobAssignment.objects.create(job=job, worker=worker, is_primary_worker=index == 0)
+        for task in task_data:
+            description = str(task.get('description', '')).strip()
+            if description:
+                JobTask.objects.create(
+                    job=job,
+                    description=description[:255],
+                    requires_evidence=bool(task.get('requires_evidence')),
+                    assigned_worker_id=task.get('assigned_worker_id') or None,
+                )
     return JsonResponse({'id': job.id, 'message': 'Job added to the calendar.'}, status=201)
 
 

@@ -40,17 +40,25 @@
 </div>
 
 <div id="calendar-drawer-overlay" class="fixed inset-0 z-40 hidden bg-gray-950/40" onclick="closeJobDrawer()"></div>
-<aside id="calendar-job-drawer" class="fixed inset-y-0 right-0 z-50 flex w-full max-w-lg translate-x-full flex-col bg-white shadow-2xl transition-transform duration-200">
+<aside id="calendar-job-drawer" class="fixed inset-y-0 right-0 z-50 flex w-full max-w-xl translate-x-full flex-col bg-white shadow-2xl transition-transform duration-200">
     <div class="flex items-center justify-between border-b border-gray-200 px-5 py-4"><div><p id="drawer-eyebrow" class="text-xs font-semibold uppercase tracking-wide text-blue-600">Calendar job</p><h2 id="drawer-title" class="text-xl font-semibold text-gray-950">Create a job</h2></div><button type="button" onclick="closeJobDrawer()" class="flex h-9 w-9 items-center justify-center rounded-md text-2xl text-gray-500 hover:bg-gray-100" aria-label="Close">×</button></div>
 
     <form id="calendar-job-form" class="flex-1 space-y-4 overflow-y-auto p-5" onsubmit="submitCalendarJob(event)">
         <label class="block text-sm font-medium text-gray-700">Workspace<select id="calendar-workspace" required onchange="filterCalendarForm()" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2.5"></select></label>
         <label class="block text-sm font-medium text-gray-700">Job title<input id="calendar-job-title" required class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2.5" placeholder="Service or project name"></label>
         <div class="grid grid-cols-2 gap-3"><label class="text-sm font-medium text-gray-700">Starts<input id="calendar-job-start" type="datetime-local" required class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2.5"></label><label class="text-sm font-medium text-gray-700">Duration<select id="calendar-job-duration" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2.5"><option value="30">30 minutes</option><option value="60" selected>1 hour</option><option value="90">1.5 hours</option><option value="120">2 hours</option><option value="180">3 hours</option><option value="240">4 hours</option><option value="480">Full day</option></select></label></div>
-        <label class="block text-sm font-medium text-gray-700">Account<select id="calendar-account" required onchange="filterCalendarProperties()" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2.5"></select></label>
+        <label class="block text-sm font-medium text-gray-700">Account<select id="calendar-account" required onchange="filterCalendarProperties(); refreshCalendarContacts()" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2.5"></select></label>
         <label class="block text-sm font-medium text-gray-700">Property<select id="calendar-property" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2.5"></select></label>
         <fieldset><legend class="text-sm font-medium text-gray-700">Assign team</legend><p class="mt-1 text-xs text-gray-500">Office users appear here when “Can be assigned jobs” is enabled.</p><div id="calendar-workers" class="mt-2 grid gap-2 sm:grid-cols-2"></div></fieldset>
+        <div class="grid gap-3 sm:grid-cols-2"><label class="text-sm font-medium text-gray-700">Required skill<select id="calendar-skill" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2.5"></select></label><label class="text-sm font-medium text-gray-700">Service zone<select id="calendar-zone" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2.5"></select></label></div>
         <label class="block text-sm font-medium text-gray-700">Instructions<textarea id="calendar-description" rows="4" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2.5" placeholder="Access, service, or customer notes"></textarea></label>
+        <div class="border-t border-gray-200 pt-4"><label class="block text-sm font-medium text-gray-700">Field completion<select id="calendar-completion-mode" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2.5"><option value="tasks">Crew completes each task</option><option value="project">Crew completes the whole project</option></select></label></div>
+        <div><div class="mb-2 flex items-center justify-between"><label class="text-sm font-medium text-gray-700">Task checklist</label><button type="button" onclick="addCalendarTask()" class="text-sm font-semibold text-blue-700">Add task</button></div><div id="calendar-task-list" class="space-y-2"></div></div>
+        <div class="grid gap-3 sm:grid-cols-2"><label class="text-sm font-medium text-gray-700">Arrival radius (meters)<input id="calendar-arrival-radius" type="number" min="25" max="5000" value="250" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2.5"></label><label class="flex items-end gap-2 pb-2 text-sm text-gray-700"><input id="calendar-require-location" type="checkbox" checked class="h-4 w-4 rounded border-gray-300 text-blue-600"> Require GPS arrival</label></div>
+        <label class="block text-sm font-medium text-gray-700">Final closeout instruction<input id="calendar-closeout" value="Secure the property and confirm the site is closed." class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2.5"></label>
+        <div class="border-t border-gray-200 pt-4"><label class="block text-sm font-medium text-gray-700">Notify customer after closeout<select id="calendar-notification-method" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2.5"><option value="none">Do not notify</option><option value="email">Email</option><option value="sms">SMS</option><option value="both">Email and SMS</option></select></label></div>
+        <label class="block text-sm font-medium text-gray-700">Completion contact<select id="calendar-completion-contact" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2.5"></select></label>
+        <label class="block text-sm font-medium text-gray-700">Job-specific message <span class="font-normal text-gray-400">(optional)</span><textarea id="calendar-completion-message" rows="3" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2.5" placeholder="Leave blank to use the workspace template."></textarea></label>
     </form>
     <div class="flex items-center justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-4"><button type="button" onclick="closeJobDrawer()" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700">Cancel</button><button type="submit" form="calendar-job-form" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Create job</button></div>
 </aside>
@@ -58,7 +66,7 @@
 <div id="event-detail" class="fixed bottom-4 right-4 z-30 hidden w-[calc(100%-2rem)] max-w-sm rounded-lg border border-gray-200 bg-white p-4 shadow-xl"><div class="flex items-start justify-between gap-4"><div class="min-w-0"><p id="event-workspace" class="text-xs font-semibold uppercase tracking-wide text-blue-600"></p><h3 id="event-title" class="mt-1 truncate font-semibold text-gray-950"></h3></div><button onclick="document.getElementById('event-detail').classList.add('hidden')" class="text-xl text-gray-400">×</button></div><div id="event-meta" class="mt-3 space-y-1 text-sm text-gray-600"></div></div>
 
 <script>
-let calendarData = {workspaces:[], accounts:[], properties:[], workers:[]};
+let calendarData = {workspaces:[], accounts:[], properties:[], workers:[], skills:[], zones:[], contacts:[]};
 let jobCalendar;
 function csrfToken() { return document.cookie.split('; ').find(row => row.startsWith('csrftoken='))?.split('=')[1] || ''; }
 function escapeCalendarHtml(value) { const div = document.createElement('div'); div.textContent = value || ''; return div.innerHTML; }
@@ -79,13 +87,41 @@ function filterCalendarForm() {
     const accounts = calendarData.accounts.filter(item => item.workspace_id === workspaceId);
     document.getElementById('calendar-account').innerHTML = '<option value="">Select an account</option>' + accounts.map(item => `<option value="${item.id}">${escapeCalendarHtml(item.name)}</option>`).join('');
     document.getElementById('calendar-property').innerHTML = '<option value="">Select account first</option>';
+    document.getElementById('calendar-completion-contact').innerHTML = '<option value="">Select an account first</option>';
     const workers = calendarData.workers.filter(item => item.workspace_ids.includes(workspaceId));
-    document.getElementById('calendar-workers').innerHTML = workers.length ? workers.map(item => `<label class="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700"><input type="checkbox" name="calendar_worker" value="${item.id}" class="rounded border-gray-300 text-blue-600">${escapeCalendarHtml(item.name)}</label>`).join('') : '<p class="text-sm text-amber-700">No field-capable users assigned to this workspace.</p>';
+    document.getElementById('calendar-workers').innerHTML = workers.length ? workers.map(item => `<label class="flex items-center gap-2 rounded-md border border-gray-200 px-3 py-2 text-sm text-gray-700"><input type="checkbox" name="calendar_worker" value="${item.id}" onchange="refreshCalendarTaskWorkers()" class="rounded border-gray-300 text-blue-600">${escapeCalendarHtml(item.name)}</label>`).join('') : '<p class="text-sm text-amber-700">No field-capable users assigned to this workspace.</p>';
+    document.getElementById('calendar-skill').innerHTML = '<option value="">Any / none</option>' + calendarData.skills.filter(item => !item.workspace_ids?.length || item.workspace_ids.includes(workspaceId)).map(item => `<option value="${item.id}">${escapeCalendarHtml(item.name)}</option>`).join('');
+    document.getElementById('calendar-zone').innerHTML = '<option value="">Any / none</option>' + calendarData.zones.filter(item => item.workspace_id === workspaceId).map(item => `<option value="${item.id}">${escapeCalendarHtml(item.name)}</option>`).join('');
+    refreshCalendarTaskWorkers();
 }
 function filterCalendarProperties() {
     const accountId = Number(document.getElementById('calendar-account').value);
     const properties = calendarData.properties.filter(item => item.account_id === accountId);
     document.getElementById('calendar-property').innerHTML = '<option value="">No property / ad-hoc</option>' + properties.map(item => `<option value="${item.id}">${escapeCalendarHtml(item.name)}${item.address ? ' · ' + escapeCalendarHtml(item.address) : ''}</option>`).join('');
+}
+function selectedCalendarWorkerIds() { return [...document.querySelectorAll('[name=calendar_worker]:checked')].map(item => Number(item.value)); }
+function calendarTaskWorkerOptions(selected = '') {
+    const selectedIds = new Set(selectedCalendarWorkerIds());
+    const workers = calendarData.workers.filter(item => selectedIds.has(Number(item.id)));
+    return '<option value="">Any crew member</option>' + workers.map(item => `<option value="${item.id}" ${String(item.id) === String(selected) ? 'selected' : ''}>${escapeCalendarHtml(item.name)}</option>`).join('');
+}
+function refreshCalendarTaskWorkers() {
+    document.querySelectorAll('.calendar-task-worker').forEach(select => {
+        const current = select.value;
+        select.innerHTML = calendarTaskWorkerOptions(current);
+        if (![...select.options].some(option => option.value === current)) select.value = '';
+    });
+}
+function addCalendarTask(description = '', requiresEvidence = false, assignedWorkerId = '') {
+    const row = document.createElement('div');
+    row.className = 'calendar-task-row grid grid-cols-[minmax(0,1fr)_auto] gap-2 rounded-md border border-gray-200 bg-gray-50 p-2';
+    row.innerHTML = `<input class="calendar-task-description min-w-0 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm" placeholder="Task description" value="${escapeCalendarHtml(description)}"><button type="button" class="row-span-2 p-2 text-gray-400 hover:text-red-600" title="Remove task" onclick="this.closest('.calendar-task-row').remove()">×</button><div class="grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"><select class="calendar-task-worker min-w-0 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm">${calendarTaskWorkerOptions(assignedWorkerId)}</select><label class="flex items-center gap-1.5 whitespace-nowrap px-2 text-xs text-gray-600"><input type="checkbox" class="calendar-task-evidence h-4 w-4 rounded border-gray-300" ${requiresEvidence ? 'checked' : ''}> Evidence required</label></div>`;
+    document.getElementById('calendar-task-list').appendChild(row);
+}
+function refreshCalendarContacts() {
+    const accountId = Number(document.getElementById('calendar-account').value);
+    const contacts = calendarData.contacts.filter(item => item.account_id === accountId);
+    document.getElementById('calendar-completion-contact').innerHTML = '<option value="">Use primary account contact</option>' + contacts.map(item => `<option value="${item.id}">${escapeCalendarHtml(item.name)}</option>`).join('');
 }
 function openJobDrawer(start, end = null, workspaceId = null) {
     document.getElementById('calendar-job-form').reset();
@@ -94,6 +130,8 @@ function openJobDrawer(start, end = null, workspaceId = null) {
     document.getElementById('calendar-job-start').value = localInputValue(start || new Date());
     if (end && start) document.getElementById('calendar-job-duration').value = String(Math.max(15, Math.round((end-start)/60000)));
     filterCalendarForm();
+    document.getElementById('calendar-task-list').innerHTML = '';
+    addCalendarTask();
     document.getElementById('calendar-drawer-overlay').classList.remove('hidden');
     document.getElementById('calendar-job-drawer').classList.remove('translate-x-full');
 }
@@ -107,8 +145,22 @@ async function submitCalendarJob(event) {
         duration_minutes: document.getElementById('calendar-job-duration').value,
         account_id: document.getElementById('calendar-account').value,
         property_id: document.getElementById('calendar-property').value || null,
-        worker_ids: [...document.querySelectorAll('[name=calendar_worker]:checked')].map(item => item.value),
+        worker_ids: selectedCalendarWorkerIds(),
         description: document.getElementById('calendar-description').value,
+        required_skill_id: document.getElementById('calendar-skill').value || null,
+        service_zone_id: document.getElementById('calendar-zone').value || null,
+        completion_mode: document.getElementById('calendar-completion-mode').value,
+        require_location: document.getElementById('calendar-require-location').checked,
+        arrival_radius_meters: Number(document.getElementById('calendar-arrival-radius').value || 250),
+        closeout_instruction: document.getElementById('calendar-closeout').value,
+        completion_contact_id: document.getElementById('calendar-completion-contact').value || null,
+        completion_notification_method: document.getElementById('calendar-notification-method').value,
+        completion_message_override: document.getElementById('calendar-completion-message').value,
+        tasks: [...document.querySelectorAll('.calendar-task-row')].map(row => ({
+            description: row.querySelector('.calendar-task-description').value.trim(),
+            requires_evidence: row.querySelector('.calendar-task-evidence').checked,
+            assigned_worker_id: row.querySelector('.calendar-task-worker').value || null,
+        })).filter(task => task.description),
     };
     const response = await fetch('/api/calendar/jobs/', {method:'POST', headers:{'Content-Type':'application/json','X-CSRFToken':csrfToken()}, body:JSON.stringify(payload)});
     const result = await response.json();

@@ -4,7 +4,7 @@
 <div class="mx-auto max-w-6xl space-y-5">
     <header class="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div class="flex min-w-0 items-center gap-4">
-            <div class="flex h-14 w-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-blue-100 text-xl font-semibold uppercase text-blue-700">{% if worker_profile.photo %}<img src="{{ worker_profile.photo.url }}" alt="" class="h-full w-full object-cover">{% else %}{{ request.user.first_name|default:request.user.username|first }}{% endif %}</div>
+            <div class="flex h-16 w-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-blue-100 text-xl font-semibold uppercase text-blue-700 ring-4 ring-white shadow-sm">{% if worker_profile.photo %}<img id="profile-photo-preview" src="{% url 'employee_photo' worker_profile.id %}" alt="{{ request.user.get_full_name }}" class="h-full w-full object-cover">{% else %}<span id="profile-photo-fallback">{{ request.user.first_name|default:request.user.username|first }}</span><img id="profile-photo-preview" alt="" class="hidden h-full w-full object-cover">{% endif %}</div>
             <div class="min-w-0">
                 <p class="text-xs font-semibold uppercase tracking-wide text-blue-600">{{ active_role_label }}</p>
                 <h1 class="truncate text-2xl font-semibold text-gray-950 sm:text-3xl">{{ request.user.get_full_name|default:request.user.username }}</h1>
@@ -12,7 +12,7 @@
             </div>
         </div>
         {% if worker_profile %}
-        <div class="flex flex-wrap gap-2"><button type="button" onclick="enrollPasskey()" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50">Set up Face ID</button><a href="{% url 'field_operations' %}" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Open field app</a><a href="#profile" class="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100">
+        <div class="flex flex-wrap gap-2"><button type="button" onclick="enrollPasskey()" title="Mobile field tool. Face ID availability depends on the phone and browser." class="inline-flex items-center justify-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50">Set up Face ID<span class="flex h-4 w-4 items-center justify-center rounded-full border border-gray-400 text-[10px] font-bold" aria-hidden="true">i</span></button><a href="{% url 'field_operations' %}" title="Designed for the mobile field experience." class="inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Open field app<span class="rounded bg-blue-500 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-white">Mobile</span></a><a href="#profile" class="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100">
             <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 20h9M16.5 3.5a2.1 2.1 0 013 3L8 18l-4 1 1-4L16.5 3.5z"></path></svg>
             Edit profile
         </a></div>
@@ -71,7 +71,7 @@
         <section id="profile" class="self-start rounded-lg border border-gray-200 bg-white shadow-sm">
             <div class="flex items-center gap-3 border-b border-gray-200 px-4 py-3"><span class="flex h-9 w-9 items-center justify-center rounded-md bg-violet-50 text-violet-600"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 21a8 8 0 10-16 0m8-10a4 4 0 100-8 4 4 0 000 8z"></path></svg></span><div><h2 class="font-semibold text-gray-950">Personal Profile</h2><p class="text-xs text-gray-500">Private information visible to you and authorized management.</p></div></div>
             <form method="post" enctype="multipart/form-data" class="space-y-4 p-4">{% csrf_token %}<input type="hidden" name="action" value="update_profile">
-                <label class="block text-sm font-medium text-gray-700">Profile photo<input type="file" name="photo" accept="image/*" capture="user" class="mt-1 block w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"><span class="mt-1 block text-xs font-normal text-gray-500">On a phone, this opens the front camera.</span></label>
+                <label class="block text-sm font-medium text-gray-700">Profile photo<span class="mt-2 flex items-center gap-3 rounded-lg border border-dashed border-blue-200 bg-blue-50 p-3"><span class="flex h-10 w-10 items-center justify-center rounded-full bg-white text-blue-600"><svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4-4 4 4 4-4 4 4M8 8h.01M5 4h14a1 1 0 011 1v14H4V5a1 1 0 011-1z"></path></svg></span><span><strong class="block text-sm text-blue-800">Choose or take a photo</strong><small class="text-blue-600">JPG, PNG, or phone camera up to 15 MB</small></span></span><input id="profile-photo-input" type="file" name="photo" accept="image/*" capture="user" class="sr-only"></label>
                 <div class="grid grid-cols-2 gap-3"><label class="text-sm font-medium text-gray-700">First name<input name="first_name" value="{{ request.user.first_name }}" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></label><label class="text-sm font-medium text-gray-700">Last name<input name="last_name" value="{{ request.user.last_name }}" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></label></div>
                 <label class="block text-sm font-medium text-gray-700">Phone<input name="phone" value="{{ worker_profile.phone }}" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm" placeholder="(555) 000-0000"></label>
                 <label class="block text-sm font-medium text-gray-700">Work classification<select name="employment_type" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm"><option value="">Not specified</option>{% for value, label in employment_type_choices %}<option value="{{ value }}" {% if worker_profile.employment_type == value %}selected{% endif %}>{{ label }}</option>{% endfor %}</select></label>
@@ -124,5 +124,13 @@ async function enrollPasskey() {
         const result = await verifyResponse.json(); if (!verifyResponse.ok) throw new Error(result.error); alert(result.message);
     } catch (err) { alert(err.message || 'Face ID setup was cancelled.'); }
 }
+document.getElementById('profile-photo-input')?.addEventListener('change', event => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const preview = document.getElementById('profile-photo-preview');
+    preview.src = URL.createObjectURL(file);
+    preview.classList.remove('hidden');
+    document.getElementById('profile-photo-fallback')?.classList.add('hidden');
+});
 </script>
 {% endblock %}

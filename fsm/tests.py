@@ -168,6 +168,29 @@ class FieldWorkflowTests(TestCase):
         response = self.client.get(reverse('field_job', args=[other_job.id]))
         self.assertEqual(response.status_code, 404)
 
+    def test_worker_only_sees_and_completes_own_or_shared_tasks(self):
+        other_user = User.objects.create_user('task-owner@example.com', password='StrongPass123!')
+        other_worker = WorkerProfile.objects.create(user=other_user)
+        other_worker.workspaces.add(self.workspace)
+        JobAssignment.objects.create(job=self.job, worker=other_worker)
+        self.task.assigned_worker = self.worker
+        self.task.save(update_fields=['assigned_worker'])
+        other_task = JobTask.objects.create(
+            job=self.job,
+            description='Other worker task',
+            assigned_worker=other_worker,
+        )
+        shared_task = JobTask.objects.create(job=self.job, description='Shared crew task')
+
+        page = self.client.get(reverse('field_job', args=[self.job.id]))
+        self.assertContains(page, self.task.description)
+        self.assertContains(page, shared_task.description)
+        self.assertNotContains(page, other_task.description)
+        self.assertEqual(
+            self.post_action('complete_task', task_id=other_task.id).status_code,
+            403,
+        )
+
     def test_shift_requires_location(self):
         response = self.client.post(
             reverse('api_field_shift'),
@@ -276,6 +299,13 @@ class MultiWorkspaceCalendarTests(TestCase):
                 'duration_minutes': 90,
                 'account_id': self.account_two.id,
                 'worker_ids': [self.worker.id],
+                'completion_mode': 'tasks',
+                'arrival_radius_meters': 175,
+                'tasks': [{
+                    'description': 'Clean bathrooms',
+                    'assigned_worker_id': self.worker.id,
+                    'requires_evidence': True,
+                }],
             }),
             content_type='application/json',
         )
@@ -283,4 +313,47 @@ class MultiWorkspaceCalendarTests(TestCase):
         job = Job.objects.get(title='Calendar Cleaning')
         self.assertEqual(job.organization, self.two)
         self.assertEqual(job.estimated_duration_minutes, 90)
+        self.assertEqual(job.arrival_radius_meters, 175)
         self.assertTrue(job.worker_assignments.filter(worker=self.worker).exists())
+        self.assertTrue(job.tasks.filter(
+            description='Clean bathrooms',
+            assigned_worker=self.worker,
+            requires_evidence=True,
+        ).exists())
+
+    def test_job_cancel_preserves_audit_and_assigned_job_cannot_be_deleted(self):
+        session = self.client.session
+        session['active_org_id'] = str(self.one.id)
+        session.save()
+        job = Job.objects.create(
+            organization=self.one,
+            account=self.account_one,
+            title='Customer cancellation',
+            status='dispatched',
+        )
+        JobAssignment.objects.create(job=job, worker=self.worker)
+
+        delete_response = self.client.delete(reverse('api-job-detail', args=[job.id]))
+        self.assertEqual(delete_response.status_code, 400)
+        cancel_response = self.client.post(
+            reverse('api-job-cancel', args=[job.id]),
+            data=json.dumps({'reason': 'Customer requested another date'}),
+            content_type='application/json',
+        )
+        self.assertEqual(cancel_response.status_code, 200)
+        job.refresh_from_db()
+        self.assertEqual(job.status, 'canceled')
+        self.assertEqual(job.custom_data['cancellation']['reason'], 'Customer requested another date')
+
+    def test_unassigned_pending_draft_can_be_discarded(self):
+        session = self.client.session
+        session['active_org_id'] = str(self.one.id)
+        session.save()
+        draft = Job.objects.create(
+            organization=self.one,
+            account=self.account_one,
+            title='Mistake draft',
+        )
+        response = self.client.delete(reverse('api-job-detail', args=[draft.id]))
+        self.assertEqual(response.status_code, 204)
+        self.assertFalse(Job.objects.filter(id=draft.id).exists())

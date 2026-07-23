@@ -4,6 +4,7 @@ from django.contrib.auth.models import User
 from django.db import models
 
 from fsm.models import Job
+from crm.models.contacts import Contact
 from organizations.models import CustomerAccount, Workspace
 
 
@@ -21,6 +22,15 @@ class ChatConversation(models.Model):
     created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, blank=True, related_name='created_chat_conversations')
     visitor_name = models.CharField(max_length=120, blank=True)
     visitor_email = models.EmailField(blank=True)
+    visitor_key = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    visitor_page_url = models.URLField(max_length=1000, blank=True)
+    contact = models.ForeignKey(
+        Contact,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='chat_conversations',
+    )
     transcript_attached_at = models.DateTimeField(null=True, blank=True)
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
@@ -32,12 +42,34 @@ class ChatConversation(models.Model):
         return self.title
 
 
+class WebsiteChatWidget(models.Model):
+    workspace = models.OneToOneField(
+        Workspace,
+        on_delete=models.CASCADE,
+        related_name='website_chat_widget',
+    )
+    public_key = models.UUIDField(default=uuid.uuid4, editable=False, unique=True)
+    is_enabled = models.BooleanField(default=False)
+    brand_color = models.CharField(max_length=7, default='#2563eb')
+    greeting = models.CharField(
+        max_length=180,
+        default='Hi! How can our team help you today?',
+    )
+    require_email = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    def __str__(self):
+        return f'{self.workspace.name} website chat'
+
+
 class ChatParticipant(models.Model):
     conversation = models.ForeignKey(ChatConversation, on_delete=models.CASCADE, related_name='participants')
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='chat_participations')
     joined_at = models.DateTimeField(auto_now_add=True)
     last_read_at = models.DateTimeField(null=True, blank=True)
     unread_count = models.PositiveIntegerField(default=0)
+    archived_at = models.DateTimeField(null=True, blank=True)
 
     class Meta:
         unique_together = ('conversation', 'user')

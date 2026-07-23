@@ -33,6 +33,7 @@ from .models import (
     UserEmailVerification,
 )
 from .emailing import email_verification_token, read_email_verification_token
+from .images import normalize_profile_photo
 from .tasks import send_new_account_alert, send_signup_welcome_email
 from .permissions import (
     user_can_manage_people,
@@ -821,11 +822,11 @@ def employee_profile_view(request):
             ]
             photo = request.FILES.get('photo')
             if photo:
-                content_type = (getattr(photo, 'content_type', '') or '').lower()
-                if photo.size > 15 * 1024 * 1024 or not content_type.startswith('image/'):
-                    messages.error(request, 'Profile photo must be an image no larger than 15 MB.')
+                normalized_photo, photo_error = normalize_profile_photo(photo)
+                if photo_error:
+                    messages.error(request, photo_error)
                     return redirect('employee_profile')
-                worker_profile.photo = photo
+                worker_profile.photo = normalized_photo
                 update_fields.append('photo')
             worker_profile.save(update_fields=update_fields)
             messages.success(request, 'Your employee profile has been updated.')

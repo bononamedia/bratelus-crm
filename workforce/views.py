@@ -1,3 +1,5 @@
+import mimetypes
+
 from django.contrib import messages
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
@@ -25,12 +27,32 @@ from organizations.permissions import (
     user_can_manage_people,
     worker_profile_for_workspace,
 )
+from organizations.images import normalize_profile_photo
 from .services import workforce_ledger
 from .activity_services import activity_ledger
 
 
-def _valid_profile_photo(upload):
-    return bool(upload and upload.size <= 15 * 1024 * 1024 and (upload.content_type or '').startswith('image/'))
+@login_required
+def employee_photo_view(request, worker_id):
+    worker = get_object_or_404(WorkerProfile.objects.select_related('user'), id=worker_id)
+    active_workspace = getattr(request, 'active_organization', None)
+    active_account = getattr(active_workspace, 'customer_account', None)
+    can_view = (
+        request.user.is_superuser
+        or request.user.id == worker.user_id
+        or (
+            active_account
+            and customer_account_membership_for_user(request.user, active_account)
+            and worker.user.customer_accounts.filter(account=active_account, is_active=True).exists()
+        )
+    )
+    if not can_view or not worker.photo:
+        raise Http404
+    try:
+        content_type = mimetypes.guess_type(worker.photo.name)[0] or 'application/octet-stream'
+        return FileResponse(worker.photo.open('rb'), content_type=content_type)
+    except (FileNotFoundError, OSError, ValueError):
+        raise Http404
 
 
 @login_required
@@ -262,10 +284,11 @@ def team_member_detail_view(request, member_id):
                 worker.employment_type = employment_type if employment_type in dict(WorkerProfile.EMPLOYMENT_TYPE_CHOICES) else ''
                 photo = request.FILES.get('photo')
                 if photo:
-                    if not _valid_profile_photo(photo):
-                        messages.error(request, 'Profile photo must be an image no larger than 15 MB.')
+                    normalized_photo, photo_error = normalize_profile_photo(photo)
+                    if photo_error:
+                        messages.error(request, photo_error)
                         return redirect('team_member_detail', member_id=member.id)
-                    worker.photo = photo
+                    worker.photo = normalized_photo
                 worker.save()
                 member.photo_required = request.POST.get('photo_required') == 'yes'
                 member.drivers_license_required = request.POST.get('drivers_license_required') == 'yes'

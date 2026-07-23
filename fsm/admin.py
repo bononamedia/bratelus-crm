@@ -39,7 +39,12 @@ class JobAdmin(admin.ModelAdmin):
     )
 
 # Register the other models here. 
-admin.site.register(JobTask)
+@admin.register(JobTask)
+class JobTaskAdmin(admin.ModelAdmin):
+    list_display = ('description', 'job', 'assigned_worker', 'requires_evidence', 'is_completed')
+    list_filter = ('requires_evidence', 'is_completed', 'job__organization')
+    search_fields = ('description', 'job__title', 'assigned_worker__user__username')
+
 admin.site.register(WorkerLocation)
 admin.site.register(JobEvidence) # Added your new Evidence model
 admin.site.register(MaterialRun)

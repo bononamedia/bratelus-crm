@@ -155,6 +155,14 @@ class JobTask(models.Model):
     The specific checklist items the worker must complete before finishing the job.
     """
     job = models.ForeignKey(Job, on_delete=models.CASCADE, related_name='tasks')
+    assigned_worker = models.ForeignKey(
+        WorkerProfile,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='assigned_job_tasks',
+        help_text='Optional task owner. Leave blank for any assigned crew member.',
+    )
     description = models.CharField(max_length=255)
     requires_evidence = models.BooleanField(default=False)
     is_completed = models.BooleanField(default=False)

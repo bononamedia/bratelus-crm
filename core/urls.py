@@ -51,10 +51,11 @@ from organizations.passkeys import (
     passkey_authentication_options, passkey_authentication_verify,
     passkey_registration_options, passkey_registration_verify,
 )
-from workforce.views import employee_document_download_view, team_member_detail_view, workforce_view, work_activity_ledger_view
+from workforce.views import employee_document_download_view, employee_photo_view, team_member_detail_view, workforce_view, work_activity_ledger_view
 from chat.views import (
-    chat_attach_job_view, chat_inbox_view, chat_message_view,
+    chat_attach_job_view, chat_conversation_action_view, chat_inbox_view, chat_message_view,
     chat_push_subscribe_view, chat_push_unsubscribe_view, chat_service_worker_view,
+    website_chat_launcher_view, website_chat_settings_view, website_chat_widget_view,
 )
 
 
@@ -130,8 +131,13 @@ urlpatterns = [
     path('chat/<uuid:conversation_id>/', chat_inbox_view, name='chat_conversation'),
     path('chat/<uuid:conversation_id>/message/', chat_message_view, name='chat_message'),
     path('chat/<uuid:conversation_id>/attach-job/', chat_attach_job_view, name='chat_attach_job'),
+    path('chat/<uuid:conversation_id>/action/', chat_conversation_action_view, name='chat_conversation_action'),
+    path('chat/website/settings/', website_chat_settings_view, name='website_chat_settings'),
+    path('chat/widget/<uuid:public_key>/', website_chat_widget_view, name='website_chat_widget'),
+    path('chat/widget/<uuid:public_key>/launcher.js', website_chat_launcher_view, name='website_chat_launcher'),
     path('workforce/activity/', work_activity_ledger_view, name='work_activity_ledger'),
     path('workforce/team/<int:member_id>/', team_member_detail_view, name='team_member_detail'),
+    path('workforce/photos/<int:worker_id>/', employee_photo_view, name='employee_photo'),
     path('workforce/documents/<int:document_id>/download/', employee_document_download_view, name='employee_document_download'),
     path('reports/', reports_view, name='reports'),
     path('settings/', admin_console_view, name='admin_console'),

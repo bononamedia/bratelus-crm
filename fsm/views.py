@@ -7,6 +7,7 @@ from django.shortcuts import redirect
 from django.utils import timezone
 from django.core.cache import cache
 from django.db import transaction
+from django.db.models import Q
 
 # Django REST Framework
 from rest_framework.views import APIView
@@ -161,7 +162,9 @@ def field_job_view(request, job_id):
     return render(request, 'field_job.html', {
         'assignment': assignment,
         'job': assignment.job,
-        'tasks': assignment.job.tasks.prefetch_related('evidence').all(),
+        'tasks': assignment.job.tasks.filter(
+            Q(assigned_worker=worker) | Q(assigned_worker__isnull=True)
+        ).select_related('assigned_worker__user').prefetch_related('evidence'),
         'events': assignment.job.field_events.filter(worker=worker)[:30],
         'issues': assignment.job.issues.filter(worker=worker).prefetch_related('media')[:20],
         'active_shift': _active_shift(worker, active_org),
@@ -206,6 +209,8 @@ class EvidenceUploadView(APIView):
 
             if not JobAssignment.objects.filter(job=job, worker=worker_profile).exists():
                 return Response({"error": "You are not assigned to this job."}, status=status.HTTP_403_FORBIDDEN)
+            if task and task.assigned_worker_id and task.assigned_worker_id != worker_profile.id:
+                return Response({"error": "This task is assigned to another crew member."}, status=status.HTTP_403_FORBIDDEN)
 
             content_type = (getattr(evidence_file, 'content_type', '') or '').lower()
             media_type = 'video' if content_type.startswith('video/') else 'photo'
@@ -406,9 +411,21 @@ class FieldJobActionView(APIView):
         job = assignment.job
         action = request.data.get('action')
         now = timezone.now()
+        task = None
 
         if job.status in {'completed', 'canceled'}:
             return Response({'error': 'This job is already closed.'}, status=status.HTTP_400_BAD_REQUEST)
+        if action == 'complete_task':
+            task = get_object_or_404(
+                JobTask.objects.select_for_update(),
+                id=request.data.get('task_id'),
+                job=job,
+            )
+            if task.assigned_worker_id and task.assigned_worker_id != worker.id:
+                return Response(
+                    {'error': 'This task is assigned to another crew member.'},
+                    status=status.HTTP_403_FORBIDDEN,
+                )
         if not _active_shift(worker, workspace):
             return Response({'error': 'Check in as available before working a job.'}, status=status.HTTP_400_BAD_REQUEST)
 
@@ -472,7 +489,6 @@ class FieldJobActionView(APIView):
         if action == 'complete_task':
             if job.completion_mode != 'tasks':
                 return Response({'error': 'This job is configured for whole-project completion.'}, status=status.HTTP_400_BAD_REQUEST)
-            task = get_object_or_404(JobTask.objects.select_for_update(), id=request.data.get('task_id'), job=job)
             if task.requires_evidence and not task.evidence.exists():
                 return Response({'error': 'Upload required photo or video evidence before completing this task.'}, status=status.HTTP_400_BAD_REQUEST)
             task.is_completed = True
@@ -481,7 +497,11 @@ class FieldJobActionView(APIView):
             task.completion_notes = request.data.get('note', '').strip()
             task.save(update_fields=['is_completed', 'completed_at', 'completed_by', 'completion_notes'])
             _record_field_event(worker, workspace, 'task_completed', location, job=job, task=task, note=task.completion_notes)
-            if not job.tasks.filter(is_completed=False).exists():
+            worker_tasks_remaining = job.tasks.filter(
+                Q(assigned_worker=worker) | Q(assigned_worker__isnull=True),
+                is_completed=False,
+            ).exists()
+            if not worker_tasks_remaining:
                 assignment.work_completed_at = now
                 assignment.save(update_fields=['work_completed_at'])
             return Response({'message': 'Task completed.', 'work_complete': bool(assignment.work_completed_at)})
