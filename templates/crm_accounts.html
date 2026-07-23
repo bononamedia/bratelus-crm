@@ -15,9 +15,9 @@
                 Company Setup
             </a>
             {% endif %}
-            <button type="button" onclick="openRecordPanel()" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">
+            <button id="new-record-button" type="button" onclick="openRecordPanel()" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">
                 <svg class="mr-2 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
-                New Record
+                <span id="new-record-label">New Account</span>
             </button>
         </div>
     </div>
@@ -122,18 +122,26 @@
             </button>
         </div>
     </div>
-    <div id="record-type-selector" class="border-b border-gray-100 p-4">
-        <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <button type="button" data-type="accounts" onclick="setRecordType('accounts')" class="record-type rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold text-gray-600">Account</button>
-            <button type="button" data-type="contacts" onclick="setRecordType('contacts')" class="record-type rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold text-gray-600">Contact</button>
-            <button type="button" data-type="properties" onclick="setRecordType('properties')" class="record-type rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold text-gray-600">Property</button>
-            <button type="button" data-type="payment_methods" onclick="setRecordType('payment_methods')" class="record-type rounded-lg border border-gray-200 px-3 py-2 text-sm font-bold text-gray-600">Payment</button>
+    <div id="record-type-selector" class="hidden border-b border-gray-100 p-4">
+        <div class="mb-3 flex items-center justify-between gap-3">
+            <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Client setup</p>
+            <span id="record-step-label" class="text-xs font-semibold text-blue-600">Step 1 of 4</span>
         </div>
+        <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            <button type="button" data-type="accounts" onclick="goToWizardStep('accounts')" class="record-type rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600">1. Account</button>
+            <button type="button" data-type="contacts" onclick="goToWizardStep('contacts')" class="record-type rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600">2. Contact</button>
+            <button type="button" data-type="properties" onclick="goToWizardStep('properties')" class="record-type rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600">3. Property</button>
+            <button type="button" data-type="payment_methods" onclick="goToWizardStep('payment_methods')" class="record-type rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600">4. Payment</button>
+        </div>
+        <p id="record-step-help" class="mt-3 text-sm text-gray-500">Create the customer account first. The next steps are optional and stay linked to it.</p>
     </div>
     <form id="record-form" class="flex flex-1 flex-col overflow-hidden">
         <div id="record-form-fields" class="flex-1 space-y-4 overflow-y-auto p-5"></div>
-        <div class="flex justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-4">
+        <div class="flex items-center justify-between gap-2 border-t border-gray-200 bg-gray-50 px-5 py-4">
+            <button id="record-back-button" type="button" onclick="moveWizardStep(-1)" class="hidden rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Back</button>
+            <span class="flex-1"></span>
             <button type="button" onclick="closeRecordPanel()" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
+            <button id="record-skip-button" type="button" onclick="moveWizardStep(1, true)" class="hidden rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100">Skip</button>
             <button id="record-submit-button" type="submit" class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Save Record</button>
         </div>
     </form>
@@ -254,7 +262,7 @@
             <div class="flex flex-wrap gap-2">
                 <button id="detail-edit-button" type="button" onclick="editCurrentRecord()" class="hidden inline-flex items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-semibold text-blue-700 hover:bg-blue-100">
                     <svg class="mr-1.5 h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 13H9v-2.828l6.586-6.586z"></path></svg>
-                    Edit contact
+                    <span id="detail-edit-label">Edit record</span>
                 </button>
                 <button id="detail-duplicate-button" type="button" onclick="openWorkspaceCopy()" class="hidden inline-flex items-center justify-center gap-1.5 rounded-lg border border-violet-200 bg-violet-50 px-3 py-2 text-sm font-semibold text-violet-700 hover:bg-violet-100">
                     <i data-lucide="copy-plus" class="h-4 w-4"></i>
@@ -310,6 +318,8 @@
         detailRecord: null,
         detailRelated: 'overview',
         editingRecord: null,
+        creationMode: 'single',
+        wizardDrafts: {},
     };
 
     const crmCustomFields = JSON.parse(document.getElementById('crm-custom-fields-data')?.textContent || '[]');
@@ -339,6 +349,28 @@
         { key: 'twilio_sms', label: 'SMS / Twilio', icon: 'message-square-text', tone: 'bg-fuchsia-50 text-fuchsia-600' },
         { key: 'timeline', label: 'Timeline', icon: 'history', tone: 'bg-slate-100 text-slate-600' },
     ];
+    const relationshipDefinitions = {
+        accounts: [
+            { key: 'contacts', label: 'Contacts', icon: 'contact', tone: 'bg-blue-50 text-blue-600' },
+            { key: 'properties', label: 'Properties', icon: 'map-pin-house', tone: 'bg-emerald-50 text-emerald-600' },
+            { key: 'payment_methods', label: 'Payment Methods', icon: 'credit-card', tone: 'bg-violet-50 text-violet-600' },
+        ],
+        contacts: [
+            { key: 'account', label: 'Account', icon: 'building-2', tone: 'bg-blue-50 text-blue-600' },
+            { key: 'properties', label: 'Properties', icon: 'map-pin-house', tone: 'bg-emerald-50 text-emerald-600' },
+            { key: 'payment_methods', label: 'Payment Methods', icon: 'credit-card', tone: 'bg-violet-50 text-violet-600' },
+        ],
+    };
+
+    function relatedDefinitionsFor(type) {
+        const relationships = relationshipDefinitions[type] || [];
+        return [
+            relatedListDefinitions[0],
+            relatedListDefinitions[1],
+            ...relationships,
+            ...relatedListDefinitions.slice(2),
+        ];
+    }
 
     const tableHeads = {
         accounts: `
@@ -473,6 +505,9 @@
         document.getElementById('crm-search').placeholder = tab === 'contacts'
             ? 'Search name, email, or phone...'
             : `Search ${tabLabel(tab)}...`;
+        document.getElementById('new-record-label').innerText = tab === 'payment_methods'
+            ? 'New Payment Method'
+            : `New ${detailTypeMeta[tab]?.label || 'Record'}`;
         renderCrmTable();
         updateTabStyles();
         renderRecordForm();
@@ -713,25 +748,46 @@
         if (!record) return [];
         if (type === 'accounts') {
             return [
-                ...crmState.contacts.filter(item => String(item.account) === String(record.id)).map(item => ({ type: 'Contact', name: recordName('contacts', item), detail: item.email || item.phone || 'No contact info' })),
-                ...crmState.properties.filter(item => String(item.account) === String(record.id)).map(item => ({ type: 'Property', name: item.name, detail: item.address || 'No address' })),
-                ...crmState.payment_methods.filter(item => String(item.account) === String(record.id)).map(item => ({ type: 'Payment', name: recordName('payment_methods', item), detail: item.property_name || 'General billing' })),
+                ...crmState.contacts.filter(item => String(item.account) === String(record.id)).map(item => ({ recordType: 'contacts', id: item.id, type: 'Contact', name: recordName('contacts', item), detail: item.email || item.phone || 'No contact info' })),
+                ...crmState.properties.filter(item => String(item.account) === String(record.id)).map(item => ({ recordType: 'properties', id: item.id, type: 'Property', name: item.name, detail: item.address || 'No address' })),
+                ...crmState.payment_methods.filter(item => String(item.account) === String(record.id)).map(item => ({ recordType: 'payment_methods', id: item.id, type: 'Payment', name: recordName('payment_methods', item), detail: item.property_name || 'General billing' })),
             ];
         }
         if (type === 'contacts') {
             const account = findRecord('accounts', record.account);
-            return account ? [{ type: 'Account', name: account.name, detail: account.phone || account.billing_address || 'Account record' }] : [];
+            return account ? [{ recordType: 'accounts', id: account.id, type: 'Account', name: account.name, detail: account.phone || account.billing_address || 'Account record' }] : [];
         }
         if (type === 'properties') {
             const account = findRecord('accounts', record.account);
-            return account ? [{ type: 'Account', name: account.name, detail: account.phone || account.billing_address || 'Account record' }] : [];
+            return account ? [{ recordType: 'accounts', id: account.id, type: 'Account', name: account.name, detail: account.phone || account.billing_address || 'Account record' }] : [];
         }
         const account = findRecord('accounts', record.account);
         const property = record.assigned_property ? findRecord('properties', record.assigned_property) : null;
         return [
-            account ? { type: 'Account', name: account.name, detail: account.phone || 'Account record' } : null,
-            property ? { type: 'Property', name: property.name, detail: property.address || 'Property record' } : null,
+            account ? { recordType: 'accounts', id: account.id, type: 'Account', name: account.name, detail: account.phone || 'Account record' } : null,
+            property ? { recordType: 'properties', id: property.id, type: 'Property', name: property.name, detail: property.address || 'Property record' } : null,
         ].filter(Boolean);
+    }
+
+    function relationshipRecordsFor(key, type, record) {
+        const accountId = type === 'accounts' ? record.id : record.account;
+        if (key === 'account') {
+            const account = findRecord('accounts', accountId);
+            return account ? [{ recordType: 'accounts', id: account.id, type: 'Account', name: account.name, detail: account.email || account.phone || account.billing_address || 'Account record' }] : [];
+        }
+        if (key === 'contacts') {
+            return crmState.contacts.filter(item => String(item.account) === String(accountId))
+                .map(item => ({ recordType: 'contacts', id: item.id, type: 'Contact', name: recordName('contacts', item), detail: item.email || item.phone || 'No contact info' }));
+        }
+        if (key === 'properties') {
+            return crmState.properties.filter(item => String(item.account) === String(accountId))
+                .map(item => ({ recordType: 'properties', id: item.id, type: 'Property', name: recordName('properties', item), detail: item.address || 'No address' }));
+        }
+        if (key === 'payment_methods') {
+            return crmState.payment_methods.filter(item => String(item.account) === String(accountId))
+                .map(item => ({ recordType: 'payment_methods', id: item.id, type: 'Payment Method', name: recordName('payment_methods', item), detail: item.property_name || 'General billing' }));
+        }
+        return [];
     }
 
     function relatedCount(key, type, record) {
@@ -745,6 +801,10 @@
             timeline: jobs.length,
             notes: record?.custom_data?.notes ? 1 : 0,
             connected_records: connected.length,
+            account: relationshipRecordsFor('account', type, record).length,
+            contacts: relationshipRecordsFor('contacts', type, record).length,
+            properties: relationshipRecordsFor('properties', type, record).length,
+            payment_methods: relationshipRecordsFor('payment_methods', type, record).length,
             attachments: 0,
             potentials: 0,
             open_activities: openJobs.length,
@@ -854,13 +914,40 @@
                 </div>
                 <div class="divide-y divide-gray-100">
                     ${rows.map(row => `
-                        <div class="flex items-start justify-between gap-3 px-4 py-3">
+                        <button type="button" onclick="openRecordDetail('${row.recordType}', '${row.id}')" class="flex w-full items-start justify-between gap-3 px-4 py-3 text-left hover:bg-gray-50">
                             <div>
                                 <div class="text-sm font-semibold text-gray-950">${escapeHtml(row.name)}</div>
                                 <div class="mt-1 text-xs text-gray-500">${escapeHtml(row.detail)}</div>
                             </div>
                             <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">${escapeHtml(row.type)}</span>
-                        </div>`).join('')}
+                        </button>`).join('')}
+                </div>
+            </section>`;
+    }
+
+    function renderRelationshipList(key, type, record) {
+        const rows = relationshipRecordsFor(key, type, record);
+        const definition = relatedDefinitionsFor(type).find(item => item.key === key);
+        if (!rows.length) {
+            return simpleEmptyState(
+                `No ${definition?.label?.toLowerCase() || 'related records'} yet`,
+                'Create or link a record from its CRM module and it will appear here.'
+            );
+        }
+        return `
+            <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div class="border-b border-gray-200 px-4 py-3">
+                    <h3 class="text-sm font-semibold uppercase tracking-wide text-gray-700">${escapeHtml(definition?.label || 'Related Records')}</h3>
+                </div>
+                <div class="divide-y divide-gray-100">
+                    ${rows.map(row => `
+                        <button type="button" onclick="openRecordDetail('${row.recordType}', '${row.id}')" class="flex w-full items-center justify-between gap-4 px-4 py-3 text-left hover:bg-gray-50">
+                            <span>
+                                <span class="block text-sm font-semibold text-gray-950">${escapeHtml(row.name)}</span>
+                                <span class="mt-1 block text-xs text-gray-500">${escapeHtml(row.detail)}</span>
+                            </span>
+                            <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">${escapeHtml(row.type)}</span>
+                        </button>`).join('')}
                 </div>
             </section>`;
     }
@@ -973,6 +1060,8 @@
 
         if (key === 'overview') {
             content.innerHTML = renderDetailOverview(type, record);
+        } else if (['account', 'contacts', 'properties', 'payment_methods'].includes(key)) {
+            content.innerHTML = renderRelationshipList(key, type, record);
         } else if (key === 'connected_records') {
             content.innerHTML = renderConnectedRecords(type, record);
         } else if (key === 'open_activities') {
@@ -986,7 +1075,7 @@
         } else if (key === 'timeline') {
             content.innerHTML = renderTimeline(type, record);
         } else {
-            const definition = relatedListDefinitions.find(item => item.key === key);
+            const definition = relatedDefinitionsFor(type).find(item => item.key === key);
             content.innerHTML = simpleEmptyState(
                 `${definition?.label || 'Related list'} is ready for data`,
                 'This module placeholder gives us the Zoho-style navigation now, while the backend object can be added cleanly as the feature comes online.'
@@ -1000,7 +1089,7 @@
         const record = crmState.detailRecord;
         if (!nav || !type || !record) return;
 
-        nav.innerHTML = relatedListDefinitions.map(item => {
+        nav.innerHTML = relatedDefinitionsFor(type).map(item => {
             const count = relatedCount(item.key, type, record);
             const active = crmState.detailRelated === item.key;
             return `
@@ -1028,7 +1117,9 @@
         document.getElementById('detail-subtitle').innerText = recordSubtitle(type, record);
         document.getElementById('detail-avatar').innerText = recordInitial(type, record);
         document.getElementById('detail-type-badge').innerText = detailTypeMeta[type]?.badge || 'CRM';
-        document.getElementById('detail-edit-button').classList.toggle('hidden', type !== 'contacts');
+        const canEdit = ['accounts', 'contacts'].includes(type);
+        document.getElementById('detail-edit-button').classList.toggle('hidden', !canEdit);
+        document.getElementById('detail-edit-label').innerText = `Edit ${detailTypeMeta[type]?.label?.toLowerCase() || 'record'}`;
         document.getElementById('detail-archive-button').classList.toggle('hidden', !['accounts', 'contacts'].includes(type));
         const duplicateButton = document.getElementById('detail-duplicate-button');
         const canDuplicate = ['accounts', 'contacts'].includes(type) && crmDuplicateWorkspaces.length > 0;
@@ -1140,6 +1231,57 @@
         document.getElementById('record-sms-opt-out').checked = Boolean(contact.sms_opt_out);
     }
 
+    function populateAccountForm(account) {
+        setFormValue('record-name', account.name);
+        setFormValue('record-phone', account.phone);
+        setFormValue('record-email', account.email);
+        setFormValue('record-website', account.website);
+        setFormValue('record-billing-street', account.billing_street);
+        setFormValue('record-billing-city', account.billing_city);
+        setFormValue('record-billing-state', account.billing_state);
+        setFormValue('record-billing-postal', account.billing_postal_code);
+        setFormValue('record-billing-country', account.billing_country || 'United States');
+    }
+
+    function applyRecordDraft(type, draft) {
+        if (!draft) return;
+        const values = {
+            accounts: {
+                'record-name': draft.name, 'record-phone': draft.phone, 'record-email': draft.email,
+                'record-website': draft.website, 'record-billing-street': draft.billing_street,
+                'record-billing-city': draft.billing_city, 'record-billing-state': draft.billing_state,
+                'record-billing-postal': draft.billing_postal_code, 'record-billing-country': draft.billing_country,
+            },
+            contacts: {
+                'record-first-name': draft.first_name, 'record-last-name': draft.last_name,
+                'record-email': draft.email, 'record-secondary-email': draft.secondary_email,
+                'record-phone': draft.phone, 'record-mobile': draft.mobile,
+                'record-mailing-street': draft.mailing_street, 'record-mailing-city': draft.mailing_city,
+                'record-mailing-state': draft.mailing_state, 'record-mailing-postal': draft.mailing_postal_code,
+                'record-mailing-country': draft.mailing_country, 'record-lead-source': draft.lead_source,
+                'record-status': draft.status, 'record-description': draft.description,
+            },
+            properties: {
+                'record-name': draft.name, 'record-address': draft.address,
+                'record-unit': draft.unit_number, 'record-gate-code': draft.gate_code,
+            },
+            payment_methods: {
+                'record-card-type': draft.card_type, 'record-last-four': draft.last_four,
+                'record-expiration': draft.expiration_date,
+            },
+        }[type] || {};
+        Object.entries(values).forEach(([id, value]) => setFormValue(id, value));
+        if (type === 'contacts') {
+            document.getElementById('record-is-primary').checked = Boolean(draft.is_primary);
+            document.getElementById('record-email-opt-out').checked = Boolean(draft.email_opt_out);
+            document.getElementById('record-sms-opt-out').checked = Boolean(draft.sms_opt_out);
+        }
+        if (type === 'payment_methods') {
+            document.getElementById('record-is-default').checked = Boolean(draft.is_default);
+            document.getElementById('record-use-created-property').checked = draft.use_created_property !== false;
+        }
+    }
+
     function renderRecordForm() {
         const fields = document.getElementById('record-form-fields');
         const title = document.getElementById('record-panel-title');
@@ -1147,14 +1289,28 @@
         const submitButton = document.getElementById('record-submit-button');
         const type = crmState.recordType;
         const editing = crmState.editingRecord;
-        document.getElementById('record-type-selector').classList.toggle('hidden', Boolean(editing));
+        const wizard = crmState.creationMode === 'wizard' && !editing;
+        document.getElementById('record-type-selector').classList.toggle('hidden', !wizard);
+        document.getElementById('record-back-button').classList.toggle('hidden', !wizard || type === 'accounts');
+        document.getElementById('record-skip-button').classList.toggle('hidden', !wizard || type === 'accounts' || type === 'payment_methods');
 
         updateTabStyles();
         eyebrow.innerText = type === 'accounts' ? 'CRM Account' : type === 'contacts' ? 'CRM Contact' : type === 'properties' ? 'CRM Property' : 'CRM Payment';
         title.innerText = editing
             ? `Edit ${recordName(type, editing)}`
             : type === 'accounts' ? 'New Account' : type === 'contacts' ? 'New Contact' : type === 'properties' ? 'New Property' : 'New Payment Method';
-        submitButton.innerText = editing ? 'Save Changes' : 'Save Record';
+        const wizardTypes = ['accounts', 'contacts', 'properties', 'payment_methods'];
+        const stepIndex = wizardTypes.indexOf(type);
+        if (wizard) {
+            document.getElementById('record-step-label').innerText = `Step ${stepIndex + 1} of 4`;
+            document.getElementById('record-step-help').innerText = [
+                'Create the customer account first. The next steps are optional and stay linked to it.',
+                'Add the primary contact for this account, or skip this step.',
+                'Add the service location for this account, or skip this step.',
+                'Add a tokenized payment reference now, or finish without one.',
+            ][stepIndex];
+        }
+        submitButton.innerText = editing ? 'Save Changes' : wizard ? (type === 'payment_methods' ? 'Create Client' : 'Continue') : 'Save Record';
 
         if (type === 'accounts') {
             fields.innerHTML = `
@@ -1166,15 +1322,17 @@
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('City', 'record-billing-city')}${field('State', 'record-billing-state')}</div>
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('ZIP / Postal code', 'record-billing-postal', 'autocomplete="postal-code"')}${field('Country', 'record-billing-country', 'value="United States"')}</div>`;
             bindPostalLookup('record-billing-postal','record-billing-city','record-billing-state','record-billing-country');
+            if (editing) populateAccountForm(editing);
+            if (wizard) applyRecordDraft(type, crmState.wizardDrafts[type]);
             return;
         }
 
         if (type === 'contacts') {
             fields.innerHTML = `
-                <label class="block">
+                ${wizard ? '<input id="record-account" type="hidden" value=""><div class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-800">This contact will be linked to the account from step 1.</div>' : `<label class="block">
                     <span class="text-sm font-semibold text-gray-700">Account</span>
                     <select id="record-account" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${accountOptions(true)}</select>
-                </label>
+                </label>`}
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     ${field('First Name', 'record-first-name', 'required')}
                     ${field('Last Name', 'record-last-name', 'required')}
@@ -1193,52 +1351,80 @@
                 </div>`;
             bindPostalLookup('record-mailing-postal','record-mailing-city','record-mailing-state','record-mailing-country');
             if (editing) populateContactForm(editing);
+            if (wizard) applyRecordDraft(type, crmState.wizardDrafts[type]);
             return;
         }
 
         if (type === 'payment_methods') {
             fields.innerHTML = `
-                <label class="block">
+                ${wizard ? '<input id="record-account" type="hidden" value=""><div class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-800">This payment reference will be linked to the new account.</div>' : `<label class="block">
                     <span class="text-sm font-semibold text-gray-700">Account</span>
                     <select id="record-account" required class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${accountOptions()}</select>
-                </label>
-                <label class="block">
+                </label>`}
+                ${wizard ? '<input id="record-property" type="hidden" value=""><label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700"><input id="record-use-created-property" type="checkbox" checked class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">Use the property from step 3</label>' : `<label class="block">
                     <span class="text-sm font-semibold text-gray-700">Property Restriction</span>
                     <select id="record-property" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${propertyOptions()}</select>
-                </label>
+                </label>`}
                 <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     ${field('Card Type', 'record-card-type', 'placeholder="Visa"')}
-                    ${field('Last Four', 'record-last-four', 'required maxlength="4" inputmode="numeric" placeholder="4242"')}
+                    ${field('Last Four', 'record-last-four', `${wizard ? '' : 'required'} maxlength="4" inputmode="numeric" placeholder="4242"`)}
                 </div>
                 ${field('Expiration', 'record-expiration', 'placeholder="MM/YYYY"')}
                 <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700">
                     <input id="record-is-default" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                     Default payment method
                 </label>`;
+            if (wizard) applyRecordDraft(type, crmState.wizardDrafts[type]);
             return;
         }
 
         fields.innerHTML = `
-            <label class="block">
+            ${wizard ? '<input id="record-account" type="hidden" value=""><div class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-800">This property will be linked to the account from step 1.</div>' : `<label class="block">
                 <span class="text-sm font-semibold text-gray-700">Account</span>
                 <select id="record-account" required class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${accountOptions()}</select>
-            </label>
+            </label>`}
             ${field('Property Name', 'record-name', 'required placeholder="Main Office"')}
             ${field('Address', 'record-address', 'required placeholder="1170 N Federal Highway, Fort Lauderdale, FL"')}
             <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 ${field('Unit / Suite', 'record-unit', 'placeholder="Unit 204"')}
                 ${field('Gate Code', 'record-gate-code', 'placeholder="Optional"')}
             </div>`;
+        if (wizard) applyRecordDraft(type, crmState.wizardDrafts[type]);
     }
 
     function setRecordType(type) {
         crmState.editingRecord = null;
+        crmState.creationMode = 'single';
         crmState.recordType = type;
+        renderRecordForm();
+    }
+
+    function captureWizardDraft() {
+        if (crmState.creationMode !== 'wizard') return;
+        crmState.wizardDrafts[crmState.recordType] = payloadForType(crmState.recordType);
+    }
+
+    function goToWizardStep(type) {
+        if (crmState.creationMode !== 'wizard') return;
+        captureWizardDraft();
+        crmState.recordType = type;
+        renderRecordForm();
+    }
+
+    function moveWizardStep(direction, skip = false) {
+        const types = ['accounts', 'contacts', 'properties', 'payment_methods'];
+        const current = types.indexOf(crmState.recordType);
+        if (!skip && direction > 0 && !document.getElementById('record-form').reportValidity()) return;
+        if (!skip) captureWizardDraft();
+        else delete crmState.wizardDrafts[crmState.recordType];
+        crmState.recordType = types[Math.max(0, Math.min(types.length - 1, current + direction))];
         renderRecordForm();
     }
 
     function openRecordPanel(type = crmState.activeTab) {
         crmState.editingRecord = null;
+        crmState.creationMode = type === 'accounts' ? 'wizard' : 'single';
+        crmState.wizardDrafts = {};
         crmState.recordType = type;
         renderRecordForm();
         document.getElementById('record-overlay').classList.remove('hidden');
@@ -1250,12 +1436,15 @@
         document.getElementById('record-overlay').classList.add('hidden');
         document.getElementById('record-form').reset();
         crmState.editingRecord = null;
-        document.getElementById('record-type-selector').classList.remove('hidden');
+        crmState.creationMode = 'single';
+        crmState.wizardDrafts = {};
+        document.getElementById('record-type-selector').classList.add('hidden');
     }
 
     function editCurrentRecord() {
-        if (crmState.detailType !== 'contacts' || !crmState.detailRecord) return;
-        crmState.recordType = 'contacts';
+        if (!['accounts', 'contacts'].includes(crmState.detailType) || !crmState.detailRecord) return;
+        crmState.creationMode = 'single';
+        crmState.recordType = crmState.detailType;
         crmState.editingRecord = crmState.detailRecord;
         renderRecordForm();
         document.getElementById('record-overlay').classList.remove('hidden');
@@ -1307,7 +1496,7 @@
         }
 
         if (type === 'payment_methods') {
-            return {
+            const payload = {
                 account: document.getElementById('record-account').value,
                 assigned_property: document.getElementById('record-property').value || null,
                 card_type: document.getElementById('record-card-type').value,
@@ -1315,6 +1504,9 @@
                 expiration_date: document.getElementById('record-expiration').value,
                 is_default: document.getElementById('record-is-default').checked,
             };
+            const useCreatedProperty = document.getElementById('record-use-created-property');
+            if (useCreatedProperty) payload.use_created_property = useCreatedProperty.checked;
+            return payload;
         }
 
         return {
@@ -1630,6 +1822,40 @@
         const type = crmState.recordType;
         const editing = crmState.editingRecord;
         try {
+            if (crmState.creationMode === 'wizard' && !editing) {
+                captureWizardDraft();
+                if (type !== 'payment_methods') {
+                    moveWizardStep(1);
+                    return;
+                }
+
+                const drafts = crmState.wizardDrafts;
+                const bundlePayload = {
+                    account: drafts.accounts,
+                    contact: drafts.contacts?.first_name && drafts.contacts?.last_name ? drafts.contacts : null,
+                    property: drafts.properties?.name && drafts.properties?.address ? drafts.properties : null,
+                    payment_method: drafts.payment_methods?.last_four ? drafts.payment_methods : null,
+                };
+                const response = await fetch('/api/v1/accounts/create-bundle/', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken'),
+                    },
+                    body: JSON.stringify(bundlePayload),
+                });
+                if (!response.ok) {
+                    const data = await response.json();
+                    alert(`Could not create client: ${JSON.stringify(data)}`);
+                    return;
+                }
+                closeRecordPanel();
+                crmState.activeTab = 'accounts';
+                await loadCrmData();
+                setCrmTab('accounts');
+                return;
+            }
+
             const endpoint = editing
                 ? `/api/v1/${endpointForType(type)}/${editing.id}/`
                 : `/api/v1/${endpointForType(type)}/`;

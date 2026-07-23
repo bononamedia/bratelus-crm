@@ -120,6 +120,50 @@ class AccountlessContactApiTests(TestCase):
         self.assertEqual(contact.organization, self.workspace)
         self.assertEqual(contact.external_id, 'zoho-123')
 
+    def test_account_bundle_creates_linked_records_atomically(self):
+        response = self.client.post(
+            reverse('api-account-create-bundle'),
+            {
+                'account': {'name': 'Bundle Client', 'email': 'billing@example.com'},
+                'contact': {
+                    'first_name': 'Ana',
+                    'last_name': 'Client',
+                    'email': 'ana@example.com',
+                },
+                'property': {
+                    'name': 'Main Property',
+                    'address': '100 Main St, Richmond, VA',
+                },
+                'payment_method': {
+                    'card_type': 'Visa',
+                    'last_four': '4242',
+                    'use_created_property': True,
+                },
+            },
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 201, response.content)
+        account = Account.objects.get(name='Bundle Client')
+        self.assertEqual(account.organization, self.workspace)
+        self.assertEqual(Contact.objects.get().account, account)
+        property_record = Property.objects.get()
+        self.assertEqual(property_record.account, account)
+        payment = PaymentMethod.objects.get()
+        self.assertEqual(payment.account, account)
+        self.assertEqual(payment.assigned_property, property_record)
+
+    def test_invalid_account_bundle_rolls_back_every_record(self):
+        response = self.client.post(
+            reverse('api-account-create-bundle'),
+            {
+                'account': {'name': 'Should Roll Back'},
+                'contact': {'first_name': 'Missing last name'},
+            },
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(Account.objects.filter(name='Should Roll Back').exists())
+
     def test_contact_edit_panel_stacks_above_the_detail_panel(self):
         response = self.client.get(reverse('contacts'))
         self.assertContains(response, 'id="record-overlay" class="fixed inset-0 z-[75]')

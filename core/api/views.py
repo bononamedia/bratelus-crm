@@ -92,6 +92,45 @@ class AccountViewSet(BaseWorkspaceViewSet):
         # Auto-attach the organization that the user currently has selected in the UI
         serializer.save(organization=self.request.active_organization)
 
+    @action(detail=False, methods=['post'], url_path='create-bundle')
+    @transaction.atomic
+    def create_bundle(self, request):
+        workspace = getattr(request, 'active_organization', None)
+        if not user_can_manage_workspace(request.user, workspace):
+            raise PermissionDenied('Only workspace admins can manage CRM accounts.')
+
+        account_serializer = self.get_serializer(data=request.data.get('account') or {})
+        account_serializer.is_valid(raise_exception=True)
+        account = account_serializer.save(organization=workspace)
+
+        created = {'account': account_serializer.data}
+        contact_data = request.data.get('contact')
+        if contact_data:
+            contact_serializer = ContactSerializer(data={**contact_data, 'account': account.id})
+            contact_serializer.is_valid(raise_exception=True)
+            contact_serializer.save(organization=workspace)
+            created['contact'] = contact_serializer.data
+
+        property_record = None
+        property_data = request.data.get('property')
+        if property_data:
+            property_serializer = PropertySerializer(data={**property_data, 'account': account.id})
+            property_serializer.is_valid(raise_exception=True)
+            property_record = property_serializer.save()
+            created['property'] = property_serializer.data
+
+        payment_data = request.data.get('payment_method')
+        if payment_data:
+            payment_payload = {**payment_data, 'account': account.id}
+            if payment_payload.pop('use_created_property', False) and property_record:
+                payment_payload['assigned_property'] = property_record.id
+            payment_serializer = PaymentMethodSerializer(data=payment_payload)
+            payment_serializer.is_valid(raise_exception=True)
+            payment_serializer.save()
+            created['payment_method'] = payment_serializer.data
+
+        return Response(created, status=status.HTTP_201_CREATED)
+
     def destroy(self, request, *args, **kwargs):
         account = self.get_object()
         account.archived_at = timezone.now()
