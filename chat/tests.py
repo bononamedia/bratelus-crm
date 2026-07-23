@@ -193,6 +193,16 @@ class InternalChatTests(TestCase):
         self.assertRedirects(delete, reverse('chat_inbox'))
         self.assertFalse(ChatConversation.objects.filter(id=conversation.id).exists())
 
+    def test_account_owner_can_open_website_chat_settings(self):
+        response = self.client.get(reverse('website_chat_settings'))
+
+        self.assertEqual(response.status_code, 200)
+        widget = WebsiteChatWidget.objects.get(workspace=self.workspace)
+        self.assertContains(
+            response,
+            reverse('website_chat_launcher', args=[widget.public_key]),
+        )
+
     def test_website_widget_creates_crm_lead_and_staff_conversation(self):
         widget = WebsiteChatWidget.objects.create(
             workspace=self.workspace,
