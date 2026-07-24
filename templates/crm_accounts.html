@@ -109,35 +109,41 @@
 </div>
 
 <div id="record-overlay" class="fixed inset-0 z-[75] hidden bg-gray-900 bg-opacity-50" onclick="closeRecordPanel()"></div>
-<aside id="record-panel" class="fixed inset-y-0 right-0 z-[80] flex w-full max-w-lg translate-x-full flex-col bg-white shadow-2xl transition-transform duration-300">
-    <div class="border-b border-gray-200 bg-gray-50 px-5 py-4">
+<aside id="record-panel" class="fixed inset-y-0 right-0 z-[80] flex w-full max-w-xl translate-x-full flex-col bg-slate-50 shadow-2xl transition-transform duration-300">
+    <div class="border-b border-blue-100 bg-blue-50 px-5 py-4">
         <div class="flex items-start justify-between gap-4">
-            <div>
-                <p class="text-xs font-bold uppercase tracking-wide text-blue-600" id="record-panel-eyebrow">CRM</p>
-                <h2 class="text-lg font-extrabold text-gray-950" id="record-panel-title">New Record</h2>
+            <div class="flex min-w-0 items-start gap-3">
+                <span class="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm">
+                    <i id="record-panel-icon" data-lucide="contact-round" class="h-5 w-5"></i>
+                </span>
+                <div class="min-w-0">
+                    <p class="text-xs font-bold uppercase tracking-wide text-blue-600" id="record-panel-eyebrow">CRM</p>
+                    <h2 class="truncate text-lg font-extrabold text-gray-950" id="record-panel-title">New Record</h2>
+                    <p id="record-panel-subtitle" class="mt-0.5 text-xs text-slate-600">Add a customer record to this workspace.</p>
+                </div>
             </div>
-            <button type="button" onclick="closeRecordPanel()" class="rounded-md p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-600">
+            <button type="button" onclick="closeRecordPanel()" class="rounded-md p-2 text-slate-500 hover:bg-white hover:text-gray-800">
                 <span class="sr-only">Close</span>
                 <svg class="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
             </button>
         </div>
     </div>
-    <div id="record-type-selector" class="hidden border-b border-gray-100 p-4">
+    <div id="record-type-selector" class="hidden border-b border-blue-100 bg-white p-4">
         <div class="mb-3 flex items-center justify-between gap-3">
             <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Client setup</p>
             <span id="record-step-label" class="text-xs font-semibold text-blue-600">Step 1 of 4</span>
         </div>
         <div class="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            <button type="button" data-type="accounts" onclick="goToWizardStep('accounts')" class="record-type rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600">1. Account</button>
-            <button type="button" data-type="contacts" onclick="goToWizardStep('contacts')" class="record-type rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600">2. Contact</button>
-            <button type="button" data-type="properties" onclick="goToWizardStep('properties')" class="record-type rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600">3. Property</button>
-            <button type="button" data-type="payment_methods" onclick="goToWizardStep('payment_methods')" class="record-type rounded-lg border border-gray-200 px-3 py-2 text-sm font-semibold text-gray-600">4. Payment</button>
+            <button type="button" data-type="accounts" onclick="goToWizardStep('accounts')" class="record-type rounded-lg border border-gray-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-gray-600">1. Account</button>
+            <button type="button" data-type="contacts" onclick="goToWizardStep('contacts')" class="record-type rounded-lg border border-gray-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-gray-600">2. Contact</button>
+            <button type="button" data-type="properties" onclick="goToWizardStep('properties')" class="record-type rounded-lg border border-gray-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-gray-600">3. Property</button>
+            <button type="button" data-type="payment_methods" onclick="goToWizardStep('payment_methods')" class="record-type rounded-lg border border-gray-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-gray-600">4. Payment</button>
         </div>
         <p id="record-step-help" class="mt-3 text-sm text-gray-500">Create the customer account first. The next steps are optional and stay linked to it.</p>
     </div>
     <form id="record-form" class="flex flex-1 flex-col overflow-hidden">
-        <div id="record-form-fields" class="flex-1 space-y-4 overflow-y-auto p-5"></div>
-        <div class="flex items-center justify-between gap-2 border-t border-gray-200 bg-gray-50 px-5 py-4">
+        <div id="record-form-fields" class="flex-1 space-y-4 overflow-y-auto bg-slate-50 p-4 sm:p-5"></div>
+        <div class="flex items-center justify-between gap-2 border-t border-blue-100 bg-white px-5 py-4 shadow-[0_-8px_24px_rgba(15,23,42,0.04)]">
             <button id="record-back-button" type="button" onclick="moveWizardStep(-1)" class="hidden rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Back</button>
             <span class="flex-1"></span>
             <button type="button" onclick="closeRecordPanel()" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50">Cancel</button>
@@ -1088,7 +1094,7 @@
         const categoryStyle = noteCategoryStyles[note.category] || noteCategoryStyles.general;
         const created = new Date(note.created_at).toLocaleString();
         return `
-            <article class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+            <article class="rounded-lg border border-gray-200 border-l-4 border-l-blue-400 bg-white p-4 shadow-sm transition-shadow hover:shadow-md">
                 <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                     <div class="flex flex-wrap items-center gap-2">
                         <span class="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">${escapeHtml(noteTargetNames[note.target_type] || note.target_type)}: ${escapeHtml(note.target_label)}</span>
@@ -1120,19 +1126,30 @@
             renderRelatedNav();
             const accountless = context.type === 'contact' && !crmState.detailRecord.account;
             content.innerHTML = `
-                <section class="rounded-lg border border-gray-200 bg-white shadow-sm">
-                    <div class="border-b border-gray-200 px-5 py-4">
-                        <h3 class="font-semibold text-gray-950">Add a note</h3>
-                        <p class="mt-1 text-sm text-gray-500">Choose what this note is about so service instructions do not become general customer notes.</p>
+                <div class="mx-auto max-w-5xl">
+                <section class="overflow-hidden rounded-lg border border-blue-100 bg-white shadow-sm">
+                    <div class="flex items-start gap-3 border-b border-blue-100 bg-blue-50 px-5 py-4">
+                        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-blue-600 text-white shadow-sm">
+                            <i data-lucide="notebook-pen" class="h-5 w-5"></i>
+                        </span>
+                        <div>
+                            <h3 class="font-semibold text-gray-950">Add a note</h3>
+                            <p class="mt-1 text-sm text-slate-600">Give the note a clear home so the next person sees it in the right context.</p>
+                        </div>
                     </div>
-                    <div class="space-y-4 p-5">
+                    <div class="space-y-4 bg-slate-50 p-4 sm:p-5">
                         ${accountless ? '<div class="rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-800">This contact has no account. The note will stay attached directly to this person.</div>' : ''}
-                        <div class="grid gap-3 md:grid-cols-3">
-                            <label class="text-sm font-medium text-gray-700">About
-                                <select id="crm-note-target" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5">${noteTargetOptions(targets)}</select>
+                        <div class="rounded-lg border border-blue-100 bg-white p-4 shadow-sm">
+                            <label class="block text-sm font-semibold text-gray-800">
+                                <span class="inline-flex items-center gap-2"><i data-lucide="link-2" class="h-4 w-4 text-blue-600"></i>What is this note about?</span>
+                                <select id="crm-note-target" class="mt-2 w-full rounded-lg border border-gray-300 bg-white px-3 py-3 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${noteTargetOptions(targets)}</select>
                             </label>
-                            <label class="text-sm font-medium text-gray-700">Category
-                                <select id="crm-note-category" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5">
+                            <p class="mt-2 text-xs text-gray-500">Choose the contact, account, property, or job that should own this information.</p>
+                        </div>
+                        <div class="grid gap-3 sm:grid-cols-2">
+                            <label class="rounded-lg border border-amber-100 bg-amber-50 p-3 text-sm font-semibold text-gray-800">
+                                <span class="inline-flex items-center gap-2"><i data-lucide="tags" class="h-4 w-4 text-amber-600"></i>Category</span>
+                                <select id="crm-note-category" class="mt-2 w-full rounded-lg border border-amber-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-amber-400 focus:ring-2 focus:ring-amber-100">
                                     <option value="general">General</option>
                                     <option value="service">Service</option>
                                     <option value="access">Access</option>
@@ -1140,27 +1157,36 @@
                                     <option value="safety">Safety</option>
                                 </select>
                             </label>
-                            <label class="text-sm font-medium text-gray-700">Visibility
-                                <select id="crm-note-visibility" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5">
+                            <label class="rounded-lg border border-violet-100 bg-violet-50 p-3 text-sm font-semibold text-gray-800">
+                                <span class="inline-flex items-center gap-2"><i data-lucide="eye" class="h-4 w-4 text-violet-600"></i>Visibility</span>
+                                <select id="crm-note-visibility" class="mt-2 w-full rounded-lg border border-violet-200 bg-white px-3 py-2.5 text-sm outline-none focus:border-violet-400 focus:ring-2 focus:ring-violet-100">
                                     <option value="internal">Internal only</option>
                                     <option value="customer">Customer visible</option>
                                 </select>
                             </label>
                         </div>
-                        <label class="block text-sm font-medium text-gray-700">Note
-                            <textarea id="crm-note-body" rows="4" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5" placeholder="Write the information the team needs..."></textarea>
-                        </label>
+                        <div class="rounded-lg border border-cyan-100 bg-white p-4 shadow-sm">
+                            <label class="block text-sm font-semibold text-gray-800">
+                                <span class="inline-flex items-center gap-2"><i data-lucide="align-left" class="h-4 w-4 text-cyan-600"></i>Note</span>
+                                <textarea id="crm-note-body" rows="5" class="mt-2 w-full resize-y rounded-lg border border-gray-300 bg-white px-3 py-3 text-sm leading-6 outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100" placeholder="Write the information the team needs..."></textarea>
+                            </label>
+                        </div>
                         <div id="crm-note-error" class="hidden rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"></div>
-                        <div class="flex justify-end"><button type="button" onclick="saveCrmNote()" class="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">Add note</button></div>
+                        <div class="flex justify-end"><button type="button" onclick="saveCrmNote()" class="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700"><i data-lucide="plus" class="h-4 w-4"></i>Add note</button></div>
                     </div>
                 </section>
-                <section class="mt-5">
+                <section class="mt-6">
                     <div class="mb-3 flex items-center justify-between">
-                        <div><h3 class="font-semibold text-gray-950">Related notes</h3><p class="mt-1 text-xs text-gray-500">Every note keeps its original record target.</p></div>
-                        <span class="rounded-full bg-gray-100 px-2.5 py-1 text-xs font-medium text-gray-600">${notes.length}</span>
+                        <div class="flex items-center gap-3">
+                            <span class="flex h-9 w-9 items-center justify-center rounded-lg bg-cyan-50 text-cyan-700"><i data-lucide="messages-square" class="h-4 w-4"></i></span>
+                            <div><h3 class="font-semibold text-gray-950">Related notes</h3><p class="mt-0.5 text-xs text-gray-500">Every note keeps its original record target.</p></div>
+                        </div>
+                        <span class="rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">${notes.length}</span>
                     </div>
-                    <div class="space-y-3">${notes.length ? notes.map(noteCard).join('') : '<div class="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">No notes yet for this record or its related work.</div>'}</div>
-                </section>`;
+                    <div class="space-y-3">${notes.length ? notes.map(noteCard).join('') : '<div class="rounded-lg border border-dashed border-blue-200 bg-blue-50 px-6 py-10 text-center"><span class="mx-auto flex h-12 w-12 items-center justify-center rounded-lg bg-white text-blue-500 shadow-sm"><i data-lucide="notebook-tabs" class="h-6 w-6"></i></span><p class="mt-4 text-sm font-semibold text-gray-800">No notes yet</p><p class="mt-1 text-sm text-gray-500">The first note for this record or its related work will appear here.</p></div>'}</div>
+                </section>
+                </div>`;
+            if (window.lucide) window.lucide.createIcons();
         } catch (error) {
             console.error(error);
             content.innerHTML = simpleEmptyState('Notes could not load', 'Refresh the page and try again.');
@@ -1329,7 +1355,7 @@
         return `
             <label class="block">
                 <span class="text-sm font-semibold text-gray-700">${label}</span>
-                <input id="${id}" ${attrs} class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
+                <input id="${id}" ${attrs} class="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100">
             </label>`;
     }
 
@@ -1337,8 +1363,35 @@
         return `
             <label class="block">
                 <span class="text-sm font-semibold text-gray-700">${label}</span>
-                <textarea id="${id}" ${attrs} class="mt-1 min-h-24 w-full rounded-lg border border-gray-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"></textarea>
+                <textarea id="${id}" ${attrs} class="mt-1.5 min-h-24 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"></textarea>
             </label>`;
+    }
+
+    function formSection(title, description, icon, body, tone = 'blue') {
+        const tones = {
+            blue: 'border-blue-100 bg-blue-50 text-blue-700',
+            cyan: 'border-cyan-100 bg-cyan-50 text-cyan-700',
+            emerald: 'border-emerald-100 bg-emerald-50 text-emerald-700',
+            violet: 'border-violet-100 bg-violet-50 text-violet-700',
+            amber: 'border-amber-100 bg-amber-50 text-amber-700',
+        };
+        return `
+            <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+                <div class="flex items-start gap-3 border-b px-4 py-3 ${tones[tone] || tones.blue}">
+                    <span class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white shadow-sm">
+                        <i data-lucide="${icon}" class="h-4 w-4"></i>
+                    </span>
+                    <div>
+                        <h3 class="text-sm font-bold text-gray-950">${title}</h3>
+                        <p class="mt-0.5 text-xs text-slate-600">${description}</p>
+                    </div>
+                </div>
+                <div class="space-y-4 p-4">${body}</div>
+            </section>`;
+    }
+
+    function refreshCrmIcons() {
+        if (window.lucide) window.requestAnimationFrame(() => window.lucide.createIcons());
     }
 
     function setFormValue(id, value) {
@@ -1474,6 +1527,15 @@
             : editing
             ? `Edit ${recordName(type, editing)}`
             : type === 'accounts' ? 'New Account' : type === 'contacts' ? 'New Contact' : type === 'properties' ? 'New Property' : 'New Payment Method';
+        const panelMeta = {
+            accounts: {icon: 'building-2', subtitle: 'Customer identity, communication, and billing information.'},
+            contacts: {icon: 'contact-round', subtitle: 'Personal details, communication preferences, and CRM context.'},
+            properties: {icon: 'map-pin-house', subtitle: 'Service location, access information, and dispatch context.'},
+            payment_methods: {icon: 'credit-card', subtitle: 'Customer payment reference and property assignment.'},
+        }[type];
+        const panelIcon = document.getElementById('record-panel-icon');
+        panelIcon?.setAttribute('data-lucide', panelMeta.icon);
+        document.getElementById('record-panel-subtitle').innerText = panelMeta.subtitle;
         const wizardTypes = ['accounts', 'contacts', 'properties', 'payment_methods'];
         const stepIndex = wizardTypes.indexOf(type);
         if (wizard || clientEditing) {
@@ -1493,42 +1555,57 @@
         submitButton.innerText = clientEditing ? 'Save Configuration' : editing ? 'Save Changes' : wizard ? (type === 'payment_methods' ? 'Create Client' : 'Continue') : 'Save Record';
 
         if (type === 'accounts') {
-            fields.innerHTML = `
-                ${field('Account Name', 'record-name', 'required placeholder="Client or property name"')}
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Main Phone', 'record-phone', 'placeholder="(555) 000-0000"')}${field('Email', 'record-email', 'type="email"')}</div>
-                ${field('Website', 'record-website', 'type="text" inputmode="url" placeholder="company.com or www.company.com"')}
-                <div class="border-t border-gray-200 pt-4"><h3 class="text-sm font-semibold text-gray-900">Billing address</h3></div>
-                ${field('Street', 'record-billing-street', 'placeholder="1170 N Federal Highway"')}
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('City', 'record-billing-city')}${field('State', 'record-billing-state')}</div>
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('ZIP / Postal code', 'record-billing-postal', 'autocomplete="postal-code"')}${field('Country', 'record-billing-country', 'value="United States"')}</div>`;
+            fields.innerHTML =
+                formSection('Account identity', 'The customer name and primary ways to reach them.', 'building-2', `
+                    ${field('Account Name', 'record-name', 'required placeholder="Client or property name"')}
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Main Phone', 'record-phone', 'placeholder="(555) 000-0000"')}${field('Email', 'record-email', 'type="email"')}</div>
+                    ${field('Website', 'record-website', 'type="text" inputmode="url" placeholder="company.com or www.company.com"')}
+                `, 'blue') +
+                formSection('Billing address', 'Used on estimates, invoices, and account correspondence.', 'map-pin', `
+                    ${field('Street', 'record-billing-street', 'placeholder="1170 N Federal Highway"')}
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('City', 'record-billing-city')}${field('State', 'record-billing-state')}</div>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('ZIP / Postal code', 'record-billing-postal', 'autocomplete="postal-code"')}${field('Country', 'record-billing-country', 'value="United States"')}</div>
+                `, 'cyan');
             bindPostalLookup('record-billing-postal','record-billing-city','record-billing-state','record-billing-country');
             if (editing) populateAccountForm(editing);
             if (wizard) applyRecordDraft(type, crmState.wizardDrafts[type]);
+            refreshCrmIcons();
             return;
         }
 
         if (type === 'contacts') {
-            fields.innerHTML = `
-                ${wizard ? '<input id="record-account" type="hidden" value=""><div class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-800">This contact will be linked to the account from step 1.</div>' : `<label class="block">
+            const accountField = wizard
+                ? '<input id="record-account" type="hidden" value=""><div class="flex items-start gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-3 text-sm text-blue-800"><i data-lucide="link-2" class="mt-0.5 h-4 w-4 shrink-0"></i><span>This contact will be linked to the account from step 1.</span></div>'
+                : `<label class="block">
                     <span class="text-sm font-semibold text-gray-700">Account</span>
-                    <select id="record-account" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${accountOptions(true)}</select>
-                </label>`}
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                    ${field('First Name', 'record-first-name', 'required')}
-                    ${field('Last Name', 'record-last-name', 'required')}
-                </div>
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Email', 'record-email', 'type="email"')}${field('Secondary Email', 'record-secondary-email', 'type="email"')}</div>
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Phone', 'record-phone', 'placeholder="(555) 000-0000"')}${field('Mobile', 'record-mobile', 'placeholder="(555) 000-0000"')}</div>
-                ${field('Mailing Street', 'record-mailing-street')}
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Mailing City', 'record-mailing-city')}${field('Mailing State', 'record-mailing-state')}</div>
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Mailing ZIP', 'record-mailing-postal', 'autocomplete="postal-code"')}${field('Mailing Country', 'record-mailing-country')}</div>
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Lead Source', 'record-lead-source')}${field('Status', 'record-status')}</div>
-                ${textareaField('Description / Notes', 'record-description')}
-                <div class="grid gap-2 sm:grid-cols-3">
-                    <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700"><input id="record-is-primary" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">Primary contact</label>
-                    <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700"><input id="record-email-opt-out" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">Email opt-out</label>
-                    <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700"><input id="record-sms-opt-out" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">SMS opt-out</label>
-                </div>`;
+                    <select id="record-account" class="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${accountOptions(true)}</select>
+                </label>`;
+            fields.innerHTML =
+                formSection('Account relationship', 'Link this person to a customer account, or keep them independent.', 'link-2', accountField, 'blue') +
+                formSection('Contact details', 'The personal and communication information your team uses most.', 'contact-round', `
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                        ${field('First Name', 'record-first-name', 'required')}
+                        ${field('Last Name', 'record-last-name', 'required')}
+                    </div>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Email', 'record-email', 'type="email"')}${field('Secondary Email', 'record-secondary-email', 'type="email"')}</div>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Phone', 'record-phone', 'placeholder="(555) 000-0000"')}${field('Mobile', 'record-mobile', 'placeholder="(555) 000-0000"')}</div>
+                `, 'cyan') +
+                formSection('Mailing address', 'Used for correspondence and customer location context.', 'map-pin', `
+                    ${field('Mailing Street', 'record-mailing-street')}
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Mailing City', 'record-mailing-city')}${field('Mailing State', 'record-mailing-state')}</div>
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Mailing ZIP', 'record-mailing-postal', 'autocomplete="postal-code"')}${field('Mailing Country', 'record-mailing-country')}</div>
+                `, 'emerald') +
+                formSection('CRM context', 'Qualify the relationship and leave general contact context.', 'badge-info', `
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">${field('Lead Source', 'record-lead-source')}${field('Status', 'record-status')}</div>
+                    ${textareaField('Description / General Context', 'record-description', 'placeholder="General information about this contact. Use contextual Notes for job, property, or account-specific details."')}
+                `, 'violet') +
+                formSection('Communication preferences', 'Control the contact role and permitted outreach channels.', 'sliders-horizontal', `
+                    <div class="grid gap-2 sm:grid-cols-3">
+                        <label class="flex items-center gap-2 rounded-lg border border-blue-100 bg-blue-50 px-3 py-2.5 text-sm font-semibold text-blue-800"><input id="record-is-primary" type="checkbox" class="h-4 w-4 rounded border-blue-300 text-blue-600 focus:ring-blue-500">Primary contact</label>
+                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-gray-700"><input id="record-email-opt-out" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">Email opt-out</label>
+                        <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-slate-50 px-3 py-2.5 text-sm font-semibold text-gray-700"><input id="record-sms-opt-out" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">SMS opt-out</label>
+                    </div>
+                `, 'amber');
             bindPostalLookup('record-mailing-postal','record-mailing-city','record-mailing-state','record-mailing-country');
             if (editing) populateContactForm(editing);
             if (clientEditing) {
@@ -1536,54 +1613,63 @@
                 document.getElementById('record-account').disabled = true;
             }
             if (wizard) applyRecordDraft(type, crmState.wizardDrafts[type]);
+            refreshCrmIcons();
             return;
         }
 
         if (type === 'payment_methods') {
-            fields.innerHTML = `
-                ${wizard ? '<input id="record-account" type="hidden" value=""><div class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-800">This payment reference will be linked to the new account.</div>' : `<label class="block">
+            const paymentRelationship = `${wizard ? '<input id="record-account" type="hidden" value=""><div class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-800">This payment reference will be linked to the new account.</div>' : `<label class="block">
                     <span class="text-sm font-semibold text-gray-700">Account</span>
-                    <select id="record-account" required class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${accountOptions()}</select>
+                    <select id="record-account" required class="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${accountOptions()}</select>
                 </label>`}
                 ${wizard ? '<input id="record-property" type="hidden" value=""><label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700"><input id="record-use-created-property" type="checkbox" checked class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">Use the property from step 3</label>' : `<label class="block">
                     <span class="text-sm font-semibold text-gray-700">Property Restriction</span>
-                    <select id="record-property" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${propertyOptions()}</select>
-                </label>`}
-                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    <select id="record-property" class="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${propertyOptions()}</select>
+                </label>`}`;
+            fields.innerHTML =
+                formSection('Customer assignment', 'Choose which account and property can use this payment reference.', 'link-2', paymentRelationship, 'blue') +
+                formSection('Payment reference', 'Store only the safe reference details used to identify this method.', 'credit-card', `
+                    <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     ${field('Card Type', 'record-card-type', 'placeholder="Visa"')}
                     ${field('Last Four', 'record-last-four', `${wizard ? '' : 'required'} maxlength="4" inputmode="numeric" placeholder="4242"`)}
-                </div>
-                ${field('Expiration', 'record-expiration', 'placeholder="MM/YYYY"')}
-                <label class="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-sm font-semibold text-gray-700">
-                    <input id="record-is-default" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                    Default payment method
-                </label>`;
+                    </div>
+                    ${field('Expiration', 'record-expiration', 'placeholder="MM/YYYY"')}
+                    <label class="flex items-center gap-2 rounded-lg border border-violet-100 bg-violet-50 px-3 py-2.5 text-sm font-semibold text-violet-800">
+                        <input id="record-is-default" type="checkbox" class="h-4 w-4 rounded border-violet-300 text-violet-600 focus:ring-violet-500">
+                        Default payment method
+                    </label>
+                `, 'violet');
             if (editing) populatePaymentMethodForm(editing);
             if (clientEditing) {
                 setFormValue('record-account', crmState.clientEditAccountId);
                 document.getElementById('record-account').disabled = true;
             }
             if (wizard) applyRecordDraft(type, crmState.wizardDrafts[type]);
+            refreshCrmIcons();
             return;
         }
 
-        fields.innerHTML = `
-            ${wizard ? '<input id="record-account" type="hidden" value=""><div class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-800">This property will be linked to the account from step 1.</div>' : `<label class="block">
+        const propertyRelationship = wizard ? '<input id="record-account" type="hidden" value=""><div class="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2 text-sm text-blue-800">This property will be linked to the account from step 1.</div>' : `<label class="block">
                 <span class="text-sm font-semibold text-gray-700">Account</span>
-                <select id="record-account" required class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${accountOptions()}</select>
-            </label>`}
-            ${field('Property Name', 'record-name', 'required placeholder="Main Office"')}
-            ${field('Address', 'record-address', 'required placeholder="1170 N Federal Highway, Fort Lauderdale, FL"')}
-            <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                ${field('Unit / Suite', 'record-unit', 'placeholder="Unit 204"')}
-                ${field('Gate Code', 'record-gate-code', 'placeholder="Optional"')}
-            </div>`;
+                <select id="record-account" required class="mt-1.5 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5 text-sm shadow-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100">${accountOptions()}</select>
+            </label>`;
+        fields.innerHTML =
+            formSection('Account relationship', 'Connect this service location to its customer account.', 'link-2', propertyRelationship, 'blue') +
+            formSection('Service location', 'The address dispatch and field teams will use.', 'map-pin-house', `
+                ${field('Property Name', 'record-name', 'required placeholder="Main Office"')}
+                ${field('Address', 'record-address', 'required placeholder="1170 N Federal Highway, Fort Lauderdale, FL"')}
+                <div class="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                    ${field('Unit / Suite', 'record-unit', 'placeholder="Unit 204"')}
+                    ${field('Gate Code', 'record-gate-code', 'placeholder="Optional"')}
+                </div>
+            `, 'emerald');
         if (editing) populatePropertyForm(editing);
         if (clientEditing) {
             setFormValue('record-account', crmState.clientEditAccountId);
             document.getElementById('record-account').disabled = true;
         }
         if (wizard) applyRecordDraft(type, crmState.wizardDrafts[type]);
+        refreshCrmIcons();
     }
 
     function setRecordType(type) {
