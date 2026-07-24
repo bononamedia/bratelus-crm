@@ -108,6 +108,9 @@ def jobs_board_view(request):
                 user__customer_accounts__is_active=True,
             )
         workers = workers.select_related('user').distinct()
+        solo_worker = None
+        if active_org.customer_account and active_org.customer_account.operating_mode == 'solo':
+            solo_worker = workers.filter(user=active_org.customer_account.owner).first()
         contacts = Contact.objects.filter(organization=active_org).select_related('account').order_by('first_name', 'last_name')
     else:
         accounts = []
@@ -115,6 +118,7 @@ def jobs_board_view(request):
         skills = []
         zones = []
         workers = []
+        solo_worker = None
         contacts = []
 
     context = {
@@ -124,6 +128,11 @@ def jobs_board_view(request):
         'zones': zones,
         'workers': workers,
         'contacts': contacts,
+        'operating_mode': (
+            active_org.customer_account.operating_mode
+            if active_org and active_org.customer_account_id else 'team'
+        ),
+        'solo_worker_id': solo_worker.id if solo_worker else None,
     }
     
     return render(request, 'jobs.html', context)

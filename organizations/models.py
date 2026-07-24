@@ -7,9 +7,19 @@ import uuid
 # ---------------------------------------------------------
 class CustomerAccount(models.Model):
     """The paying Bratelus customer that owns one or more workspace brands."""
+    OPERATING_MODE_CHOICES = [
+        ('solo', 'Solo'),
+        ('team', 'Team'),
+    ]
+
     id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
     name = models.CharField(max_length=255)
     owner = models.ForeignKey(User, on_delete=models.PROTECT, related_name='owned_customer_accounts')
+    operating_mode = models.CharField(
+        max_length=10,
+        choices=OPERATING_MODE_CHOICES,
+        default='solo',
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

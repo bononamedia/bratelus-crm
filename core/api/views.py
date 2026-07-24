@@ -600,14 +600,18 @@ class JobViewSet(BaseWorkspaceViewSet):
                 return self.queryset.none()
 
             return (
-                Job.objects.filter(organization=active_org, worker_assignments__worker=worker_profile)
+                Job.objects.filter(
+                    organization=active_org,
+                    worker_assignments__worker=worker_profile,
+                    archived_at__isnull=True,
+                )
                 .select_related('account', 'property', 'required_skill', 'service_zone')
                 .prefetch_related('worker_assignments__worker__user')
                 .distinct()
             )
 
         return (
-            Job.objects.filter(organization=active_org)
+            Job.objects.filter(organization=active_org, archived_at__isnull=True)
             .select_related('account', 'property', 'required_skill', 'service_zone')
             .prefetch_related('worker_assignments__worker__user', 'tasks__assigned_worker__user')
         )
@@ -664,6 +668,23 @@ class JobViewSet(BaseWorkspaceViewSet):
     def perform_create(self, serializer):
         serializer.save(organization=self.request.active_organization)
 
+    def perform_update(self, serializer):
+        old_start = serializer.instance.scheduled_start
+        job = serializer.save()
+        if old_start != job.scheduled_start:
+            audit = dict(job.custom_data or {})
+            history = list(audit.get('schedule_history') or [])
+            history.append({
+                'from': old_start.isoformat() if old_start else None,
+                'to': job.scheduled_start.isoformat() if job.scheduled_start else None,
+                'changed_at': timezone.now().isoformat(),
+                'changed_by_id': self.request.user.id,
+                'changed_by': self.request.user.get_full_name() or self.request.user.username,
+            })
+            audit['schedule_history'] = history[-50:]
+            job.custom_data = audit
+            job.save(update_fields=['custom_data'])
+
     @action(detail=True, methods=['post'])
     def cancel(self, request, pk=None):
         self._require_manager()
@@ -694,6 +715,56 @@ class JobViewSet(BaseWorkspaceViewSet):
         job.custom_data = audit
         job.status = 'canceled'
         job.save(update_fields=['custom_data', 'status'])
+        return Response(self.get_serializer(job).data)
+
+    @action(detail=True, methods=['post'])
+    def archive(self, request, pk=None):
+        self._require_manager()
+        job = self.get_object()
+        if job.status not in {'completed', 'canceled'}:
+            return Response(
+                {'detail': 'Complete or cancel the job before archiving it.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if job.worker_assignments.filter(
+            clocked_in_at__isnull=False,
+            clocked_out_at__isnull=True,
+        ).exists():
+            return Response(
+                {'detail': 'Close active work before archiving this job.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        job.archived_at = timezone.now()
+        job.archived_by = request.user
+        job.save(update_fields=['archived_at', 'archived_by'])
+        return Response(self.get_serializer(job).data)
+
+    @action(detail=False, methods=['get'], url_path='archived')
+    def archived(self, request):
+        self._require_manager()
+        active_org = getattr(request, 'active_organization', None)
+        jobs = (
+            Job.objects.filter(organization=active_org, archived_at__isnull=False)
+            .select_related('account', 'property', 'required_skill', 'service_zone', 'archived_by')
+            .prefetch_related('worker_assignments__worker__user', 'tasks__assigned_worker__user')
+            .order_by('-archived_at', '-id')
+        )
+        return Response(self.get_serializer(jobs, many=True).data)
+
+    @action(detail=True, methods=['post'])
+    def restore(self, request, pk=None):
+        self._require_manager()
+        active_org = getattr(request, 'active_organization', None)
+        job = Job.objects.filter(
+            id=pk,
+            organization=active_org,
+            archived_at__isnull=False,
+        ).first()
+        if not job:
+            return Response({'detail': 'Archived job not found.'}, status=status.HTTP_404_NOT_FOUND)
+        job.archived_at = None
+        job.archived_by = None
+        job.save(update_fields=['archived_at', 'archived_by'])
         return Response(self.get_serializer(job).data)
 
     @action(detail=True, methods=['post'], url_path='assign-worker')

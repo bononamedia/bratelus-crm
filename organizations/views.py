@@ -152,7 +152,11 @@ def signup_view(request):
                 last_name=last_name,
                 is_active=False,
             )
-            customer_account = CustomerAccount.objects.create(name=company_name, owner=user)
+            customer_account = CustomerAccount.objects.create(
+                name=company_name,
+                owner=user,
+                operating_mode='solo',
+            )
             CustomerAccountMember.objects.create(
                 account=customer_account,
                 user=user,
@@ -260,7 +264,11 @@ def create_workspace_view(request):
                 ).select_related('account').first()
                 customer_account = account_membership.account if account_membership else None
             if not customer_account:
-                customer_account = CustomerAccount.objects.create(name=name, owner=request.user)
+                customer_account = CustomerAccount.objects.create(
+                    name=name,
+                    owner=request.user,
+                    operating_mode='solo',
+                )
                 CustomerAccountMember.objects.create(
                     account=customer_account,
                     user=request.user,

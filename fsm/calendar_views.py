@@ -7,6 +7,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.http import JsonResponse
 from django.shortcuts import get_object_or_404, render
+from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 from django.views.decorators.http import require_GET, require_http_methods
 
@@ -37,6 +38,10 @@ def job_calendar_view(request):
         raise PermissionDenied('Calendar access requires an office role.')
     return render(request, 'job_calendar.html', {
         'calendar_workspaces': _visible_workspaces(request).order_by('name'),
+        'operating_mode': (
+            active.customer_account.operating_mode
+            if active and active.customer_account_id else 'team'
+        ),
     })
 
 
@@ -129,7 +134,10 @@ def calendar_options_view(request):
 def calendar_jobs_view(request):
     if request.method == 'GET':
         workspaces = _requested_workspaces(request)
-        jobs = Job.objects.filter(organization__in=workspaces).select_related(
+        jobs = Job.objects.filter(
+            organization__in=workspaces,
+            archived_at__isnull=True,
+        ).exclude(status='canceled').select_related(
             'organization', 'account', 'property'
         ).prefetch_related('worker_assignments__worker__user')
         start = parse_datetime(request.GET.get('start', ''))
@@ -194,6 +202,17 @@ def calendar_jobs_view(request):
         ]
     if len({worker.id for worker in workers}) != len(worker_ids):
         return JsonResponse({'error': 'Choose workers available to this workspace.'}, status=400)
+    if not workers and workspace.customer_account_id and workspace.customer_account.operating_mode == 'solo':
+        owner_member = workspace.customer_account.members.filter(
+            user=workspace.customer_account.owner,
+            can_work_jobs=True,
+            is_active=True,
+        ).first()
+        if owner_member:
+            owner_worker, _ = WorkerProfile.objects.get_or_create(user=workspace.customer_account.owner)
+            owner_worker.workspaces.add(workspace)
+            workers = [owner_worker]
+            worker_ids = {owner_worker.id}
 
     task_data = data.get('tasks') or []
     worker_id_set = {worker.id for worker in workers}
@@ -284,10 +303,24 @@ def calendar_job_update_view(request, job_id):
     end = parse_datetime(data.get('end', '')) if data.get('end') else None
     if not start:
         return JsonResponse({'error': 'A valid start time is required.'}, status=400)
+    old_start = job.scheduled_start
     job.scheduled_start = start
     fields = ['scheduled_start']
     if end and end > start:
         job.estimated_duration_minutes = max(15, round((end - start).total_seconds() / 60))
         fields.append('estimated_duration_minutes')
+    if old_start != start:
+        audit = dict(job.custom_data or {})
+        history = list(audit.get('schedule_history') or [])
+        history.append({
+            'from': old_start.isoformat() if old_start else None,
+            'to': start.isoformat(),
+            'changed_at': timezone.now().isoformat(),
+            'changed_by_id': request.user.id,
+            'changed_by': request.user.get_full_name() or request.user.username,
+        })
+        audit['schedule_history'] = history[-50:]
+        job.custom_data = audit
+        fields.append('custom_data')
     job.save(update_fields=fields)
     return JsonResponse({'message': 'Job rescheduled.'})

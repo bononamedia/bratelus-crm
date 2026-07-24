@@ -379,6 +379,54 @@ class MultiWorkspaceCalendarTests(TestCase):
         self.assertEqual(job.status, 'canceled')
         self.assertEqual(job.custom_data['cancellation']['reason'], 'Customer requested another date')
 
+        archive_response = self.client.post(reverse('api-job-archive', args=[job.id]))
+        self.assertEqual(archive_response.status_code, 200)
+        job.refresh_from_db()
+        self.assertIsNotNone(job.archived_at)
+        self.assertEqual(job.archived_by, self.owner)
+        self.assertFalse(self.client.get(reverse('api-job-list')).json())
+
+        archived_response = self.client.get(reverse('api-job-archived'))
+        self.assertEqual(archived_response.status_code, 200)
+        self.assertEqual(archived_response.json()[0]['id'], job.id)
+
+        restore_response = self.client.post(reverse('api-job-restore', args=[job.id]))
+        self.assertEqual(restore_response.status_code, 200)
+        job.refresh_from_db()
+        self.assertIsNone(job.archived_at)
+
+    def test_solo_mode_auto_assigns_owner_and_records_reschedule_history(self):
+        session = self.client.session
+        session['active_org_id'] = str(self.one.id)
+        session.save()
+        self.customer_account.operating_mode = 'solo'
+        self.customer_account.save(update_fields=['operating_mode'])
+
+        create_response = self.client.post(
+            reverse('api-job-list'),
+            data=json.dumps({
+                'title': 'Owner route',
+                'account': self.account_one.id,
+                'scheduled_start': timezone.now().isoformat(),
+            }),
+            content_type='application/json',
+        )
+        self.assertEqual(create_response.status_code, 201)
+        job = Job.objects.get(id=create_response.json()['id'])
+        self.assertEqual(job.status, 'dispatched')
+        self.assertTrue(job.worker_assignments.filter(worker=self.worker).exists())
+
+        new_start = timezone.now() + timedelta(days=2)
+        update_response = self.client.patch(
+            reverse('api-job-detail', args=[job.id]),
+            data=json.dumps({'scheduled_start': new_start.isoformat()}),
+            content_type='application/json',
+        )
+        self.assertEqual(update_response.status_code, 200)
+        job.refresh_from_db()
+        self.assertEqual(len(job.custom_data['schedule_history']), 1)
+        self.assertEqual(job.custom_data['schedule_history'][0]['changed_by_id'], self.owner.id)
+
     def test_unassigned_pending_draft_can_be_discarded(self):
         session = self.client.session
         session['active_org_id'] = str(self.one.id)

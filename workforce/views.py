@@ -73,6 +73,35 @@ def workforce_view(request):
     if request.method == 'POST':
         if not can_manage_account_team:
             raise PermissionDenied('Only the account owner or an account administrator can change account-wide access.')
+        if request.POST.get('action') == 'update_operating_mode':
+            operating_mode = request.POST.get('operating_mode')
+            if operating_mode not in dict(customer_account.OPERATING_MODE_CHOICES):
+                messages.error(request, 'Choose Solo Mode or Team Mode.')
+                return redirect('workforce')
+            with transaction.atomic():
+                customer_account.operating_mode = operating_mode
+                customer_account.save(update_fields=['operating_mode'])
+                if operating_mode == 'solo':
+                    owner_member, _ = CustomerAccountMember.objects.update_or_create(
+                        account=customer_account,
+                        user=customer_account.owner,
+                        defaults={
+                            'role': 'owner',
+                            'can_work_jobs': True,
+                            'is_active': True,
+                        },
+                    )
+                    owner_worker, _ = WorkerProfile.objects.get_or_create(user=customer_account.owner)
+                    for workspace in customer_account.workspaces.all():
+                        WorkspaceMember.objects.update_or_create(
+                            workspace=workspace,
+                            user=customer_account.owner,
+                            defaults={'role': 'admin', 'is_active': True},
+                        )
+                    owner_worker.workspaces.add(*customer_account.workspaces.all())
+            label = 'Solo Mode' if operating_mode == 'solo' else 'Team Mode'
+            messages.success(request, f'{label} is now active for this account.')
+            return redirect('workforce')
         target = CustomerAccountMember.objects.filter(
             id=request.POST.get('account_member_id'),
             account=customer_account,
@@ -210,7 +239,13 @@ def work_activity_ledger_view(request):
     if end_date:
         activities = activities.filter(started_at__date__lte=end_date)
 
-    workers = WorkerProfile.objects.filter(work_activities__workspace__in=workspaces).select_related('user').distinct().order_by(
+    customer_account = getattr(active_org, 'customer_account', None)
+    workers = WorkerProfile.objects.filter(
+        user__customer_accounts__account=customer_account,
+        user__customer_accounts__is_active=True,
+        user__customer_accounts__can_work_jobs=True,
+        workspaces__in=workspaces,
+    ).select_related('user').distinct().order_by(
         'user__first_name', 'user__last_name', 'user__username',
     )
     ledger = activity_ledger(list(activities.order_by('-started_at', '-id')[:500]))

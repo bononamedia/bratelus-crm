@@ -3,7 +3,7 @@ from django.core.validators import URLValidator
 from django.core.exceptions import ValidationError as DjangoValidationError
 from django.contrib.auth.models import User
 from django.db import transaction
-from organizations.models import WorkerProfile, Skill, ServiceZone
+from organizations.models import CustomerAccountMember, WorkerProfile, Skill, ServiceZone
 from crm.models.contacts import Account, Contact, PaymentMethod, Property
 from fsm.models import Job, JobAssignment, JobTask
 
@@ -172,8 +172,9 @@ class JobSerializer(serializers.ModelSerializer):
             'require_location', 'arrival_radius_meters', 'require_closeout_confirmation',
             'closeout_instruction', 'tasks', 'task_items', 'worker_ids', 'completion_contact',
             'completion_notification_method', 'completion_message_override',
-            'open_issue_count', 'latest_issue'
+            'open_issue_count', 'latest_issue', 'archived_at', 'archived_by'
         ]
+        read_only_fields = ['archived_at', 'archived_by']
 
     def get_open_issue_count(self, obj):
         return obj.issues.exclude(status='resolved').count()
@@ -217,6 +218,22 @@ class JobSerializer(serializers.ModelSerializer):
             )
         return list(workers.select_related('user').distinct())
 
+    def _solo_owner_worker(self, workspace):
+        customer_account = workspace.customer_account
+        if not customer_account or customer_account.operating_mode != 'solo':
+            return None
+        membership = CustomerAccountMember.objects.filter(
+            account=customer_account,
+            user=customer_account.owner,
+            is_active=True,
+            can_work_jobs=True,
+        ).first()
+        if not membership:
+            return None
+        worker, _ = WorkerProfile.objects.get_or_create(user=customer_account.owner)
+        worker.workspaces.add(workspace)
+        return worker
+
     def _save_tasks(self, job, tasks, worker_ids):
         for task in tasks:
             description = str(task.get('description', '')).strip()
@@ -242,6 +259,10 @@ class JobSerializer(serializers.ModelSerializer):
         tasks = validated_data.pop('tasks', [])
         worker_ids = set(validated_data.pop('worker_ids', []))
         workspace = self.context['request'].active_organization
+        if not worker_ids:
+            solo_worker = self._solo_owner_worker(workspace)
+            if solo_worker:
+                worker_ids.add(solo_worker.id)
         workers = self._eligible_workers(worker_ids, workspace)
         if len(workers) != len(worker_ids):
             raise serializers.ValidationError({'worker_ids': 'Choose workers available to this workspace.'})

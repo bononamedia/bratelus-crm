@@ -67,6 +67,12 @@
 
     <fieldset class="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
         <legend class="px-1 text-sm font-semibold text-emerald-900">Assign crew</legend>
+        {% if operating_mode == 'solo' %}
+        <div class="flex gap-2 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-xs text-blue-800">
+            <span class="font-semibold">Solo Mode</span>
+            <span>If no crew is selected, this job is assigned to the account owner automatically.</span>
+        </div>
+        {% endif %}
         <p class="text-xs text-emerald-800">Select everyone receiving this job. Individual task owners are selected below.</p>
         {% if job_dynamic_options %}
         <div id="{{ job_form_prefix }}-workers" class="grid gap-2 sm:grid-cols-2"></div>
@@ -74,7 +80,7 @@
         <div class="grid gap-2 sm:grid-cols-2">
             {% for worker in workers %}
             <label class="flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-gray-700">
-                <input type="checkbox" name="{{ job_form_prefix }}-worker" value="{{ worker.id }}" onchange="refreshTaskWorkerOptions()" class="h-4 w-4 rounded border-gray-300 text-blue-600">
+                <input type="checkbox" name="{{ job_form_prefix }}-worker" value="{{ worker.id }}" {% if solo_worker_id == worker.id %}checked{% endif %} onchange="refreshTaskWorkerOptions()" class="h-4 w-4 rounded border-gray-300 text-blue-600">
                 {{ worker.user.get_full_name|default:worker.user.username }}
             </label>
             {% empty %}<p class="text-sm text-amber-700">No field-capable users are available in this workspace.</p>{% endfor %}

@@ -21,6 +21,12 @@ class WorkActivityLedgerTests(TestCase):
         for workspace in (self.blue, self.green):
             WorkspaceMember.objects.create(workspace=workspace, user=self.manager, role='manager')
         worker_user = User.objects.create_user('worker@example.com', password='StrongPass123!', first_name='Taylor')
+        CustomerAccountMember.objects.create(
+            account=self.account,
+            user=worker_user,
+            role='employee',
+            can_work_jobs=True,
+        )
         self.worker = WorkerProfile.objects.create(user=worker_user)
         self.worker.workspaces.add(self.blue, self.green)
         now = timezone.now()
@@ -51,3 +57,19 @@ class WorkActivityLedgerTests(TestCase):
         self.assertEqual(len(filtered.context['ledger']['rows']), 1)
         self.assertEqual(filtered.context['ledger']['rows'][0]['activity'].workspace, self.green)
         self.assertEqual(str(filtered.context['ledger']['unpaid_hours']), '0.25')
+
+    def test_employee_filter_includes_field_worker_without_activity(self):
+        standby_user = User.objects.create_user('standby@example.com', first_name='Morgan')
+        CustomerAccountMember.objects.create(
+            account=self.account,
+            user=standby_user,
+            role='employee',
+            can_work_jobs=True,
+        )
+        standby = WorkerProfile.objects.create(user=standby_user)
+        standby.workspaces.add(self.blue)
+
+        response = self.client.get(reverse('work_activity_ledger'))
+
+        self.assertContains(response, 'Morgan')
+        self.assertIn(standby, list(response.context['workers']))

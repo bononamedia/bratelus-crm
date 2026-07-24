@@ -110,6 +110,14 @@ class Job(models.Model):
     
     # --- Extensibility ---
     custom_data = models.JSONField(default=dict, blank=True)
+    archived_at = models.DateTimeField(null=True, blank=True, db_index=True)
+    archived_by = models.ForeignKey(
+        User,
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name='archived_jobs',
+    )
 
     def __str__(self):
         return f"[{self.get_job_type_display()}] {self.title}"
