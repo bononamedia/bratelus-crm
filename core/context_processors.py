@@ -1,6 +1,6 @@
 from django.db.models import Q
 
-from organizations.models import Workspace
+from organizations.models import UserAppearancePreference, Workspace
 from organizations.permissions import (
     user_can_export_data,
     user_can_manage_people,
@@ -33,6 +33,7 @@ def organization_context(request):
     active_membership = workspace_membership_for_user(request.user, active_org)
     active_worker_profile = worker_profile_for_workspace(request.user, active_org)
     can_manage_active_org = user_can_manage_workspace(request.user, active_org)
+    ui_theme = UserAppearancePreference.objects.filter(user=request.user).values_list('theme', flat=True).first() or 'blue'
 
     return {
         'active_org': active_org,
@@ -49,4 +50,5 @@ def organization_context(request):
         'is_workspace_admin': user_is_workspace_admin(request.user, active_org),
         'is_platform_admin': request.user.is_superuser,
         'is_workspace_employee': bool(active_worker_profile or active_membership),
+        'ui_theme': ui_theme,
     }

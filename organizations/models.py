@@ -132,6 +132,27 @@ class UserEmailVerification(models.Model):
         return self.verified_at is not None
 
 
+class UserAppearancePreference(models.Model):
+    THEME_CHOICES = [
+        ('blue', 'Ocean Blue'),
+        ('night', 'Night'),
+        ('red', 'Crimson'),
+        ('yellow', 'Sunrise'),
+        ('green', 'Evergreen'),
+        ('bold', 'Bold'),
+    ]
+
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='appearance_preference')
+    theme = models.CharField(max_length=12, choices=THEME_CHOICES, default='blue')
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        db_table = 'workspaces_userappearancepreference'
+
+    def __str__(self):
+        return f'{self.user} / {self.get_theme_display()}'
+
+
 class PlatformEmailSettings(models.Model):
     """Singleton SMTP configuration for Bratelus-owned transactional email."""
 

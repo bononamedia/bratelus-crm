@@ -1,12 +1,16 @@
+import json
+
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.db.models import Sum
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
+from django.views.decorators.http import require_POST
 
 from crm.models.contacts import Account, Contact, PaymentMethod, Property
 from finance.models import Invoice
 from fsm.models import Job, JobAssignment
-from organizations.models import WorkerProfile
+from organizations.models import UserAppearancePreference, WorkerProfile
 from organizations.permissions import user_can_manage_workspace, worker_profile_for_workspace
 
 
@@ -18,6 +22,25 @@ def home_view(request):
             return redirect('dashboard')
         return redirect('login')
     return render(request, 'marketing_home.html')
+
+
+@login_required
+@require_POST
+def appearance_preference_view(request):
+    try:
+        theme = json.loads(request.body).get('theme', '')
+    except (json.JSONDecodeError, AttributeError):
+        return JsonResponse({'status': 'error', 'message': 'Invalid request.'}, status=400)
+
+    valid_themes = {choice[0] for choice in UserAppearancePreference.THEME_CHOICES}
+    if theme not in valid_themes:
+        return JsonResponse({'status': 'error', 'message': 'Unknown appearance theme.'}, status=400)
+
+    UserAppearancePreference.objects.update_or_create(
+        user=request.user,
+        defaults={'theme': theme},
+    )
+    return JsonResponse({'status': 'success', 'theme': theme})
 
 
 @login_required

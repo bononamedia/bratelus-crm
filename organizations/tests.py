@@ -19,6 +19,7 @@ from organizations.models import (
     Workspace,
     WorkspaceMember,
     UserEmailVerification,
+    UserAppearancePreference,
     PlatformEmailSettings,
 )
 from organizations.emailing import email_verification_token, platform_email_delivery
@@ -156,6 +157,42 @@ class PlatformEmailSettingsTests(TestCase):
         self.assertTrue(connection.use_ssl)
         self.assertEqual(from_email, 'Bratelus Mail <platform@example.com>')
         self.assertEqual(support_email, 'alerts@example.com')
+
+
+class UserAppearancePreferenceTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user('palette@example.com', password='StrongPass123!')
+        self.account = CustomerAccount.objects.create(name='Palette Company', owner=self.user)
+        CustomerAccountMember.objects.create(account=self.account, user=self.user, role='owner')
+        self.workspace = Workspace.objects.create(
+            name='Palette Company',
+            slug='palette-company',
+            customer_account=self.account,
+            created_by=self.user,
+        )
+        WorkspaceMember.objects.create(workspace=self.workspace, user=self.user, role='admin')
+        self.client.force_login(self.user)
+
+    def test_user_can_save_and_render_personal_theme(self):
+        response = self.client.post(
+            reverse('appearance_preference'),
+            data=json.dumps({'theme': 'green'}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(UserAppearancePreference.objects.get(user=self.user).theme, 'green')
+
+        response = self.client.get(reverse('dashboard'))
+        self.assertContains(response, 'data-ui-theme="green"')
+
+    def test_unknown_theme_is_rejected(self):
+        response = self.client.post(
+            reverse('appearance_preference'),
+            data=json.dumps({'theme': 'invisible'}),
+            content_type='application/json',
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertFalse(UserAppearancePreference.objects.filter(user=self.user).exists())
 
 
 class AccountTeamTests(TestCase):

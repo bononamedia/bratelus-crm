@@ -43,7 +43,7 @@ from fsm.calendar_views import (
 
 # Unified API ViewSets
 from core.api.views import AccountViewSet, ContactViewSet, CRMNoteViewSet, JobViewSet, PaymentMethodViewSet, PropertyViewSet, WorkerViewSet
-from core.views import home_view, reports_view
+from core.views import appearance_preference_view, home_view, reports_view
 from finance.views import (
     estimate_convert_view,
     finance_invoice_detail_view,
@@ -119,6 +119,7 @@ urlpatterns = [
     path('verification-pending/', email_verification_pending_view, name='email_verification_pending'),
     path('verify-email/<str:token>/', verify_email_view, name='verify_email'),
     path('api/switch-org/', switch_organization_view, name='switch_org'),
+    path('api/appearance/', appearance_preference_view, name='appearance_preference'),
     
     # --- WEB UI DASHBOARDS ---
     path('', home_view, name='marketing_home'),

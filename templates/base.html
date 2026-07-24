@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-ui-theme="{{ ui_theme|default:'blue' }}">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
@@ -46,6 +46,159 @@
         .nav-subitem:focus-visible {
             outline: 2px solid rgba(125, 211, 252, 0.95);
             outline-offset: 2px;
+        }
+
+        :root {
+            --ui-primary: #2563eb;
+            --ui-primary-hover: #1d4ed8;
+            --ui-primary-soft: #eff6ff;
+            --ui-primary-muted: #dbeafe;
+            --ui-primary-text: #1d4ed8;
+            --ui-canvas: #f8fafc;
+            --ui-surface: #ffffff;
+            --ui-border: #e2e8f0;
+            --ui-sidebar: #020617;
+        }
+
+        [data-ui-theme="red"] {
+            --ui-primary: #dc2626;
+            --ui-primary-hover: #b91c1c;
+            --ui-primary-soft: #fef2f2;
+            --ui-primary-muted: #fee2e2;
+            --ui-primary-text: #b91c1c;
+            --ui-sidebar: #180607;
+        }
+
+        [data-ui-theme="yellow"] {
+            --ui-primary: #ca8a04;
+            --ui-primary-hover: #a16207;
+            --ui-primary-soft: #fefce8;
+            --ui-primary-muted: #fef3c7;
+            --ui-primary-text: #854d0e;
+            --ui-sidebar: #151105;
+        }
+
+        [data-ui-theme="green"] {
+            --ui-primary: #059669;
+            --ui-primary-hover: #047857;
+            --ui-primary-soft: #ecfdf5;
+            --ui-primary-muted: #d1fae5;
+            --ui-primary-text: #047857;
+            --ui-sidebar: #03140f;
+        }
+
+        [data-ui-theme="bold"] {
+            --ui-primary: #e11d48;
+            --ui-primary-hover: #be123c;
+            --ui-primary-soft: #fff1f2;
+            --ui-primary-muted: #ffe4e6;
+            --ui-primary-text: #be123c;
+            --ui-canvas: #f5f7fb;
+            --ui-border: #94a3b8;
+            --ui-sidebar: #09090b;
+        }
+
+        [data-ui-theme="night"] {
+            color-scheme: dark;
+            --ui-primary: #38bdf8;
+            --ui-primary-hover: #0ea5e9;
+            --ui-primary-soft: #0c2d40;
+            --ui-primary-muted: #123d55;
+            --ui-primary-text: #7dd3fc;
+            --ui-canvas: #0b1220;
+            --ui-surface: #111827;
+            --ui-border: #334155;
+            --ui-sidebar: #020617;
+        }
+
+        body,
+        #app-shell,
+        #app-topbar,
+        #mobile-app-nav,
+        #org-dropdown-menu {
+            transition: background-color 180ms ease, color 180ms ease, border-color 180ms ease;
+        }
+
+        body { background: var(--ui-canvas) !important; }
+        #app-sidebar { background: var(--ui-sidebar) !important; }
+        .bg-blue-600 { background-color: var(--ui-primary) !important; }
+        .hover\:bg-blue-700:hover { background-color: var(--ui-primary-hover) !important; }
+        .text-blue-600, .text-blue-700 { color: var(--ui-primary-text) !important; }
+        .bg-blue-50 { background-color: var(--ui-primary-soft) !important; }
+        .bg-blue-100 { background-color: var(--ui-primary-muted) !important; }
+        .border-blue-100, .border-blue-200 { border-color: color-mix(in srgb, var(--ui-primary) 28%, transparent) !important; }
+        .focus\:ring-blue-500:focus { --tw-ring-color: var(--ui-primary) !important; }
+        .focus\:border-blue-500:focus { border-color: var(--ui-primary) !important; }
+
+        [data-ui-theme="bold"] button,
+        [data-ui-theme="bold"] .font-medium {
+            font-weight: 700 !important;
+        }
+
+        [data-ui-theme="bold"] .border,
+        [data-ui-theme="bold"] .border-b,
+        [data-ui-theme="bold"] .border-t {
+            border-color: var(--ui-border);
+        }
+
+        [data-ui-theme="night"] body,
+        [data-ui-theme="night"] #app-shell {
+            color: #e5e7eb;
+        }
+
+        [data-ui-theme="night"] #app-topbar,
+        [data-ui-theme="night"] #mobile-app-nav,
+        [data-ui-theme="night"] .bg-white,
+        [data-ui-theme="night"] #org-dropdown-menu {
+            background-color: var(--ui-surface) !important;
+        }
+
+        [data-ui-theme="night"] .bg-gray-50,
+        [data-ui-theme="night"] .bg-slate-50 {
+            background-color: #0f172a !important;
+        }
+
+        [data-ui-theme="night"] .text-gray-950,
+        [data-ui-theme="night"] .text-gray-900,
+        [data-ui-theme="night"] .text-slate-900,
+        [data-ui-theme="night"] .text-gray-800 {
+            color: #f8fafc !important;
+        }
+
+        [data-ui-theme="night"] .text-gray-700,
+        [data-ui-theme="night"] .text-slate-700,
+        [data-ui-theme="night"] .text-gray-600 {
+            color: #cbd5e1 !important;
+        }
+
+        [data-ui-theme="night"] .text-gray-500,
+        [data-ui-theme="night"] .text-gray-400 {
+            color: #94a3b8 !important;
+        }
+
+        [data-ui-theme="night"] .border-gray-100,
+        [data-ui-theme="night"] .border-gray-200,
+        [data-ui-theme="night"] .border-gray-300,
+        [data-ui-theme="night"] .divide-gray-100 > :not([hidden]) ~ :not([hidden]) {
+            border-color: var(--ui-border) !important;
+        }
+
+        [data-ui-theme="night"] input,
+        [data-ui-theme="night"] select,
+        [data-ui-theme="night"] textarea {
+            background-color: #0f172a !important;
+            border-color: #475569 !important;
+            color: #f8fafc !important;
+        }
+
+        [data-ui-theme="night"] input::placeholder,
+        [data-ui-theme="night"] textarea::placeholder {
+            color: #64748b !important;
+        }
+
+        .appearance-option[aria-checked="true"] {
+            border-color: var(--ui-primary);
+            box-shadow: 0 0 0 2px color-mix(in srgb, var(--ui-primary) 20%, transparent);
         }
     </style>
 </head>
@@ -240,9 +393,9 @@
         </div>
     </aside>
 
-    <div class="relative flex w-full min-w-0 flex-1 flex-col">
+    <div id="app-shell" class="relative flex w-full min-w-0 flex-1 flex-col">
         
-        <header class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-sm z-30 sticky top-0">
+        <header id="app-topbar" class="bg-white border-b border-gray-200 h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 shadow-sm z-30 sticky top-0">
             <div class="flex items-center gap-2 md:hidden">
                 <button type="button" onclick="openMobileSidebar()" class="flex h-9 w-9 items-center justify-center rounded-md border border-gray-200 text-gray-600 hover:bg-gray-50" aria-label="Open navigation" aria-controls="app-sidebar">
                     <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16"></path></svg>
@@ -297,6 +450,11 @@
                     </div>
                     {% endif %}
                     <div class="py-1 border-t border-gray-100" role="none">
+                        <button type="button" onclick="openAppearancePalette()" class="flex w-full items-center px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100 transition-colors" role="menuitem">
+                            <svg class="mr-2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3a9 9 0 100 18h1.5a1.5 1.5 0 000-3H12a1.5 1.5 0 010-3h3a6 6 0 006-6c0-3.314-4.03-6-9-6zM7.5 9h.01M9.5 6.5h.01M14.5 6.5h.01"></path></svg>
+                            Appearance
+                            <span class="ml-auto h-3 w-3 rounded-full border border-black/10" style="background: var(--ui-primary)"></span>
+                        </button>
                         {% if is_workspace_admin or is_platform_admin %}
                         <a href="{% url 'workspace_create' %}" class="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 transition-colors" role="menuitem">
                             <span class="mr-2 text-lg leading-none text-gray-400">+</span>
@@ -333,7 +491,7 @@
         </main>
     </div>
 
-    <nav class="md:hidden fixed bottom-0 w-full bg-white border-t border-gray-200 flex justify-around py-3 text-sm shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-40 pb-safe">
+    <nav id="mobile-app-nav" class="md:hidden fixed bottom-0 w-full bg-white border-t border-gray-200 flex justify-around py-3 text-sm shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.05)] z-40 pb-safe">
         <a href="{% url 'dashboard' %}" class="flex flex-col items-center text-blue-600">
             <svg class="w-6 h-6 mb-1" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"></path></svg>
             <span class="font-bold text-[10px] uppercase tracking-wide">Home</span>
@@ -356,6 +514,47 @@
         {% endif %}
     </nav>
 
+    <div id="appearance-palette" class="fixed inset-0 z-[70] hidden items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="appearance-title">
+        <div class="flex max-h-[calc(100dvh-2rem)] w-full max-w-2xl flex-col overflow-hidden rounded-lg border border-gray-200 bg-white shadow-2xl">
+            <div class="flex shrink-0 items-center justify-between border-b border-gray-200 px-5 py-4">
+                <div>
+                    <p class="text-xs font-semibold uppercase text-blue-600">Personal preference</p>
+                    <h2 id="appearance-title" class="mt-1 text-xl font-semibold text-gray-900">Choose your appearance</h2>
+                </div>
+                <button type="button" onclick="closeAppearancePalette()" class="flex h-9 w-9 items-center justify-center rounded-md text-gray-400 hover:bg-gray-100 hover:text-gray-700" aria-label="Close appearance palette">
+                    <svg class="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                </button>
+            </div>
+            <div class="grid overflow-y-auto gap-3 p-5 sm:grid-cols-2 lg:grid-cols-3" role="radiogroup" aria-label="Appearance theme">
+                <button type="button" class="appearance-option rounded-lg border border-gray-200 bg-white p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md" data-theme-option="blue" role="radio" aria-checked="false">
+                    <span class="mb-3 flex h-16 overflow-hidden rounded-md border border-blue-100"><span class="w-1/3 bg-slate-950"></span><span class="flex-1 bg-blue-50 p-2"><span class="block h-2 w-2/3 rounded bg-blue-600"></span><span class="mt-2 block h-6 rounded bg-white"></span></span></span>
+                    <span class="block text-sm font-semibold text-gray-900">Ocean Blue</span><span class="text-xs text-gray-500">Clean and familiar</span>
+                </button>
+                <button type="button" class="appearance-option rounded-lg border border-gray-200 bg-white p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md" data-theme-option="night" role="radio" aria-checked="false">
+                    <span class="mb-3 flex h-16 overflow-hidden rounded-md border border-slate-700"><span class="w-1/3 bg-black"></span><span class="flex-1 bg-slate-900 p-2"><span class="block h-2 w-2/3 rounded bg-sky-400"></span><span class="mt-2 block h-6 rounded bg-slate-800"></span></span></span>
+                    <span class="block text-sm font-semibold text-gray-900">Night</span><span class="text-xs text-gray-500">Low-light workspace</span>
+                </button>
+                <button type="button" class="appearance-option rounded-lg border border-gray-200 bg-white p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md" data-theme-option="red" role="radio" aria-checked="false">
+                    <span class="mb-3 flex h-16 overflow-hidden rounded-md border border-red-100"><span class="w-1/3 bg-[#180607]"></span><span class="flex-1 bg-red-50 p-2"><span class="block h-2 w-2/3 rounded bg-red-600"></span><span class="mt-2 block h-6 rounded bg-white"></span></span></span>
+                    <span class="block text-sm font-semibold text-gray-900">Crimson</span><span class="text-xs text-gray-500">Warm and decisive</span>
+                </button>
+                <button type="button" class="appearance-option rounded-lg border border-gray-200 bg-white p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md" data-theme-option="yellow" role="radio" aria-checked="false">
+                    <span class="mb-3 flex h-16 overflow-hidden rounded-md border border-amber-100"><span class="w-1/3 bg-[#151105]"></span><span class="flex-1 bg-amber-50 p-2"><span class="block h-2 w-2/3 rounded bg-yellow-600"></span><span class="mt-2 block h-6 rounded bg-white"></span></span></span>
+                    <span class="block text-sm font-semibold text-gray-900">Sunrise</span><span class="text-xs text-gray-500">Bright and energetic</span>
+                </button>
+                <button type="button" class="appearance-option rounded-lg border border-gray-200 bg-white p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md" data-theme-option="green" role="radio" aria-checked="false">
+                    <span class="mb-3 flex h-16 overflow-hidden rounded-md border border-emerald-100"><span class="w-1/3 bg-[#03140f]"></span><span class="flex-1 bg-emerald-50 p-2"><span class="block h-2 w-2/3 rounded bg-emerald-600"></span><span class="mt-2 block h-6 rounded bg-white"></span></span></span>
+                    <span class="block text-sm font-semibold text-gray-900">Evergreen</span><span class="text-xs text-gray-500">Calm and focused</span>
+                </button>
+                <button type="button" class="appearance-option rounded-lg border border-gray-300 bg-white p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md" data-theme-option="bold" role="radio" aria-checked="false">
+                    <span class="mb-3 flex h-16 overflow-hidden rounded-md border-2 border-slate-900"><span class="w-1/3 bg-black"></span><span class="flex-1 bg-white p-2"><span class="block h-2 w-2/3 rounded bg-rose-600"></span><span class="mt-2 block h-6 rounded border-2 border-slate-900 bg-white"></span></span></span>
+                    <span class="block text-sm font-bold text-gray-950">Bold</span><span class="text-xs font-medium text-gray-600">High contrast</span>
+                </button>
+            </div>
+            <div class="shrink-0 border-t border-gray-200 bg-gray-50 px-5 py-3 text-xs text-gray-500">Changes save instantly and apply to your account on every workspace.</div>
+        </div>
+    </div>
+
     <script>
         function getCookie(name) {
             let cookieValue = null;
@@ -376,6 +575,52 @@
             const menu = document.getElementById('org-dropdown-menu');
             menu.classList.toggle('hidden');
             document.getElementById('org-menu-button').setAttribute('aria-expanded', menu.classList.contains('hidden') ? 'false' : 'true');
+        }
+
+        function syncAppearanceSelection(theme) {
+            document.querySelectorAll('[data-theme-option]').forEach(option => {
+                option.setAttribute('aria-checked', option.dataset.themeOption === theme ? 'true' : 'false');
+            });
+        }
+
+        function openAppearancePalette() {
+            const palette = document.getElementById('appearance-palette');
+            document.getElementById('org-dropdown-menu').classList.add('hidden');
+            syncAppearanceSelection(document.documentElement.dataset.uiTheme || 'blue');
+            palette.classList.remove('hidden');
+            palette.classList.add('flex');
+            document.body.classList.add('overflow-hidden');
+        }
+
+        function closeAppearancePalette() {
+            const palette = document.getElementById('appearance-palette');
+            palette.classList.add('hidden');
+            palette.classList.remove('flex');
+            document.body.classList.remove('overflow-hidden');
+        }
+
+        async function saveAppearanceTheme(theme) {
+            const previousTheme = document.documentElement.dataset.uiTheme || 'blue';
+            document.documentElement.dataset.uiTheme = theme;
+            syncAppearanceSelection(theme);
+
+            try {
+                const response = await fetch('{% url "appearance_preference" %}', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': getCookie('csrftoken')
+                    },
+                    body: JSON.stringify({ theme })
+                });
+                if (!response.ok) {
+                    throw new Error('Appearance could not be saved.');
+                }
+            } catch (error) {
+                document.documentElement.dataset.uiTheme = previousTheme;
+                syncAppearanceSelection(previousTheme);
+                console.error(error);
+            }
         }
 
         function openMobileSidebar() {
@@ -479,6 +724,7 @@
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Escape') {
                 closeMobileSidebar();
+                closeAppearancePalette();
                 const menu = document.getElementById('org-dropdown-menu');
                 menu.classList.add('hidden');
                 document.getElementById('org-menu-button').setAttribute('aria-expanded', 'false');
@@ -486,6 +732,20 @@
         });
 
         document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('[data-theme-option]').forEach(option => {
+                option.addEventListener('click', function() {
+                    saveAppearanceTheme(this.dataset.themeOption);
+                });
+            });
+
+            document.getElementById('appearance-palette').addEventListener('click', function(event) {
+                if (event.target === this) {
+                    closeAppearancePalette();
+                }
+            });
+
+            syncAppearanceSelection(document.documentElement.dataset.uiTheme || 'blue');
+
             document.querySelectorAll('[data-module-toggle]').forEach(toggle => {
                 toggle.addEventListener('click', function() {
                     const moduleName = this.dataset.moduleToggle;
