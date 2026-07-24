@@ -5,6 +5,7 @@ from django.contrib.auth.models import User
 from django.db import transaction
 from organizations.models import CustomerAccountMember, WorkerProfile, Skill, ServiceZone
 from crm.models.contacts import Account, Contact, PaymentMethod, Property
+from crm.models.notes import CRMNote
 from fsm.models import Job, JobAssignment, JobTask
 
 # ==========================================
@@ -117,6 +118,63 @@ class PaymentMethodSerializer(serializers.ModelSerializer):
             'last_four',
             'expiration_date',
         ]
+
+
+class CRMNoteSerializer(serializers.ModelSerializer):
+    author_name = serializers.SerializerMethodField()
+    target_label = serializers.SerializerMethodField()
+
+    class Meta:
+        model = CRMNote
+        fields = [
+            'id', 'workspace', 'author', 'author_name', 'target_type', 'target_label',
+            'account', 'contact', 'property', 'job', 'category', 'visibility',
+            'body', 'created_at', 'updated_at',
+        ]
+        read_only_fields = ['workspace', 'author', 'author_name', 'target_label', 'created_at', 'updated_at']
+
+    def get_author_name(self, obj):
+        if not obj.author:
+            return 'Former user'
+        return obj.author.get_full_name() or obj.author.username
+
+    def get_target_label(self, obj):
+        target = obj.target_object
+        if not target:
+            return 'Removed record'
+        if obj.target_type == 'contact':
+            return str(target).strip() or f'Contact #{target.id}'
+        if obj.target_type == 'job':
+            return target.title
+        return target.name
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        workspace = getattr(request, 'active_organization', None) if request else None
+        target_type = attrs.get('target_type', getattr(self.instance, 'target_type', None))
+        targets = {
+            name: attrs.get(name, getattr(self.instance, name, None) if self.instance else None)
+            for name in ('account', 'contact', 'property', 'job')
+        }
+        if target_type not in dict(CRMNote.TARGET_CHOICES):
+            raise serializers.ValidationError({'target_type': 'Choose a valid note target.'})
+        if not targets.get(target_type) or sum(value is not None for value in targets.values()) != 1:
+            raise serializers.ValidationError('Choose exactly one record for this note.')
+
+        target = targets[target_type]
+        target_workspace_id = (
+            target.organization_id
+            if target_type in {'account', 'contact', 'job'}
+            else target.account.organization_id
+        )
+        if not workspace or target_workspace_id != workspace.id:
+            raise serializers.ValidationError('The note target must belong to the active workspace.')
+
+        body = str(attrs.get('body', getattr(self.instance, 'body', ''))).strip()
+        if not body:
+            raise serializers.ValidationError({'body': 'Enter a note.'})
+        attrs['body'] = body
+        return attrs
 
 
 # ==========================================

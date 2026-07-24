@@ -273,6 +273,18 @@
     </div>
 </dialog>
 
+<dialog id="job-notes-dialog" class="m-auto w-[min(94vw,820px)] rounded-lg border border-gray-200 bg-white p-0 shadow-2xl backdrop:bg-gray-950/40">
+    <div class="flex items-start justify-between border-b border-gray-200 px-5 py-4">
+        <div class="min-w-0">
+            <p class="text-xs font-semibold uppercase tracking-wide text-blue-600">Job context</p>
+            <h2 id="job-notes-title" class="truncate text-lg font-semibold text-gray-950">Job notes</h2>
+            <p class="mt-1 text-sm text-gray-500">Notes keep their original record target and remain visible from related CRM records.</p>
+        </div>
+        <button type="button" onclick="closeJobNotes()" class="rounded-md p-2 text-gray-400 hover:bg-gray-100 hover:text-gray-700" title="Close">X</button>
+    </div>
+    <div id="job-notes-content" class="max-h-[78vh] overflow-y-auto bg-gray-50 p-5"></div>
+</dialog>
+
 <style>
 /* Optional: Hide the ugly default scrollbar on the horizontal container for a cleaner app look */
 .hide-scrollbars::-webkit-scrollbar {
@@ -659,6 +671,7 @@
                         Assign
                     </button>
                     <div class="flex items-center gap-1">
+                        <button type="button" onclick="openJobNotes(${job.id})" class="rounded border border-blue-200 bg-blue-50 px-2 py-1 text-xs font-medium text-blue-700 hover:bg-blue-100" title="Add or review related notes">Notes</button>
                         ${!['in_progress', 'completed', 'canceled'].includes(job.status) ? `<button type="button" onclick="openEditJob(${job.id})" class="rounded border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-50" title="Change job details or schedule">Edit / reschedule</button>` : ''}
                         ${['pending', 'dispatched', 'accepted', 'en_route'].includes(job.status) ? `<button type="button" onclick="cancelJob(${job.id})" class="rounded border border-red-200 bg-red-50 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-100" title="Cancel job and preserve history">Cancel</button>` : ''}
                         ${job.status === 'completed' ? `<button type="button" onclick="archiveJob(${job.id})" class="rounded border border-gray-200 bg-white px-2 py-1 text-xs font-medium text-gray-600 hover:bg-gray-50" title="Move completed job to the archive">Archive</button>` : ''}
@@ -674,6 +687,160 @@
                 </div>
             </div>
         `;
+    }
+
+    const jobNoteTargetNames = {
+        job: 'Job',
+        account: 'Account',
+        contact: 'Contact',
+        property: 'Property',
+    };
+
+    const jobNoteCategoryClasses = {
+        general: 'bg-gray-100 text-gray-700',
+        service: 'bg-blue-50 text-blue-700',
+        access: 'bg-amber-50 text-amber-800',
+        billing: 'bg-violet-50 text-violet-700',
+        safety: 'bg-red-50 text-red-700',
+    };
+
+    function jobNoteTargetOptions(options) {
+        const groups = {};
+        options.forEach(option => {
+            if (!groups[option.type]) groups[option.type] = [];
+            groups[option.type].push(option);
+        });
+        return Object.entries(groups).map(([type, records]) => `
+            <optgroup label="${escapeHtml(jobNoteTargetNames[type] || type)}">
+                ${records.map(record => `<option value="${escapeHtml(type)}:${record.id}">${escapeHtml(record.label)}</option>`).join('')}
+            </optgroup>
+        `).join('');
+    }
+
+    function jobNoteCard(note) {
+        const created = new Date(note.created_at).toLocaleString();
+        const categoryClass = jobNoteCategoryClasses[note.category] || jobNoteCategoryClasses.general;
+        return `
+            <article class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
+                <div class="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                    <div class="flex flex-wrap items-center gap-2">
+                        <span class="rounded-md bg-blue-50 px-2 py-1 text-xs font-semibold text-blue-700">${escapeHtml(jobNoteTargetNames[note.target_type] || note.target_type)}: ${escapeHtml(note.target_label)}</span>
+                        <span class="rounded-md px-2 py-1 text-xs font-medium ${categoryClass}">${escapeHtml(note.category)}</span>
+                        <span class="rounded-md bg-gray-50 px-2 py-1 text-xs text-gray-500">${note.visibility === 'customer' ? 'Customer visible' : 'Internal only'}</span>
+                    </div>
+                    <time class="shrink-0 text-xs text-gray-400">${escapeHtml(created)}</time>
+                </div>
+                <p class="mt-3 whitespace-pre-wrap text-sm leading-6 text-gray-800">${escapeHtml(note.body)}</p>
+                <p class="mt-3 text-xs text-gray-500">Added by <span class="font-medium text-gray-700">${escapeHtml(note.author_name)}</span></p>
+            </article>`;
+    }
+
+    async function openJobNotes(jobId) {
+        const dialog = document.getElementById('job-notes-dialog');
+        const content = document.getElementById('job-notes-content');
+        const job = boardJobs.get(jobId);
+        if (!dialog || !content || !job) return;
+        document.getElementById('job-notes-title').textContent = `#${job.id} ${job.title}`;
+        content.dataset.jobId = String(jobId);
+        content.innerHTML = '<div class="rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">Loading related notes...</div>';
+        if (!dialog.open) dialog.showModal();
+
+        try {
+            const query = `target_type=job&target_id=${encodeURIComponent(jobId)}`;
+            const [notesResponse, targetsResponse] = await Promise.all([
+                fetch(`/api/v1/notes/?${query}&related=1`),
+                fetch(`/api/v1/notes/targets/?${query}`),
+            ]);
+            if (!notesResponse.ok || !targetsResponse.ok) throw new Error('Notes could not load.');
+            const notes = await notesResponse.json();
+            const targets = await targetsResponse.json();
+            content.innerHTML = `
+                <section class="rounded-lg border border-gray-200 bg-white shadow-sm">
+                    <div class="border-b border-gray-200 px-5 py-4">
+                        <h3 class="font-semibold text-gray-950">Add a note</h3>
+                        <p class="mt-1 text-sm text-gray-500">Choose the exact record this information belongs to.</p>
+                    </div>
+                    <div class="space-y-4 p-5">
+                        <div class="grid gap-3 md:grid-cols-3">
+                            <label class="text-sm font-medium text-gray-700">About
+                                <select id="job-note-target" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5">${jobNoteTargetOptions(targets)}</select>
+                            </label>
+                            <label class="text-sm font-medium text-gray-700">Category
+                                <select id="job-note-category" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5">
+                                    <option value="general">General</option>
+                                    <option value="service">Service</option>
+                                    <option value="access">Access</option>
+                                    <option value="billing">Billing</option>
+                                    <option value="safety">Safety</option>
+                                </select>
+                            </label>
+                            <label class="text-sm font-medium text-gray-700">Visibility
+                                <select id="job-note-visibility" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5">
+                                    <option value="internal">Internal only</option>
+                                    <option value="customer">Customer visible</option>
+                                </select>
+                            </label>
+                        </div>
+                        <label class="block text-sm font-medium text-gray-700">Note
+                            <textarea id="job-note-body" rows="4" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5" placeholder="Add instructions, service context, access details, or a follow-up..."></textarea>
+                        </label>
+                        <div id="job-note-error" class="hidden rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"></div>
+                        <div class="flex justify-end">
+                            <button type="button" onclick="saveJobNote()" class="rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700">Add note</button>
+                        </div>
+                    </div>
+                </section>
+                <section class="mt-5">
+                    <div class="mb-3 flex items-center justify-between">
+                        <div>
+                            <h3 class="font-semibold text-gray-950">Related notes</h3>
+                            <p class="mt-1 text-xs text-gray-500">Job, account, contact, and property notes appear together with clear labels.</p>
+                        </div>
+                        <span class="rounded-full bg-gray-200 px-2.5 py-1 text-xs font-medium text-gray-600">${notes.length}</span>
+                    </div>
+                    <div class="space-y-3">${notes.length ? notes.map(jobNoteCard).join('') : '<div class="rounded-lg border border-dashed border-gray-300 bg-white p-8 text-center text-sm text-gray-500">No related notes yet.</div>'}</div>
+                </section>`;
+        } catch (error) {
+            console.error(error);
+            content.innerHTML = '<div class="rounded-lg border border-red-200 bg-red-50 p-6 text-center text-sm text-red-700">Notes could not load. Refresh the page and try again.</div>';
+        }
+    }
+
+    function closeJobNotes() {
+        document.getElementById('job-notes-dialog')?.close();
+    }
+
+    async function saveJobNote() {
+        const content = document.getElementById('job-notes-content');
+        const targetValue = document.getElementById('job-note-target')?.value || '';
+        const [targetType, targetId] = targetValue.split(':');
+        const body = document.getElementById('job-note-body')?.value.trim() || '';
+        const error = document.getElementById('job-note-error');
+        if (!targetType || !targetId || !body) {
+            error.textContent = 'Choose what the note is about and enter the note.';
+            error.classList.remove('hidden');
+            return;
+        }
+
+        const payload = {
+            target_type: targetType,
+            category: document.getElementById('job-note-category').value,
+            visibility: document.getElementById('job-note-visibility').value,
+            body,
+        };
+        payload[targetType] = Number(targetId);
+        const response = await fetch('/api/v1/notes/', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json', 'X-CSRFToken': getCookie('csrftoken')},
+            body: JSON.stringify(payload),
+        });
+        const result = await response.json();
+        if (!response.ok) {
+            error.textContent = result.detail || result.body || Object.values(result).flat().join(' ') || 'The note could not be saved.';
+            error.classList.remove('hidden');
+            return;
+        }
+        await openJobNotes(Number(content.dataset.jobId));
     }
 
     async function loadBoard() {

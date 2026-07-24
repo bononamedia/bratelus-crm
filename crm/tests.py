@@ -5,6 +5,7 @@ from django.utils import timezone
 
 from crm.management.commands.import_zoho_contacts import fit_contact_field
 from crm.models.contacts import Account, Contact, PaymentMethod, Property
+from crm.models.notes import CRMNote
 from organizations.models import Workspace, WorkspaceMember
 from fsm.models import Job
 
@@ -410,6 +411,105 @@ class AccountlessContactApiTests(TestCase):
     def test_zoho_import_values_are_bounded_by_the_destination_field(self):
         self.assertEqual(len(fit_contact_field('phone', '1' * 80)), 50)
         self.assertEqual(fit_contact_field('description', 'Unbounded notes'), 'Unbounded notes')
+
+
+class CRMNoteApiTests(TestCase):
+    def setUp(self):
+        self.user = User.objects.create_user('notes-admin@example.com', password='StrongPass123!')
+        self.workspace = Workspace.objects.create(name='Notes Brand', slug='notes-brand', created_by=self.user)
+        WorkspaceMember.objects.create(workspace=self.workspace, user=self.user, role='admin')
+        self.account = Account.objects.create(organization=self.workspace, name='Customer Account')
+        self.contact = Contact.objects.create(
+            organization=self.workspace,
+            account=self.account,
+            first_name='Fabio',
+            last_name='Customer',
+        )
+        self.property = Property.objects.create(account=self.account, name='Main Site', address='')
+        self.job = Job.objects.create(
+            organization=self.workspace,
+            account=self.account,
+            property=self.property,
+            title='Service Visit',
+        )
+        self.client.force_login(self.user)
+
+    def create_note(self, target_type, target_id, body='Team context'):
+        return self.client.post(
+            reverse('api-note-list'),
+            {
+                'target_type': target_type,
+                target_type: target_id,
+                'category': 'general',
+                'visibility': 'internal',
+                'body': body,
+            },
+            content_type='application/json',
+        )
+
+    def test_accountless_contact_can_have_its_own_note(self):
+        accountless = Contact.objects.create(
+            organization=self.workspace,
+            first_name='No',
+            last_name='Account',
+        )
+        response = self.create_note('contact', accountless.id)
+        self.assertEqual(response.status_code, 201, response.content)
+        note = CRMNote.objects.get()
+        self.assertEqual(note.contact, accountless)
+        self.assertIsNone(note.account)
+        self.assertEqual(note.workspace, self.workspace)
+        self.assertEqual(note.author, self.user)
+
+        targets = self.client.get(
+            reverse('api-note-targets'),
+            {'target_type': 'contact', 'target_id': accountless.id},
+        )
+        self.assertEqual(targets.status_code, 200)
+        self.assertEqual(
+            [(item['type'], item['id']) for item in targets.json()],
+            [('contact', accountless.id)],
+        )
+
+    def test_related_feed_preserves_notes_for_every_record_type(self):
+        responses = [
+            self.create_note('contact', self.contact.id, 'Person preference'),
+            self.create_note('account', self.account.id, 'Customer policy'),
+            self.create_note('property', self.property.id, 'Gate instructions'),
+            self.create_note('job', self.job.id, 'Visit follow-up'),
+        ]
+        self.assertTrue(all(response.status_code == 201 for response in responses))
+
+        response = self.client.get(
+            reverse('api-note-list'),
+            {'target_type': 'contact', 'target_id': self.contact.id, 'related': '1'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual({item['target_type'] for item in response.json()}, {
+            'contact', 'account', 'property', 'job',
+        })
+
+    def test_note_rejects_foreign_workspace_and_multiple_targets(self):
+        other = Workspace.objects.create(name='Other Notes', slug='other-notes')
+        foreign_contact = Contact.objects.create(
+            organization=other,
+            first_name='Foreign',
+            last_name='Contact',
+        )
+        foreign = self.create_note('contact', foreign_contact.id)
+        self.assertEqual(foreign.status_code, 400)
+
+        multiple = self.client.post(
+            reverse('api-note-list'),
+            {
+                'target_type': 'contact',
+                'contact': self.contact.id,
+                'account': self.account.id,
+                'body': 'Ambiguous note',
+            },
+            content_type='application/json',
+        )
+        self.assertEqual(multiple.status_code, 400)
 
 
 class CrmArchiveTests(TestCase):

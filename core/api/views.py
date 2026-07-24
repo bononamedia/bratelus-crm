@@ -13,6 +13,7 @@ from rest_framework import status
 from rest_framework.exceptions import PermissionDenied, ValidationError
 from .serializers import (
     AccountSerializer,
+    CRMNoteSerializer,
     ContactSerializer,
     JobSerializer,
     PaymentMethodSerializer,
@@ -22,6 +23,7 @@ from .serializers import (
 from organizations.models import WorkerProfile, Workspace
 from organizations.permissions import user_can_manage_workspace, user_can_purge_crm
 from crm.models.contacts import Account, Contact, PaymentMethod, Property
+from crm.models.notes import CRMNote
 from crm.services.contacts import duplicate_account_bundle, duplicate_contact
 from fsm.models import Job, JobAssignment
 
@@ -582,6 +584,150 @@ class PaymentMethodViewSet(viewsets.ModelViewSet):
     def perform_update(self, serializer):
         self._validate_workspace_links(serializer)
         serializer.save()
+
+
+class CRMNoteViewSet(viewsets.ModelViewSet):
+    queryset = CRMNote.objects.all()
+    serializer_class = CRMNoteSerializer
+    permission_classes = [IsAuthenticated]
+
+    def _require_workspace_manager(self):
+        active_org = getattr(self.request, 'active_organization', None)
+        if not active_org or not user_can_manage_workspace(self.request.user, active_org):
+            raise PermissionDenied('Only workspace users with CRM access can manage notes.')
+        return active_org
+
+    def _target(self, workspace):
+        target_type = self.request.query_params.get('target_type', '')
+        target_id = self.request.query_params.get('target_id', '')
+        models_by_type = {
+            'account': Account,
+            'contact': Contact,
+            'property': Property,
+            'job': Job,
+        }
+        model = models_by_type.get(target_type)
+        if not model or not str(target_id).isdigit():
+            return None, None
+        if target_type in {'account', 'contact', 'job'}:
+            target = model.objects.filter(id=target_id, organization=workspace).first()
+        else:
+            target = model.objects.filter(id=target_id, account__organization=workspace).first()
+        return target_type, target
+
+    def get_queryset(self):
+        workspace = self._require_workspace_manager()
+        queryset = CRMNote.objects.filter(workspace=workspace).select_related(
+            'author', 'account', 'contact', 'property', 'job',
+        )
+        target_type, target = self._target(workspace)
+        if not target:
+            return queryset.none()
+        exact = Q(**{f'{target_type}_id': target.id})
+        if self.request.query_params.get('related') != '1':
+            return queryset.filter(exact)
+
+        account_id = None
+        property_id = None
+        if target_type == 'account':
+            account_id = target.id
+        elif target_type == 'contact':
+            account_id = target.account_id
+        elif target_type == 'property':
+            account_id = target.account_id
+            property_id = target.id
+        elif target_type == 'job':
+            account_id = target.account_id
+            property_id = target.property_id
+
+        related = exact
+        if account_id:
+            related |= Q(account_id=account_id)
+            related |= Q(contact__account_id=account_id)
+            related |= Q(property__account_id=account_id)
+            related |= Q(job__account_id=account_id)
+        if property_id:
+            related |= Q(property_id=property_id) | Q(job__property_id=property_id)
+        return queryset.filter(related).distinct()
+
+    @action(detail=False, methods=['get'])
+    def targets(self, request):
+        workspace = self._require_workspace_manager()
+        target_type, target = self._target(workspace)
+        if not target:
+            return Response({'detail': 'Record not found.'}, status=status.HTTP_404_NOT_FOUND)
+
+        account = None
+        property_obj = None
+        if target_type == 'account':
+            account = target
+        elif target_type == 'contact':
+            account = target.account
+        elif target_type == 'property':
+            account = target.account
+            property_obj = target
+        elif target_type == 'job':
+            account = target.account
+            property_obj = target.property
+
+        options = []
+        seen = set()
+
+        def add_option(option_type, record, label, description=''):
+            if not record or (option_type, record.id) in seen:
+                return
+            seen.add((option_type, record.id))
+            options.append({
+                'type': option_type,
+                'id': record.id,
+                'label': label,
+                'description': description,
+            })
+
+        if target_type == 'contact':
+            add_option('contact', target, str(target), target.email or target.phone)
+        elif target_type == 'account':
+            add_option('account', target, target.name, target.email or target.phone)
+        elif target_type == 'property':
+            add_option('property', target, target.name, target.address)
+        elif target_type == 'job':
+            add_option('job', target, target.title, target.get_status_display())
+
+        if account:
+            add_option('account', account, account.name, account.email or account.phone)
+            contacts = Contact.objects.filter(
+                organization=workspace,
+                account=account,
+                archived_at__isnull=True,
+            ).order_by('first_name', 'last_name', 'id')
+            for contact in contacts:
+                add_option('contact', contact, str(contact), contact.email or contact.phone)
+            properties = Property.objects.filter(account=account).order_by('name', 'id')
+            for item in properties:
+                add_option('property', item, item.name, item.address)
+            jobs = Job.objects.filter(
+                organization=workspace,
+                account=account,
+                archived_at__isnull=True,
+            ).order_by('-scheduled_start', '-id')[:100]
+            for job in jobs:
+                add_option('job', job, job.title, job.get_status_display())
+        elif property_obj:
+            add_option('property', property_obj, property_obj.name, property_obj.address)
+
+        return Response(options)
+
+    def perform_create(self, serializer):
+        workspace = self._require_workspace_manager()
+        serializer.save(workspace=workspace, author=self.request.user)
+
+    def perform_update(self, serializer):
+        self._require_workspace_manager()
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        self._require_workspace_manager()
+        instance.delete()
 
 
 class JobViewSet(BaseWorkspaceViewSet):

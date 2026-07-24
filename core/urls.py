@@ -42,7 +42,7 @@ from fsm.calendar_views import (
 )
 
 # Unified API ViewSets
-from core.api.views import AccountViewSet, ContactViewSet, JobViewSet, PaymentMethodViewSet, PropertyViewSet, WorkerViewSet
+from core.api.views import AccountViewSet, ContactViewSet, CRMNoteViewSet, JobViewSet, PaymentMethodViewSet, PropertyViewSet, WorkerViewSet
 from core.views import home_view, reports_view
 from finance.views import (
     estimate_convert_view,
@@ -75,6 +75,7 @@ router.register(r'accounts', AccountViewSet, basename='api-account')
 router.register(r'contacts', ContactViewSet, basename='api-contact')
 router.register(r'properties', PropertyViewSet, basename='api-property')
 router.register(r'payment-methods', PaymentMethodViewSet, basename='api-payment-method')
+router.register(r'notes', CRMNoteViewSet, basename='api-note')
 router.register(r'jobs', JobViewSet, basename='api-job')
 router.register(r'workers', WorkerViewSet, basename='api-worker')
 
