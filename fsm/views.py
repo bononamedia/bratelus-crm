@@ -130,6 +130,18 @@ def jobs_board_view(request):
 
 
 @login_required
+def live_fleet_view(request):
+    """Renders the map-only fleet display intended for a separate monitor."""
+    active_org = getattr(request, 'active_organization', None)
+    if not user_can_manage_workspace(request.user, active_org):
+        raise PermissionDenied('Only workspace admins can view the live fleet.')
+
+    return render(request, 'live_fleet.html', {
+        'active_org': active_org,
+    })
+
+
+@login_required
 def field_operations_view(request):
     active_org, worker = _worker_for_request(request)
     if not worker:

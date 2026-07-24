@@ -1,0 +1,121 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mx-auto max-w-[1600px] space-y-5">
+    <header class="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div>
+            <p class="text-xs font-semibold uppercase text-amber-600">{{ active_org.name }} books</p>
+            <h1 class="mt-1 text-2xl font-semibold text-gray-950 md:text-3xl">Sales</h1>
+            <p class="mt-1 text-sm text-gray-500">Customer estimates, invoices, payments, recurring billing, and credits.</p>
+        </div>
+        <button type="button" onclick="openSalesDocument('{{ active_tab }}')" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">+ New record</button>
+    </header>
+
+    <nav class="flex gap-1 overflow-x-auto rounded-lg border border-gray-200 bg-gray-50 p-1" aria-label="Sales modules">
+        <a href="?tab=estimates" class="shrink-0 rounded-md px-3 py-2 text-sm font-medium {% if active_tab == 'estimates' %}bg-white text-blue-700 shadow-sm{% else %}text-gray-600 hover:bg-white{% endif %}">Estimates</a>
+        <a href="?tab=invoices" class="shrink-0 rounded-md px-3 py-2 text-sm font-medium {% if active_tab == 'invoices' %}bg-white text-blue-700 shadow-sm{% else %}text-gray-600 hover:bg-white{% endif %}">Invoices</a>
+        <a href="?tab=recurring" class="shrink-0 rounded-md px-3 py-2 text-sm font-medium {% if active_tab == 'recurring' %}bg-white text-blue-700 shadow-sm{% else %}text-gray-600 hover:bg-white{% endif %}">Recurring Invoices</a>
+        <a href="?tab=payments" class="shrink-0 rounded-md px-3 py-2 text-sm font-medium {% if active_tab == 'payments' %}bg-white text-blue-700 shadow-sm{% else %}text-gray-600 hover:bg-white{% endif %}">Payments Received</a>
+        <a href="?tab=credits" class="shrink-0 rounded-md px-3 py-2 text-sm font-medium {% if active_tab == 'credits' %}bg-white text-blue-700 shadow-sm{% else %}text-gray-600 hover:bg-white{% endif %}">Credit Notes</a>
+    </nav>
+
+    <section class="overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm">
+        <div class="overflow-x-auto">
+            {% if active_tab == 'estimates' %}
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50"><tr><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Estimate</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Customer</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Date</th><th class="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500">Total</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Status</th><th class="px-4 py-3"></th></tr></thead>
+                <tbody class="divide-y divide-gray-100">
+                    {% for estimate in estimates %}
+                    <tr class="hover:bg-gray-50"><td class="px-4 py-3 font-semibold text-gray-950">{{ estimate.estimate_number }}</td><td class="px-4 py-3 text-sm text-gray-700">{{ estimate.account.name }}</td><td class="px-4 py-3 text-sm text-gray-600">{{ estimate.issue_date }}</td><td class="px-4 py-3 text-right font-semibold">${{ estimate.total_amount }}</td><td class="px-4 py-3 text-sm">{{ estimate.get_status_display }}</td><td class="px-4 py-3 text-right">{% if not estimate.converted_invoice %}<form method="post" action="{% url 'finance_estimate_convert' estimate.id %}">{% csrf_token %}<button class="text-sm font-semibold text-blue-700 hover:text-blue-900">Convert to invoice</button></form>{% else %}<a class="text-sm font-semibold text-blue-700" href="{% url 'finance_invoice_detail' estimate.converted_invoice_id %}">View invoice</a>{% endif %}</td></tr>
+                    {% empty %}<tr><td colspan="6" class="px-5 py-14 text-center text-sm text-gray-500">No estimates yet. Create one and convert it when the customer approves.</td></tr>{% endfor %}
+                </tbody>
+            </table>
+            {% elif active_tab == 'recurring' %}
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50"><tr><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Schedule</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Customer</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Frequency</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Next invoice</th><th class="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500">Amount</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Status</th></tr></thead>
+                <tbody class="divide-y divide-gray-100">{% for item in recurring_invoices %}<tr><td class="px-4 py-3 font-semibold">{{ item.name }}</td><td class="px-4 py-3 text-sm">{{ item.account.name }}</td><td class="px-4 py-3 text-sm">{{ item.get_frequency_display }}</td><td class="px-4 py-3 text-sm">{{ item.next_issue_date }}</td><td class="px-4 py-3 text-right font-semibold">${{ item.total_amount }}</td><td class="px-4 py-3 text-sm">{% if item.is_active %}Active{% else %}Paused{% endif %}</td></tr>{% empty %}<tr><td colspan="6" class="px-5 py-14 text-center text-sm text-gray-500">No recurring invoice schedules.</td></tr>{% endfor %}</tbody>
+            </table>
+            {% elif active_tab == 'payments' %}
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50"><tr><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Payment</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Customer</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Job</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Invoice</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Method</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Date</th><th class="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500">Amount</th></tr></thead>
+                <tbody class="divide-y divide-gray-100">{% for payment in payments_received %}<tr><td class="px-4 py-3 font-semibold">{{ payment.payment_number }}</td><td class="px-4 py-3 text-sm">{{ payment.account.name }}</td><td class="px-4 py-3 text-sm">{% if payment.job %}#{{ payment.job_id }} {{ payment.job.title }}{% else %}Not assigned{% endif %}</td><td class="px-4 py-3 text-sm">{% if payment.invoice %}<a class="text-blue-700" href="{% url 'finance_invoice_detail' payment.invoice_id %}">{{ payment.invoice.invoice_number }}</a>{% else %}Unapplied{% endif %}</td><td class="px-4 py-3 text-sm">{{ payment.get_method_display }}</td><td class="px-4 py-3 text-sm">{{ payment.payment_date }}</td><td class="px-4 py-3 text-right font-semibold">${{ payment.amount }}</td></tr>{% empty %}<tr><td colspan="7" class="px-5 py-14 text-center text-sm text-gray-500">No payments have been recorded.</td></tr>{% endfor %}</tbody>
+            </table>
+            {% elif active_tab == 'credits' %}
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50"><tr><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Credit note</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Customer</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Invoice</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Date</th><th class="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500">Amount</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Status</th></tr></thead>
+                <tbody class="divide-y divide-gray-100">{% for credit in credit_notes %}<tr><td class="px-4 py-3 font-semibold">{{ credit.credit_number }}</td><td class="px-4 py-3 text-sm">{{ credit.account.name }}</td><td class="px-4 py-3 text-sm">{{ credit.invoice.invoice_number|default:"Unapplied" }}</td><td class="px-4 py-3 text-sm">{{ credit.issue_date }}</td><td class="px-4 py-3 text-right font-semibold">${{ credit.amount }}</td><td class="px-4 py-3 text-sm">{{ credit.get_status_display }}</td></tr>{% empty %}<tr><td colspan="6" class="px-5 py-14 text-center text-sm text-gray-500">No credit notes.</td></tr>{% endfor %}</tbody>
+            </table>
+            {% else %}
+            <table class="min-w-full divide-y divide-gray-200">
+                <thead class="bg-gray-50"><tr><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Invoice</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Customer</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Job</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Due</th><th class="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500">Total</th><th class="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500">Balance</th><th class="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">Status</th></tr></thead>
+                <tbody class="divide-y divide-gray-100">{% for invoice in invoices %}<tr class="cursor-pointer hover:bg-gray-50" onclick="location.href='{% url 'finance_invoice_detail' invoice.id %}'"><td class="px-4 py-3 font-semibold text-blue-700">{{ invoice.invoice_number }}</td><td class="px-4 py-3 text-sm">{{ invoice.account.name }}</td><td class="px-4 py-3 text-sm">{{ invoice.job.title|default:"—" }}</td><td class="px-4 py-3 text-sm">{{ invoice.due_date }}</td><td class="px-4 py-3 text-right font-semibold">${{ invoice.total_amount }}</td><td class="px-4 py-3 text-right font-semibold">${{ invoice.balance_due }}</td><td class="px-4 py-3 text-sm">{{ invoice.get_status_display }}</td></tr>{% empty %}<tr><td colspan="7" class="px-5 py-14 text-center text-sm text-gray-500">No invoices yet.</td></tr>{% endfor %}</tbody>
+            </table>
+            {% endif %}
+        </div>
+    </section>
+</div>
+
+<dialog id="sales-document-dialog" class="w-[calc(100%-2rem)] max-w-2xl rounded-lg p-0 shadow-2xl backdrop:bg-slate-950/50">
+    <form method="post" class="max-h-[90vh] overflow-y-auto">
+        {% csrf_token %}
+        <input type="hidden" name="action" id="sales-action">
+        <input type="hidden" name="return_tab" id="sales-return-tab">
+        <header class="sticky top-0 z-10 flex items-center justify-between border-b border-gray-200 bg-white px-5 py-4"><div><p class="text-xs font-semibold uppercase text-blue-600">Finance & Books</p><h2 id="sales-dialog-title" class="text-xl font-semibold text-gray-950">New record</h2></div><button type="button" onclick="document.getElementById('sales-document-dialog').close()" class="text-2xl text-gray-400" aria-label="Close">&times;</button></header>
+        <div class="space-y-4 p-5">
+            <label class="block text-sm font-medium text-gray-700">Customer account<select id="sales-account" name="account_id" required onchange="filterSalesRelations()" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5"><option value="">Select customer</option>{% for account in accounts %}<option value="{{ account.id }}">{{ account.name }}</option>{% endfor %}</select></label>
+            <div class="grid gap-4 sm:grid-cols-2 common-document-field">
+                <label class="text-sm font-medium text-gray-700">Contact<select id="sales-contact" name="contact_id" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5"><option value="">Default contact</option>{% for contact in contacts %}<option value="{{ contact.id }}" data-account="{{ contact.account_id|default:'' }}">{{ contact }}</option>{% endfor %}</select></label>
+                <label class="text-sm font-medium text-gray-700">Property<select id="sales-property" name="property_id" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5"><option value="">No property</option>{% for property in properties %}<option value="{{ property.id }}" data-account="{{ property.account_id }}">{{ property.name }}</option>{% endfor %}</select></label>
+            </div>
+            <label class="block text-sm font-medium text-gray-700 common-document-field">Job / project<select id="sales-job" name="job_id" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5"><option value="">No job</option>{% for job in jobs %}<option value="{{ job.id }}" data-account="{{ job.account_id }}">#{{ job.id }} {{ job.title }}</option>{% endfor %}</select></label>
+
+            <div class="document-line-fields space-y-4 rounded-lg border border-gray-200 bg-gray-50 p-4">
+                <label class="block text-sm font-medium text-gray-700">Item & description<input name="description" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5" placeholder="Service, materials, or project milestone"></label>
+                <div class="grid grid-cols-3 gap-3"><label class="text-sm font-medium text-gray-700">Quantity<input name="quantity" type="number" step="0.01" value="1" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"></label><label class="text-sm font-medium text-gray-700">Rate<input name="unit_price" type="number" step="0.01" min="0" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"></label><label class="text-sm font-medium text-gray-700">Tax<input name="tax_amount" type="number" step="0.01" min="0" value="0" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"></label></div>
+            </div>
+
+            <div class="estimate-fields hidden grid gap-4 sm:grid-cols-2"><label class="text-sm font-medium text-gray-700">Issue date<input name="issue_date" type="date" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"></label><label class="text-sm font-medium text-gray-700">Expires<input name="expiration_date" type="date" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"></label></div>
+            <label class="invoice-fields hidden text-sm font-medium text-gray-700">Due date<input name="due_date" type="date" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"></label>
+            <div class="recurring-fields hidden space-y-4"><label class="block text-sm font-medium text-gray-700">Schedule name<input name="name" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"></label><div class="grid gap-4 sm:grid-cols-3"><label class="text-sm font-medium text-gray-700">Frequency<select name="frequency" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5"><option value="weekly">Weekly</option><option value="monthly" selected>Monthly</option><option value="quarterly">Quarterly</option><option value="yearly">Yearly</option></select></label><label class="text-sm font-medium text-gray-700">Next invoice<input name="next_issue_date" type="date" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"></label><label class="text-sm font-medium text-gray-700">Due days<input name="due_days" type="number" value="30" min="0" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"></label></div></div>
+
+            <div class="payment-fields hidden space-y-4"><label class="block text-sm font-medium text-gray-700">Invoice<select id="payment-invoice" name="invoice_id" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5"><option value="">Unapplied payment</option>{% for invoice in invoices %}<option value="{{ invoice.id }}" data-account="{{ invoice.account_id }}">{{ invoice.invoice_number }} · ${{ invoice.balance_due }}</option>{% endfor %}</select></label><label class="block text-sm font-medium text-gray-700">Job / project<select id="payment-job" name="job_id" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5"><option value="">No job</option>{% for job in jobs %}<option value="{{ job.id }}" data-account="{{ job.account_id }}">#{{ job.id }} {{ job.title }}</option>{% endfor %}</select></label><div class="grid gap-4 sm:grid-cols-2"><label class="text-sm font-medium text-gray-700">Amount<input name="amount" type="number" step="0.01" min="0.01" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"></label><label class="text-sm font-medium text-gray-700">Payment date<input name="payment_date" type="date" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"></label></div><div class="grid gap-4 sm:grid-cols-2"><label class="text-sm font-medium text-gray-700">Method<select name="method" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5">{% for value,label in payment_methods %}<option value="{{ value }}">{{ label }}</option>{% endfor %}</select></label><label class="text-sm font-medium text-gray-700">Reference<input name="reference" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"></label></div></div>
+            <div class="credit-fields hidden space-y-4"><label class="block text-sm font-medium text-gray-700">Invoice<select id="credit-invoice" name="invoice_id" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5"><option value="">Unapplied credit</option>{% for invoice in invoices %}<option value="{{ invoice.id }}" data-account="{{ invoice.account_id }}">{{ invoice.invoice_number }}</option>{% endfor %}</select></label><div class="grid gap-4 sm:grid-cols-2"><label class="text-sm font-medium text-gray-700">Credit amount<input name="amount" type="number" step="0.01" min="0.01" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"></label><label class="text-sm font-medium text-gray-700">Issue date<input name="issue_date" type="date" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"></label></div><label class="block text-sm font-medium text-gray-700">Reason<textarea name="reason" rows="3" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"></textarea></label></div>
+            <label class="notes-fields block text-sm font-medium text-gray-700">Customer notes<textarea name="notes" rows="3" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"></textarea></label>
+            <label class="terms-fields block text-sm font-medium text-gray-700">Terms<textarea name="terms" rows="2" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"></textarea></label>
+        </div>
+        <footer class="sticky bottom-0 flex justify-end gap-2 border-t border-gray-200 bg-white px-5 py-4"><button type="button" onclick="document.getElementById('sales-document-dialog').close()" class="rounded-lg border border-gray-300 px-4 py-2 text-sm font-medium">Cancel</button><button class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Save record</button></footer>
+    </form>
+</dialog>
+
+<script>
+function openSalesDocument(tab) {
+    const type = ['estimates','invoices','recurring','payments','credits'].includes(tab) ? tab : 'invoices';
+    const actions = {estimates:'create_estimate', invoices:'create_invoice', recurring:'create_recurring', payments:'record_payment', credits:'create_credit'};
+    const titles = {estimates:'New estimate', invoices:'New invoice', recurring:'New recurring invoice', payments:'Record payment', credits:'New credit note'};
+    document.getElementById('sales-action').value = actions[type];
+    document.getElementById('sales-return-tab').value = type;
+    document.getElementById('sales-dialog-title').textContent = titles[type];
+    const fieldGroup = {estimates:'estimate', invoices:'invoice', recurring:'recurring', payments:'payment', credits:'credit'}[type];
+    ['estimate','invoice','recurring','payment','credit'].forEach(name => document.querySelectorAll(`.${name}-fields`).forEach(item => {
+        const inactive = name !== fieldGroup;
+        item.classList.toggle('hidden', inactive);
+        item.querySelectorAll('input,select,textarea').forEach(control => control.disabled = inactive);
+    }));
+    const isPaymentOrCredit = ['payments','credits'].includes(type);
+    document.querySelectorAll('.document-line-fields,.common-document-field,.terms-fields').forEach(item => {
+        item.classList.toggle('hidden', isPaymentOrCredit);
+        item.querySelectorAll('input,select,textarea').forEach(control => control.disabled = isPaymentOrCredit);
+    });
+    document.getElementById('sales-document-dialog').showModal();
+}
+function filterSalesRelations() {
+    const account = document.getElementById('sales-account').value;
+    ['sales-contact','sales-property','sales-job','payment-job','payment-invoice','credit-invoice'].forEach(id => {
+        const select = document.getElementById(id);
+        if (!select) return;
+        [...select.options].forEach((option, index) => option.hidden = index > 0 && option.dataset.account !== account);
+        if (select.selectedOptions[0]?.hidden) select.value = '';
+    });
+}
+</script>
+{% endblock %}

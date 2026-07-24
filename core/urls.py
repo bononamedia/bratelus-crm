@@ -19,7 +19,8 @@ from crm.views import (
 
 # FSM Views & APIs
 from fsm.views import (
-    jobs_board_view, 
+    jobs_board_view,
+    live_fleet_view,
     EvidenceUploadView, 
     MobileClockInView, 
     MobileClockOutView,
@@ -43,7 +44,14 @@ from fsm.calendar_views import (
 # Unified API ViewSets
 from core.api.views import AccountViewSet, ContactViewSet, JobViewSet, PaymentMethodViewSet, PropertyViewSet, WorkerViewSet
 from core.views import home_view, reports_view
-from finance.views import finance_overview_view
+from finance.views import (
+    estimate_convert_view,
+    finance_invoice_detail_view,
+    finance_job_costing_view,
+    finance_overview_view,
+    finance_payment_settings_view,
+    finance_sales_view,
+)
 from finance.billing_views import billing_overview_view, create_billing_portal_view, create_checkout_session_view, stripe_webhook_view
 from organizations.models import Workspace
 from organizations.views import admin_console_view, create_workspace_view, employee_profile_view, signup_view, verify_email_view, email_verification_pending_view
@@ -117,12 +125,18 @@ urlpatterns = [
     path('leads/', leads_list_view, name='leads'),
     path('jobs/', jobs_board_view, name='jobs'),
     path('jobs/calendar/', job_calendar_view, name='job_calendar'),
+    path('jobs/live-fleet/', live_fleet_view, name='live_fleet'),
     path('accounts/', crm_accounts_view, name='accounts'),
     path('contacts/', crm_accounts_view, {'section': 'contacts'}, name='contacts'),
     path('properties/', crm_accounts_view, {'section': 'properties'}, name='properties'),
     path('payment-methods/', crm_accounts_view, {'section': 'payment_methods'}, name='payment_methods'),
     path('crm/archive/', crm_archive_view, name='crm_archive'),
     path('finance/', finance_overview_view, name='finance'),
+    path('finance/sales/', finance_sales_view, name='finance_sales'),
+    path('finance/estimates/<int:estimate_id>/convert/', estimate_convert_view, name='finance_estimate_convert'),
+    path('finance/invoices/<int:invoice_id>/', finance_invoice_detail_view, name='finance_invoice_detail'),
+    path('finance/payment-settings/', finance_payment_settings_view, name='finance_payment_settings'),
+    path('finance/job-costing/', finance_job_costing_view, name='finance_job_costing'),
     path('workforce/', workforce_view, name='workforce'),
     path('chat/', chat_inbox_view, name='chat_inbox'),
     path('chat/push/subscribe/', chat_push_subscribe_view, name='chat_push_subscribe'),

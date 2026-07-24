@@ -36,7 +36,7 @@
             <p class="mt-2 text-3xl font-extrabold text-gray-950" id="stat-properties">{{ crm_stats.properties }}</p>
         </div>
         <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <p class="text-xs font-bold uppercase tracking-wide text-gray-500">Payment Methods</p>
+            <p class="text-xs font-bold uppercase tracking-wide text-gray-500">Customer Payment Methods</p>
             <p class="mt-2 text-3xl font-extrabold text-gray-950" id="stat-payment-methods">{{ crm_stats.payment_methods }}</p>
         </div>
         <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
@@ -318,6 +318,8 @@
         detailRecord: null,
         detailRelated: 'overview',
         editingRecord: null,
+        clientEditAccountId: null,
+        clientEditRecords: {},
         creationMode: 'single',
         wizardDrafts: {},
     };
@@ -353,12 +355,12 @@
         accounts: [
             { key: 'contacts', label: 'Contacts', icon: 'contact', tone: 'bg-blue-50 text-blue-600' },
             { key: 'properties', label: 'Properties', icon: 'map-pin-house', tone: 'bg-emerald-50 text-emerald-600' },
-            { key: 'payment_methods', label: 'Payment Methods', icon: 'credit-card', tone: 'bg-violet-50 text-violet-600' },
+            { key: 'payment_methods', label: 'Customer Payment Methods', icon: 'credit-card', tone: 'bg-violet-50 text-violet-600' },
         ],
         contacts: [
             { key: 'account', label: 'Account', icon: 'building-2', tone: 'bg-blue-50 text-blue-600' },
             { key: 'properties', label: 'Properties', icon: 'map-pin-house', tone: 'bg-emerald-50 text-emerald-600' },
-            { key: 'payment_methods', label: 'Payment Methods', icon: 'credit-card', tone: 'bg-violet-50 text-violet-600' },
+            { key: 'payment_methods', label: 'Customer Payment Methods', icon: 'credit-card', tone: 'bg-violet-50 text-violet-600' },
         ],
     };
 
@@ -1243,6 +1245,23 @@
         setFormValue('record-billing-country', account.billing_country || 'United States');
     }
 
+    function populatePropertyForm(property) {
+        setFormValue('record-account', property.account || '');
+        setFormValue('record-name', property.name);
+        setFormValue('record-address', property.address);
+        setFormValue('record-unit', property.unit_number);
+        setFormValue('record-gate-code', property.gate_code);
+    }
+
+    function populatePaymentMethodForm(payment) {
+        setFormValue('record-account', payment.account || '');
+        setFormValue('record-property', payment.assigned_property || '');
+        setFormValue('record-card-type', payment.card_type);
+        setFormValue('record-last-four', payment.last_four);
+        setFormValue('record-expiration', payment.expiration_date);
+        document.getElementById('record-is-default').checked = Boolean(payment.is_default);
+    }
+
     function applyRecordDraft(type, draft) {
         if (!draft) return;
         const values = {
@@ -1290,27 +1309,35 @@
         const type = crmState.recordType;
         const editing = crmState.editingRecord;
         const wizard = crmState.creationMode === 'wizard' && !editing;
-        document.getElementById('record-type-selector').classList.toggle('hidden', !wizard);
+        const clientEditing = crmState.creationMode === 'client_edit';
+        document.getElementById('record-type-selector').classList.toggle('hidden', !wizard && !clientEditing);
         document.getElementById('record-back-button').classList.toggle('hidden', !wizard || type === 'accounts');
         document.getElementById('record-skip-button').classList.toggle('hidden', !wizard || type === 'accounts' || type === 'payment_methods');
 
         updateTabStyles();
         eyebrow.innerText = type === 'accounts' ? 'CRM Account' : type === 'contacts' ? 'CRM Contact' : type === 'properties' ? 'CRM Property' : 'CRM Payment';
-        title.innerText = editing
+        title.innerText = clientEditing
+            ? `Configure ${recordName('accounts', findRecord('accounts', crmState.clientEditAccountId))}`
+            : editing
             ? `Edit ${recordName(type, editing)}`
             : type === 'accounts' ? 'New Account' : type === 'contacts' ? 'New Contact' : type === 'properties' ? 'New Property' : 'New Payment Method';
         const wizardTypes = ['accounts', 'contacts', 'properties', 'payment_methods'];
         const stepIndex = wizardTypes.indexOf(type);
-        if (wizard) {
+        if (wizard || clientEditing) {
             document.getElementById('record-step-label').innerText = `Step ${stepIndex + 1} of 4`;
-            document.getElementById('record-step-help').innerText = [
+            document.getElementById('record-step-help').innerText = clientEditing ? [
+                'Update the customer account and billing identity.',
+                'Update the primary contact, or add one if this account does not have a contact.',
+                'Update the primary service property, or add one for this account.',
+                'Update the default payment reference, or add one for this account.',
+            ][stepIndex] : [
                 'Create the customer account first. The next steps are optional and stay linked to it.',
                 'Add the primary contact for this account, or skip this step.',
                 'Add the service location for this account, or skip this step.',
                 'Add a tokenized payment reference now, or finish without one.',
             ][stepIndex];
         }
-        submitButton.innerText = editing ? 'Save Changes' : wizard ? (type === 'payment_methods' ? 'Create Client' : 'Continue') : 'Save Record';
+        submitButton.innerText = clientEditing ? 'Save Configuration' : editing ? 'Save Changes' : wizard ? (type === 'payment_methods' ? 'Create Client' : 'Continue') : 'Save Record';
 
         if (type === 'accounts') {
             fields.innerHTML = `
@@ -1351,6 +1378,10 @@
                 </div>`;
             bindPostalLookup('record-mailing-postal','record-mailing-city','record-mailing-state','record-mailing-country');
             if (editing) populateContactForm(editing);
+            if (clientEditing) {
+                setFormValue('record-account', crmState.clientEditAccountId);
+                document.getElementById('record-account').disabled = true;
+            }
             if (wizard) applyRecordDraft(type, crmState.wizardDrafts[type]);
             return;
         }
@@ -1374,6 +1405,11 @@
                     <input id="record-is-default" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                     Default payment method
                 </label>`;
+            if (editing) populatePaymentMethodForm(editing);
+            if (clientEditing) {
+                setFormValue('record-account', crmState.clientEditAccountId);
+                document.getElementById('record-account').disabled = true;
+            }
             if (wizard) applyRecordDraft(type, crmState.wizardDrafts[type]);
             return;
         }
@@ -1389,6 +1425,11 @@
                 ${field('Unit / Suite', 'record-unit', 'placeholder="Unit 204"')}
                 ${field('Gate Code', 'record-gate-code', 'placeholder="Optional"')}
             </div>`;
+        if (editing) populatePropertyForm(editing);
+        if (clientEditing) {
+            setFormValue('record-account', crmState.clientEditAccountId);
+            document.getElementById('record-account').disabled = true;
+        }
         if (wizard) applyRecordDraft(type, crmState.wizardDrafts[type]);
     }
 
@@ -1405,6 +1446,12 @@
     }
 
     function goToWizardStep(type) {
+        if (crmState.creationMode === 'client_edit') {
+            crmState.recordType = type;
+            crmState.editingRecord = clientConfigurationRecord(type);
+            renderRecordForm();
+            return;
+        }
         if (crmState.creationMode !== 'wizard') return;
         captureWizardDraft();
         crmState.recordType = type;
@@ -1423,6 +1470,8 @@
 
     function openRecordPanel(type = crmState.activeTab) {
         crmState.editingRecord = null;
+        crmState.clientEditAccountId = null;
+        crmState.clientEditRecords = {};
         crmState.creationMode = type === 'accounts' ? 'wizard' : 'single';
         crmState.wizardDrafts = {};
         crmState.recordType = type;
@@ -1436,19 +1485,46 @@
         document.getElementById('record-overlay').classList.add('hidden');
         document.getElementById('record-form').reset();
         crmState.editingRecord = null;
+        crmState.clientEditAccountId = null;
+        crmState.clientEditRecords = {};
         crmState.creationMode = 'single';
         crmState.wizardDrafts = {};
         document.getElementById('record-type-selector').classList.add('hidden');
     }
 
-    function editCurrentRecord() {
+    async function editCurrentRecord() {
         if (!['accounts', 'contacts'].includes(crmState.detailType) || !crmState.detailRecord) return;
+        if (crmState.detailType === 'accounts') {
+            const response = await fetch(`/api/v1/accounts/${crmState.detailRecord.id}/configuration/`);
+            if (!response.ok) {
+                alert('Could not load the complete client configuration.');
+                return;
+            }
+            crmState.clientEditRecords = await response.json();
+            crmState.creationMode = 'client_edit';
+            crmState.clientEditAccountId = crmState.detailRecord.id;
+            crmState.recordType = 'accounts';
+            crmState.editingRecord = crmState.clientEditRecords.account;
+            renderRecordForm();
+            document.getElementById('record-overlay').classList.remove('hidden');
+            document.getElementById('record-panel').classList.remove('translate-x-full');
+            return;
+        }
         crmState.creationMode = 'single';
         crmState.recordType = crmState.detailType;
         crmState.editingRecord = crmState.detailRecord;
         renderRecordForm();
         document.getElementById('record-overlay').classList.remove('hidden');
         document.getElementById('record-panel').classList.remove('translate-x-full');
+    }
+
+    function clientConfigurationRecord(type) {
+        return {
+            accounts: crmState.clientEditRecords.account,
+            contacts: crmState.clientEditRecords.contact,
+            properties: crmState.clientEditRecords.property,
+            payment_methods: crmState.clientEditRecords.payment_method,
+        }[type] || null;
     }
 
     function payloadForType(type) {
@@ -1875,6 +1951,27 @@
             }
 
             const savedRecord = await response.json();
+            if (crmState.creationMode === 'client_edit') {
+                const key = {
+                    accounts: 'account',
+                    contacts: 'contact',
+                    properties: 'property',
+                    payment_methods: 'payment_method',
+                }[type];
+                crmState.clientEditRecords[key] = savedRecord;
+                crmState.editingRecord = savedRecord;
+                if (type === 'accounts') {
+                    crmState.clientEditAccountId = savedRecord.id;
+                    crmState.detailRecord = savedRecord;
+                }
+                document.getElementById('record-step-help').innerText = `${detailTypeMeta[type].label} saved. Choose another configuration step or close when finished.`;
+                await loadCrmData();
+                crmState.creationMode = 'client_edit';
+                crmState.recordType = type;
+                crmState.editingRecord = savedRecord;
+                renderRecordForm();
+                return;
+            }
             if (editing) {
                 const index = crmState[type].findIndex(record => String(record.id) === String(savedRecord.id));
                 if (index >= 0) crmState[type][index] = savedRecord;

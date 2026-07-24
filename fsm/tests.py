@@ -289,6 +289,40 @@ class MultiWorkspaceCalendarTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertEqual({event['title'] for event in response.json()}, {'Blue Job', 'Green Job'})
 
+    def test_board_and_calendar_render_the_same_job_form_sections(self):
+        session = self.client.session
+        session['active_org_id'] = str(self.one.id)
+        session.save()
+
+        board = self.client.get(reverse('jobs'))
+        calendar = self.client.get(reverse('job_calendar'))
+
+        self.assertEqual(board.status_code, 200)
+        self.assertEqual(calendar.status_code, 200)
+        for label in (
+            'Job details',
+            'Customer and location',
+            'Assign crew',
+            'Completion and task ownership',
+            'Customer notification',
+        ):
+            self.assertContains(board, label)
+            self.assertContains(calendar, label)
+        self.assertContains(board, 'id="job-start"')
+        self.assertContains(calendar, 'id="calendar-start"')
+
+    def test_live_fleet_is_a_separate_map_only_view(self):
+        session = self.client.session
+        session['active_org_id'] = str(self.one.id)
+        session.save()
+
+        response = self.client.get(reverse('live_fleet'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Live Fleet')
+        self.assertContains(response, reverse('api_live_fleet'))
+        self.assertNotContains(response, 'Crew Assignment')
+
     def test_calendar_slot_creates_and_assigns_job(self):
         response = self.client.post(
             reverse('api_calendar_jobs'),

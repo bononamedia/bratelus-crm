@@ -1,0 +1,34 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mx-auto max-w-6xl space-y-4">
+    <div class="flex flex-wrap items-center justify-between gap-3 print:hidden">
+        <a href="{% url 'finance_sales' %}?tab=invoices" class="text-sm font-semibold text-blue-700">&larr; All invoices</a>
+        <div class="flex gap-2"><button onclick="window.print()" class="rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold">PDF / Print</button><button class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Send Email</button></div>
+    </div>
+    <article class="min-h-[900px] rounded-lg border border-gray-200 bg-white p-6 shadow-sm sm:p-10 print:border-0 print:p-0 print:shadow-none">
+        <header class="flex flex-col justify-between gap-8 border-b border-gray-200 pb-8 sm:flex-row">
+            <div>
+                <div class="text-2xl font-semibold text-blue-700">Bratelus</div>
+                <h1 class="mt-4 text-xl font-semibold text-gray-950">{{ invoice.organization.name }}</h1>
+                <div class="mt-2 max-w-sm whitespace-pre-line text-sm leading-6 text-gray-600">{{ invoice.organization.address|default:"Workspace billing address" }}</div>
+            </div>
+            <div class="sm:text-right">
+                <p class="text-4xl font-light text-gray-950">Invoice</p>
+                <p class="mt-2 text-lg font-semibold"># {{ invoice.invoice_number }}</p>
+                <div class="mt-6 rounded-lg bg-gray-50 px-5 py-4"><p class="text-xs font-semibold uppercase text-gray-500">Balance due</p><p class="mt-1 text-2xl font-semibold text-gray-950">${{ invoice.balance_due }}</p></div>
+            </div>
+        </header>
+        <section class="grid gap-8 py-8 sm:grid-cols-2">
+            <div><p class="text-xs font-semibold uppercase text-gray-500">Bill to</p><p class="mt-2 text-lg font-semibold text-blue-700">{{ invoice.account.name }}</p><p class="mt-1 whitespace-pre-line text-sm leading-6 text-gray-600">{{ invoice.account.billing_address }}</p>{% if invoice.contact %}<p class="mt-2 text-sm text-gray-600">Attn: {{ invoice.contact }}</p>{% endif %}</div>
+            <dl class="grid grid-cols-2 gap-x-6 gap-y-2 text-sm sm:justify-self-end"><dt class="text-gray-500">Invoice date</dt><dd class="font-medium">{{ invoice.issue_date }}</dd><dt class="text-gray-500">Due date</dt><dd class="font-medium">{{ invoice.due_date }}</dd><dt class="text-gray-500">Status</dt><dd class="font-medium">{{ invoice.get_status_display }}</dd>{% if invoice.job %}<dt class="text-gray-500">Job</dt><dd class="font-medium">#{{ invoice.job.id }} {{ invoice.job.title }}</dd>{% endif %}</dl>
+        </section>
+        <div class="overflow-hidden rounded-lg border border-gray-200">
+            <table class="min-w-full"><thead class="bg-gray-900 text-white"><tr><th class="px-4 py-3 text-left text-xs font-semibold uppercase">Item & description</th><th class="px-4 py-3 text-right text-xs font-semibold uppercase">Qty</th><th class="px-4 py-3 text-right text-xs font-semibold uppercase">Rate</th><th class="px-4 py-3 text-right text-xs font-semibold uppercase">Amount</th></tr></thead><tbody class="divide-y divide-gray-100">{% for item in invoice.line_items.all %}<tr><td class="px-4 py-4 text-sm">{{ item.description }}</td><td class="px-4 py-4 text-right text-sm">{{ item.quantity }}</td><td class="px-4 py-4 text-right text-sm">${{ item.unit_price }}</td><td class="px-4 py-4 text-right text-sm font-semibold">${{ item.total_price }}</td></tr>{% endfor %}</tbody></table>
+        </div>
+        <div class="mt-6 ml-auto max-w-sm space-y-3 text-sm"><div class="flex justify-between"><span class="text-gray-500">Subtotal</span><span>${{ invoice.subtotal }}</span></div><div class="flex justify-between"><span class="text-gray-500">Tax</span><span>${{ invoice.tax_amount }}</span></div><div class="flex justify-between border-t border-gray-200 pt-3 text-lg font-semibold"><span>Total</span><span>${{ invoice.total_amount }}</span></div><div class="flex justify-between"><span class="text-gray-500">Payments</span><span>-${{ invoice.amount_paid }}</span></div><div class="flex justify-between rounded-lg bg-gray-100 px-4 py-3 text-lg font-semibold"><span>Balance Due</span><span>${{ invoice.balance_due }}</span></div></div>
+        {% if invoice.notes %}<section class="mt-10 border-t border-gray-200 pt-6"><p class="text-xs font-semibold uppercase text-gray-500">Notes</p><p class="mt-2 whitespace-pre-line text-sm text-gray-700">{{ invoice.notes }}</p></section>{% endif %}
+        {% if invoice.terms %}<section class="mt-6"><p class="text-xs font-semibold uppercase text-gray-500">Terms</p><p class="mt-2 whitespace-pre-line text-sm text-gray-700">{{ invoice.terms }}</p></section>{% endif %}
+    </article>
+</div>
+{% endblock %}

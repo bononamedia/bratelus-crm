@@ -1,0 +1,19 @@
+{% extends 'base.html' %}
+
+{% block content %}
+<div class="mx-auto max-w-7xl space-y-5">
+    <header><p class="text-xs font-semibold uppercase text-amber-600">Finance</p><h1 class="mt-1 text-2xl font-semibold text-gray-950 md:text-3xl">Settings</h1><p class="mt-1 text-sm text-gray-500">Configure the payment methods {{ active_org.name }} accepts. These workspace settings are separate from payment methods saved on individual CRM customers.</p></header>
+    <section class="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950"><strong>How this works:</strong> enable the methods your company accepts here. Each invoice and recorded payment remains linked to its CRM customer and, when applicable, its job.</section>
+    <section class="rounded-lg border border-blue-200 bg-blue-50 p-4"><div class="flex flex-col justify-between gap-3 sm:flex-row sm:items-center"><div><h2 class="font-semibold text-blue-950">QuickBooks Online</h2><p class="mt-1 text-sm text-blue-800">{% if quickbooks and quickbooks.status == 'connected' %}Connected to {{ quickbooks.external_company_name }}. Last sync {{ quickbooks.last_sync_at|default:"pending" }}.{% else %}Optional accounting sync for customers, estimates, invoices, payments, and credit notes.{% endif %}</p></div><button disabled class="shrink-0 rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-semibold text-blue-700 opacity-60" title="OAuth connection will be enabled after Intuit app credentials are configured">Connect QuickBooks</button></div></section>
+    <div class="grid gap-4 lg:grid-cols-2">
+        {% for item in payment_options %}
+        <form method="post" class="rounded-lg border border-gray-200 bg-white p-5 shadow-sm">
+            {% csrf_token %}<input type="hidden" name="method" value="{{ item.method }}">
+            <div class="flex items-start justify-between gap-4"><div><h2 class="font-semibold text-gray-950">{{ item.name }}</h2><p class="mt-1 text-sm text-gray-500">{{ item.description }}</p></div><label class="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="is_enabled" value="yes" {% if item.option.is_enabled %}checked{% endif %} class="h-4 w-4 rounded border-gray-300 text-blue-600"> Enabled</label></div>
+            <div class="mt-4 space-y-3"><label class="block text-sm font-medium text-gray-700">Customer-facing name<input name="display_name" value="{{ item.option.display_name|default:item.name }}" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5"></label>{% if item.online %}<div class="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">Processor connection is configured through OAuth/API credentials. Do not paste private keys into customer instructions.</div>{% endif %}<label class="block text-sm font-medium text-gray-700">Payment instructions<textarea name="instructions" rows="3" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5" placeholder="Shown to the customer at checkout or on the invoice.">{{ item.option.instructions }}</textarea></label><label class="block text-sm font-medium text-gray-700">Account label / destination<input name="account_label" value="{{ item.option.public_config.account_label }}" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5" placeholder="Optional public identifier"></label></div>
+            <div class="mt-4 flex justify-end"><button class="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white">Save {{ item.name }}</button></div>
+        </form>
+        {% endfor %}
+    </div>
+</div>
+{% endblock %}

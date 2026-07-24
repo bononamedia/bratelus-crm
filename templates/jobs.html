@@ -12,6 +12,10 @@
             <p class="text-sm text-gray-500 mt-1">Routing matrix and live field operations.</p>
         </div>
         <div class="flex flex-col sm:flex-row gap-2 shrink-0">
+            <a href="{% url 'live_fleet' %}" target="_blank" rel="noopener" class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-800 hover:bg-emerald-100 sm:w-auto" title="Open the live fleet map in a separate window">
+                <svg class="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"></path></svg>
+                Live Fleet
+            </a>
             <a href="{% url 'job_calendar' %}" class="inline-flex w-full items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 sm:w-auto">Calendar</a>
             <button class="w-full sm:w-auto bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg font-medium shadow-sm hover:bg-gray-50 text-sm">
                 Filter by Zone
@@ -23,11 +27,17 @@
     </div>
 
     <div id="fleet-radar" class="card relative mb-4 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-sm" style="max-width: 100%; z-index: 0;">
-        <div class="bg-gray-50 px-3 py-2 border-b border-gray-200 flex justify-between items-center">
+        <div class="bg-gray-50 px-3 py-2 border-b border-gray-200 flex flex-wrap justify-between items-center gap-2">
             <h2 class="font-bold text-gray-700 flex items-center text-xs uppercase tracking-wide">
                 <span class="w-2.5 h-2.5 bg-blue-500 rounded-full mr-2 shadow-sm animate-pulse"></span> Live Fleet Radar
             </h2>
-            <span class="text-[10px] sm:text-xs text-gray-500" id="last-ping-time">Waiting for data...</span>
+            <div class="flex items-center gap-3">
+                <span class="text-[10px] sm:text-xs text-gray-500" id="last-ping-time">Waiting for data...</span>
+                <a href="{% url 'live_fleet' %}" target="_blank" rel="noopener" class="inline-flex items-center gap-1 text-xs font-medium text-blue-700 hover:text-blue-900" title="Open map in a separate window">
+                    Open full screen
+                    <svg class="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 3h7v7m0-7L10 14M5 7v12h12v-5"></path></svg>
+                </a>
+            </div>
         </div>
         <div id="fleet-map" class="w-full h-[250px] md:h-[350px]" style="position: relative; width: 100%; max-width: 100%; z-index: 1;"></div>
     </div>
@@ -82,17 +92,23 @@
 <div id="create-job-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 hidden transition-opacity" onclick="toggleCreateJobPanel()"></div>
 <div id="assignment-overlay" class="fixed inset-0 bg-gray-900 bg-opacity-50 z-40 hidden transition-opacity" onclick="closeAssignmentPanel()"></div>
 
-<div id="create-job-panel" class="fixed inset-y-0 right-0 z-50 w-full max-w-md bg-white shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
+<div id="create-job-panel" class="fixed inset-y-0 right-0 z-50 w-full max-w-xl bg-white shadow-2xl transform translate-x-full transition-transform duration-300 ease-in-out flex flex-col">
     
     <div class="px-6 py-4 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-        <h3 id="job-panel-title" class="text-lg font-bold text-gray-900">Create New Job</h3>
+        <div>
+            <p id="job-panel-eyebrow" class="text-xs font-semibold uppercase tracking-wide text-blue-600">New job</p>
+            <h3 id="job-panel-title" class="text-xl font-semibold text-gray-950">Create job</h3>
+            <p class="mt-1 text-xs text-gray-500">The same job workflow used in Job Calendar.</p>
+        </div>
         <button onclick="toggleCreateJobPanel()" class="text-gray-400 hover:text-gray-600">
             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
         </button>
     </div>
 
     <div class="p-6 flex-1 overflow-y-auto">
-        <form id="create-job-form" class="space-y-4">
+        <form id="create-job-form" class="space-y-5">
+            {% include 'partials/job_form_fields.html' with job_form_prefix='job' job_dynamic_options=False %}
+            {% comment %}Legacy duplicate form retained temporarily for a clean source migration.
             <div>
                 <label class="block text-sm font-medium text-gray-700 mb-1">Job Title</label>
                 <input type="text" id="job-title" required placeholder="e.g. Standard Deep Clean" class="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-blue-500 focus:border-blue-500 text-sm outline-none">
@@ -197,12 +213,13 @@
                 <textarea id="job-completion-message" rows="4" placeholder="Leave blank to use the workspace completion template." class="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm"></textarea>
                 <p class="mt-1 text-xs text-gray-500">Available: {% verbatim %}{{first_name}}, {{service}}, {{workspace_name}}, {{account_name}}{% endverbatim %}</p>
             </div>
+            {% endcomment %}
         </form>
     </div>
 
     <div class="px-6 py-4 border-t border-gray-200 bg-gray-50 flex justify-end gap-3">
         <button onclick="toggleCreateJobPanel()" class="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50">Cancel</button>
-        <button id="job-panel-submit" onclick="submitNewJob()" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm">Dispatch Job</button>
+        <button id="job-panel-submit" onclick="submitNewJob()" class="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 shadow-sm">Create job</button>
     </div>
 </div>
 
@@ -272,13 +289,17 @@
         if (panel.classList.contains('translate-x-full') && !forceClose) {
             panel.classList.remove('translate-x-full');
             overlay.classList.remove('hidden');
+            if (!editingJobId && !document.getElementById('job-start').value) {
+                document.getElementById('job-start').value = localJobInputValue(new Date());
+            }
             if (!document.querySelector('.job-task-row')) addJobTask();
         } else {
             panel.classList.add('translate-x-full');
             overlay.classList.add('hidden');
             editingJobId = null;
-            document.getElementById('job-panel-title').textContent = 'Create New Job';
-            document.getElementById('job-panel-submit').textContent = 'Dispatch Job';
+            document.getElementById('job-panel-eyebrow').textContent = 'New job';
+            document.getElementById('job-panel-title').textContent = 'Create job';
+            document.getElementById('job-panel-submit').textContent = 'Create job';
         }
     }
 
@@ -286,9 +307,12 @@
         const job = boardJobs.get(jobId);
         if (!job || ['in_progress', 'completed', 'canceled'].includes(job.status)) return;
         editingJobId = jobId;
+        document.getElementById('job-panel-eyebrow').textContent = 'Job details';
         document.getElementById('job-panel-title').textContent = `Edit Job #${jobId}`;
         document.getElementById('job-panel-submit').textContent = 'Save changes';
         document.getElementById('job-title').value = job.title || '';
+        document.getElementById('job-start').value = job.scheduled_start ? localJobInputValue(new Date(job.scheduled_start)) : localJobInputValue(new Date());
+        document.getElementById('job-duration').value = String(job.estimated_duration_minutes || 60);
         document.getElementById('job-account').value = job.account || '';
         document.getElementById('job-property').value = job.property || '';
         document.getElementById('job-skill').value = job.required_skill || '';
@@ -314,6 +338,11 @@
     const jobWorkers = [
         {% for worker in workers %}{id: {{ worker.id }}, name: "{{ worker.user.get_full_name|default:worker.user.username|escapejs }}"},{% endfor %}
     ];
+
+    function localJobInputValue(date) {
+        const local = new Date(date.getTime() - date.getTimezoneOffset() * 60000);
+        return local.toISOString().slice(0, 16);
+    }
 
     function selectedJobWorkerIds() {
         return Array.from(document.querySelectorAll('[name="job-worker"]:checked')).map(input => Number(input.value));
@@ -343,8 +372,13 @@
     }
 
     document.getElementById('job-account').addEventListener('change', function() {
+        const propertySelect = document.getElementById('job-property');
         const contactSelect = document.getElementById('job-completion-contact');
+        propertySelect.value = '';
         contactSelect.value = '';
+        Array.from(propertySelect.options).forEach((option, index) => {
+            option.hidden = index > 0 && option.dataset.account !== this.value;
+        });
         Array.from(contactSelect.options).forEach((option, index) => {
             option.hidden = index > 0 && option.dataset.account !== this.value;
         });
@@ -363,8 +397,16 @@
             return;
         }
 
+        const scheduledStart = document.getElementById('job-start').value;
+        if (!scheduledStart) {
+            alert("Please choose the job start date and time.");
+            return;
+        }
+
         const payload = {
             title: document.getElementById('job-title').value,
+            scheduled_start: new Date(scheduledStart).toISOString(),
+            estimated_duration_minutes: Number(document.getElementById('job-duration').value || 60),
             account: document.getElementById('job-account').value,
             organization: orgId, // Injected Org ID
             property: document.getElementById('job-property').value || null,

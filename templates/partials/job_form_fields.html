@@ -1,0 +1,173 @@
+<section class="space-y-4">
+    <div class="rounded-lg border border-blue-100 bg-blue-50 p-4">
+        <p class="text-xs font-semibold uppercase tracking-wide text-blue-700">Job details</p>
+        <div class="mt-3 space-y-4">
+            <label class="block text-sm font-medium text-gray-700">
+                Workspace
+                {% if job_dynamic_options %}
+                <select id="{{ job_form_prefix }}-workspace" required onchange="filterCalendarForm()" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5"></select>
+                {% else %}
+                <select id="{{ job_form_prefix }}-workspace" disabled class="mt-1 w-full rounded-lg border border-gray-300 bg-gray-100 px-3 py-2.5 text-gray-700">
+                    <option value="{{ active_org.id }}">{{ active_org.name }}</option>
+                </select>
+                {% endif %}
+            </label>
+
+            <label class="block text-sm font-medium text-gray-700">
+                Job title
+                <input id="{{ job_form_prefix }}-title" required class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5" placeholder="Service or project name">
+            </label>
+
+            <div class="grid gap-3 sm:grid-cols-2">
+                <label class="text-sm font-medium text-gray-700">
+                    Starts
+                    <input id="{{ job_form_prefix }}-start" type="datetime-local" required class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5">
+                </label>
+                <label class="text-sm font-medium text-gray-700">
+                    Duration
+                    <select id="{{ job_form_prefix }}-duration" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5">
+                        <option value="30">30 minutes</option>
+                        <option value="60" selected>1 hour</option>
+                        <option value="90">1.5 hours</option>
+                        <option value="120">2 hours</option>
+                        <option value="180">3 hours</option>
+                        <option value="240">4 hours</option>
+                        <option value="480">Full day</option>
+                    </select>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="space-y-4 rounded-lg border border-gray-200 p-4">
+        <p class="text-xs font-semibold uppercase tracking-wide text-gray-500">Customer and location</p>
+        <label class="block text-sm font-medium text-gray-700">
+            Client / account
+            <select id="{{ job_form_prefix }}-account" required {% if job_dynamic_options %}onchange="filterCalendarProperties(); refreshCalendarContacts()"{% endif %} class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5">
+                {% if job_dynamic_options %}
+                <option value="">Select an account</option>
+                {% else %}
+                <option value="" disabled selected>Select an account</option>
+                {% for account in accounts %}<option value="{{ account.id }}">{{ account.name }}</option>{% endfor %}
+                {% endif %}
+            </select>
+        </label>
+        <label class="block text-sm font-medium text-gray-700">
+            Property location
+            <select id="{{ job_form_prefix }}-property" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5">
+                {% if job_dynamic_options %}
+                <option value="">Select account first</option>
+                {% else %}
+                <option value="">Select a property</option>
+                {% for prop in properties %}<option value="{{ prop.id }}" data-account="{{ prop.account_id }}">{{ prop.name }}</option>{% endfor %}
+                {% endif %}
+            </select>
+        </label>
+    </div>
+
+    <fieldset class="space-y-3 rounded-lg border border-emerald-200 bg-emerald-50/50 p-4">
+        <legend class="px-1 text-sm font-semibold text-emerald-900">Assign crew</legend>
+        <p class="text-xs text-emerald-800">Select everyone receiving this job. Individual task owners are selected below.</p>
+        {% if job_dynamic_options %}
+        <div id="{{ job_form_prefix }}-workers" class="grid gap-2 sm:grid-cols-2"></div>
+        {% else %}
+        <div class="grid gap-2 sm:grid-cols-2">
+            {% for worker in workers %}
+            <label class="flex items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2 text-sm text-gray-700">
+                <input type="checkbox" name="{{ job_form_prefix }}-worker" value="{{ worker.id }}" onchange="refreshTaskWorkerOptions()" class="h-4 w-4 rounded border-gray-300 text-blue-600">
+                {{ worker.user.get_full_name|default:worker.user.username }}
+            </label>
+            {% empty %}<p class="text-sm text-amber-700">No field-capable users are available in this workspace.</p>{% endfor %}
+        </div>
+        {% endif %}
+    </fieldset>
+
+    <div class="grid gap-3 sm:grid-cols-2">
+        <label class="text-sm font-medium text-gray-700">
+            Required skill
+            <select id="{{ job_form_prefix }}-skill" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5">
+                <option value="">Any / none</option>
+                {% if not job_dynamic_options %}{% for skill in skills %}<option value="{{ skill.id }}">{{ skill.name }}</option>{% endfor %}{% endif %}
+            </select>
+        </label>
+        <label class="text-sm font-medium text-gray-700">
+            Service zone
+            <select id="{{ job_form_prefix }}-zone" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5">
+                <option value="">Any / none</option>
+                {% if not job_dynamic_options %}{% for zone in zones %}<option value="{{ zone.id }}">{{ zone.name }}</option>{% endfor %}{% endif %}
+            </select>
+        </label>
+    </div>
+
+    <label class="block text-sm font-medium text-gray-700">
+        Instructions / notes
+        <textarea id="{{ job_form_prefix }}-description" rows="4" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5" placeholder="Access, service, or customer notes"></textarea>
+    </label>
+</section>
+
+<section class="space-y-4 border-t border-gray-200 pt-5">
+    <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-violet-600">Field workflow</p>
+        <h3 class="mt-1 font-semibold text-gray-950">Completion and task ownership</h3>
+    </div>
+    <label class="block text-sm font-medium text-gray-700">
+        Field completion
+        <select id="{{ job_form_prefix }}-completion-mode" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5">
+            <option value="tasks">Crew completes each task</option>
+            <option value="project">Crew completes the whole project</option>
+        </select>
+    </label>
+    <div>
+        <div class="mb-2 flex items-center justify-between">
+            <label class="text-sm font-medium text-gray-700">Task checklist</label>
+            <button type="button" onclick="{% if job_dynamic_options %}addCalendarTask(){% else %}addJobTask(){% endif %}" class="text-sm font-semibold text-blue-700">Add task</button>
+        </div>
+        <div id="{{ job_form_prefix }}-task-list" class="space-y-2"></div>
+    </div>
+    <div class="grid gap-3 sm:grid-cols-2">
+        <label class="text-sm font-medium text-gray-700">
+            Arrival radius (meters)
+            <input id="{{ job_form_prefix }}-arrival-radius" type="number" min="25" max="5000" value="250" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5">
+        </label>
+        <label class="flex items-end gap-2 pb-2 text-sm text-gray-700">
+            <input id="{{ job_form_prefix }}-require-location" type="checkbox" checked class="h-4 w-4 rounded border-gray-300 text-blue-600">
+            Require GPS arrival
+        </label>
+    </div>
+    <label class="block text-sm font-medium text-gray-700">
+        Final closeout instruction
+        <input id="{{ job_form_prefix }}-closeout-instruction" value="Secure the property and confirm the site is closed." class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5">
+    </label>
+</section>
+
+<section class="space-y-4 border-t border-gray-200 pt-5">
+    <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-amber-600">Customer notification</p>
+        <h3 class="mt-1 font-semibold text-gray-950">Message after final closeout</h3>
+    </div>
+    <label class="block text-sm font-medium text-gray-700">
+        Delivery method
+        <select id="{{ job_form_prefix }}-notification-method" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5">
+            <option value="none">Do not notify</option>
+            <option value="email">Email</option>
+            <option value="sms">SMS</option>
+            <option value="both">Email and SMS</option>
+        </select>
+    </label>
+    <label class="block text-sm font-medium text-gray-700">
+        Completion contact
+        <select id="{{ job_form_prefix }}-completion-contact" class="mt-1 w-full rounded-lg border border-gray-300 bg-white px-3 py-2.5">
+            {% if job_dynamic_options %}
+            <option value="">Select an account first</option>
+            {% else %}
+            <option value="">Use primary account contact</option>
+            {% for contact in contacts %}<option value="{{ contact.id }}" data-account="{{ contact.account_id|default:'' }}">{{ contact.first_name }} {{ contact.last_name }}{% if contact.account %} · {{ contact.account.name }}{% endif %}</option>{% endfor %}
+            {% endif %}
+        </select>
+    </label>
+    <label class="block text-sm font-medium text-gray-700">
+        Job-specific message <span class="font-normal text-gray-400">(optional)</span>
+        <textarea id="{{ job_form_prefix }}-completion-message" rows="3" class="mt-1 w-full rounded-lg border border-gray-300 px-3 py-2.5" placeholder="Leave blank to use the workspace completion template."></textarea>
+    </label>
+    <p class="text-xs text-gray-500">Available: {% verbatim %}{{first_name}}, {{service}}, {{workspace_name}}, {{account_name}}{% endverbatim %}</p>
+</section>

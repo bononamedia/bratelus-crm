@@ -1,11 +1,18 @@
 from django.contrib import admin
 from .models import (
+    AccountingConnection,
     BillingEvent,
+    CreditNote,
+    Estimate,
+    EstimateLineItem,
     Invoice,
     LineItem,
+    PaymentReceived,
     PlatformInvoice,
+    RecurringInvoice,
     SeatPricingTier,
     SubscriptionPlan,
+    WorkspacePaymentOption,
     WorkspaceSubscription,
 )
 
@@ -13,6 +20,19 @@ from .models import (
 class LineItemInline(admin.TabularInline):
     model = LineItem
     extra = 1
+
+
+class EstimateLineItemInline(admin.TabularInline):
+    model = EstimateLineItem
+    extra = 1
+
+
+@admin.register(Estimate)
+class EstimateAdmin(admin.ModelAdmin):
+    list_display = ('estimate_number', 'account', 'organization', 'status', 'issue_date', 'total_amount')
+    list_filter = ('organization', 'status')
+    search_fields = ('estimate_number', 'account__name')
+    inlines = (EstimateLineItemInline,)
 
 
 @admin.register(Invoice)
@@ -29,6 +49,14 @@ class LineItemAdmin(admin.ModelAdmin):
     list_display = ('description', 'invoice', 'quantity', 'unit_price', 'total_price')
     search_fields = ('description', 'invoice__invoice_number')
     autocomplete_fields = ('invoice', 'job')
+
+
+@admin.register(PaymentReceived)
+class PaymentReceivedAdmin(admin.ModelAdmin):
+    list_display = ('payment_number', 'account', 'job', 'invoice', 'method', 'amount', 'payment_date')
+    list_filter = ('organization', 'method', 'payment_date')
+    search_fields = ('payment_number', 'account__name', 'invoice__invoice_number', 'job__title', 'reference')
+    autocomplete_fields = ('organization', 'account', 'invoice', 'job')
 
 
 class SeatPricingTierInline(admin.TabularInline):
@@ -66,3 +94,9 @@ class BillingEventAdmin(admin.ModelAdmin):
     list_filter = ('event_type',)
     search_fields = ('summary', 'stripe_event_id', 'workspace__name')
     readonly_fields = ('created_at',)
+
+
+admin.site.register(RecurringInvoice)
+admin.site.register(CreditNote)
+admin.site.register(WorkspacePaymentOption)
+admin.site.register(AccountingConnection)

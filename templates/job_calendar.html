@@ -41,9 +41,11 @@
 
 <div id="calendar-drawer-overlay" class="fixed inset-0 z-40 hidden bg-gray-950/40" onclick="closeJobDrawer()"></div>
 <aside id="calendar-job-drawer" class="fixed inset-y-0 right-0 z-50 flex w-full max-w-xl translate-x-full flex-col bg-white shadow-2xl transition-transform duration-200">
-    <div class="flex items-center justify-between border-b border-gray-200 px-5 py-4"><div><p id="drawer-eyebrow" class="text-xs font-semibold uppercase tracking-wide text-blue-600">Calendar job</p><h2 id="drawer-title" class="text-xl font-semibold text-gray-950">Create a job</h2></div><button type="button" onclick="closeJobDrawer()" class="flex h-9 w-9 items-center justify-center rounded-md text-2xl text-gray-500 hover:bg-gray-100" aria-label="Close">×</button></div>
+    <div class="flex items-center justify-between border-b border-gray-200 bg-gray-50 px-5 py-4"><div><p id="drawer-eyebrow" class="text-xs font-semibold uppercase tracking-wide text-blue-600">New job</p><h2 id="drawer-title" class="text-xl font-semibold text-gray-950">Create job</h2><p class="mt-1 text-xs text-gray-500">The same job workflow used on the Dispatch Board.</p></div><button type="button" onclick="closeJobDrawer()" class="flex h-9 w-9 items-center justify-center rounded-md text-2xl text-gray-500 hover:bg-gray-100" aria-label="Close">×</button></div>
 
-    <form id="calendar-job-form" class="flex-1 space-y-4 overflow-y-auto p-5" onsubmit="submitCalendarJob(event)">
+    <form id="calendar-job-form" class="flex-1 space-y-5 overflow-y-auto p-5" onsubmit="submitCalendarJob(event)">
+        {% include 'partials/job_form_fields.html' with job_form_prefix='calendar' job_dynamic_options=True %}
+        {% comment %}Legacy duplicate form retained temporarily for a clean source migration.
         <label class="block text-sm font-medium text-gray-700">Workspace<select id="calendar-workspace" required onchange="filterCalendarForm()" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2.5"></select></label>
         <label class="block text-sm font-medium text-gray-700">Job title<input id="calendar-job-title" required class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2.5" placeholder="Service or project name"></label>
         <div class="grid grid-cols-2 gap-3"><label class="text-sm font-medium text-gray-700">Starts<input id="calendar-job-start" type="datetime-local" required class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2.5"></label><label class="text-sm font-medium text-gray-700">Duration<select id="calendar-job-duration" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2.5"><option value="30">30 minutes</option><option value="60" selected>1 hour</option><option value="90">1.5 hours</option><option value="120">2 hours</option><option value="180">3 hours</option><option value="240">4 hours</option><option value="480">Full day</option></select></label></div>
@@ -59,6 +61,7 @@
         <div class="border-t border-gray-200 pt-4"><label class="block text-sm font-medium text-gray-700">Notify customer after closeout<select id="calendar-notification-method" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2.5"><option value="none">Do not notify</option><option value="email">Email</option><option value="sms">SMS</option><option value="both">Email and SMS</option></select></label></div>
         <label class="block text-sm font-medium text-gray-700">Completion contact<select id="calendar-completion-contact" class="mt-1 w-full rounded-md border border-gray-300 bg-white px-3 py-2.5"></select></label>
         <label class="block text-sm font-medium text-gray-700">Job-specific message <span class="font-normal text-gray-400">(optional)</span><textarea id="calendar-completion-message" rows="3" class="mt-1 w-full rounded-md border border-gray-300 px-3 py-2.5" placeholder="Leave blank to use the workspace template."></textarea></label>
+        {% endcomment %}
     </form>
     <div class="flex items-center justify-end gap-2 border-t border-gray-200 bg-gray-50 px-5 py-4"><button type="button" onclick="closeJobDrawer()" class="rounded-md border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700">Cancel</button><button type="submit" form="calendar-job-form" class="rounded-md bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700">Create job</button></div>
 </aside>
@@ -127,8 +130,8 @@ function openJobDrawer(start, end = null, workspaceId = null) {
     document.getElementById('calendar-job-form').reset();
     const allowed = selectedCalendarIds();
     document.getElementById('calendar-workspace').value = workspaceId || allowed[0] || calendarData.workspaces[0]?.id || '';
-    document.getElementById('calendar-job-start').value = localInputValue(start || new Date());
-    if (end && start) document.getElementById('calendar-job-duration').value = String(Math.max(15, Math.round((end-start)/60000)));
+    document.getElementById('calendar-start').value = localInputValue(start || new Date());
+    if (end && start) document.getElementById('calendar-duration').value = String(Math.max(15, Math.round((end-start)/60000)));
     filterCalendarForm();
     document.getElementById('calendar-task-list').innerHTML = '';
     addCalendarTask();
@@ -140,9 +143,9 @@ async function submitCalendarJob(event) {
     event.preventDefault();
     const payload = {
         workspace_id: document.getElementById('calendar-workspace').value,
-        title: document.getElementById('calendar-job-title').value,
-        scheduled_start: new Date(document.getElementById('calendar-job-start').value).toISOString(),
-        duration_minutes: document.getElementById('calendar-job-duration').value,
+        title: document.getElementById('calendar-title').value,
+        scheduled_start: new Date(document.getElementById('calendar-start').value).toISOString(),
+        duration_minutes: document.getElementById('calendar-duration').value,
         account_id: document.getElementById('calendar-account').value,
         property_id: document.getElementById('calendar-property').value || null,
         worker_ids: selectedCalendarWorkerIds(),
@@ -152,7 +155,7 @@ async function submitCalendarJob(event) {
         completion_mode: document.getElementById('calendar-completion-mode').value,
         require_location: document.getElementById('calendar-require-location').checked,
         arrival_radius_meters: Number(document.getElementById('calendar-arrival-radius').value || 250),
-        closeout_instruction: document.getElementById('calendar-closeout').value,
+        closeout_instruction: document.getElementById('calendar-closeout-instruction').value,
         completion_contact_id: document.getElementById('calendar-completion-contact').value || null,
         completion_notification_method: document.getElementById('calendar-notification-method').value,
         completion_message_override: document.getElementById('calendar-completion-message').value,

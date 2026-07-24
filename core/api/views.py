@@ -92,6 +92,19 @@ class AccountViewSet(BaseWorkspaceViewSet):
         # Auto-attach the organization that the user currently has selected in the UI
         serializer.save(organization=self.request.active_organization)
 
+    @action(detail=True, methods=['get'], url_path='configuration')
+    def configuration(self, request, pk=None):
+        account = self.get_object()
+        primary_contact = account.contacts.filter(archived_at__isnull=True).order_by('-is_primary', 'id').first()
+        primary_property = account.properties.order_by('id').first()
+        default_payment = account.payment_methods.order_by('-is_default', 'id').first()
+        return Response({
+            'account': self.get_serializer(account).data,
+            'contact': ContactSerializer(primary_contact).data if primary_contact else None,
+            'property': PropertySerializer(primary_property).data if primary_property else None,
+            'payment_method': PaymentMethodSerializer(default_payment).data if default_payment else None,
+        })
+
     @action(detail=False, methods=['post'], url_path='create-bundle')
     @transaction.atomic
     def create_bundle(self, request):

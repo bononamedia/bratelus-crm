@@ -6,18 +6,18 @@
         <div>
             <p class="text-xs font-bold uppercase tracking-wide text-blue-600">{{ active_org.name|default:"Workspace" }}</p>
             <h1 class="mt-1 text-2xl md:text-3xl font-extrabold text-gray-950 tracking-tight">Finance & Books</h1>
-            <p class="mt-1 text-sm text-gray-500">Invoices, payment methods, billing status, and receivables.</p>
+            <p class="mt-1 text-sm text-gray-500">Sales, receivables, payment channels, timesheets, and job profitability.</p>
         </div>
         <div class="flex flex-col sm:flex-row gap-2">
-            <a href="{% url 'payment_methods' %}" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50">Payment Methods</a>
-            <a href="{% url 'reports' %}#finance" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Finance Report</a>
+            <a href="{% url 'finance_payment_settings' %}" class="inline-flex items-center justify-center rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-700 shadow-sm hover:bg-gray-50">Payment Setup</a>
+            <a href="{% url 'finance_sales' %}?tab=invoices" class="inline-flex items-center justify-center rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white shadow-sm hover:bg-blue-700">Open Sales</a>
         </div>
     </div>
 
     <div class="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <p class="text-xs font-bold uppercase tracking-wide text-gray-500">Invoices</p>
-            <p class="mt-2 text-3xl font-extrabold text-gray-950">{{ finance_stats.invoice_count }}</p>
+            <p class="text-xs font-bold uppercase tracking-wide text-gray-500">Estimates</p>
+            <p class="mt-2 text-3xl font-extrabold text-gray-950">{{ finance_stats.estimate_count }}</p>
         </div>
         <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
             <p class="text-xs font-bold uppercase tracking-wide text-gray-500">Open Invoices</p>
@@ -28,15 +28,15 @@
             <p class="mt-2 text-3xl font-extrabold text-gray-950">${{ finance_stats.open_balance }}</p>
         </div>
         <div class="rounded-lg border border-gray-200 bg-white p-4 shadow-sm">
-            <p class="text-xs font-bold uppercase tracking-wide text-gray-500">Payment Methods</p>
-            <p class="mt-2 text-3xl font-extrabold text-gray-950">{{ finance_stats.payment_method_count }}</p>
+            <p class="text-xs font-bold uppercase tracking-wide text-gray-500">Payments Received</p>
+            <p class="mt-2 text-3xl font-extrabold text-gray-950">${{ finance_stats.payments_received }}</p>
         </div>
     </div>
 
     <section id="invoices" class="rounded-lg border border-gray-200 bg-white shadow-sm">
         <div class="flex items-center justify-between border-b border-gray-200 px-4 py-3">
             <h2 class="text-sm font-bold uppercase tracking-wide text-gray-700">Recent Invoices</h2>
-            <span class="text-xs text-gray-500">Invoice creation workflow comes next.</span>
+            <a href="{% url 'finance_sales' %}?tab=invoices" class="text-xs font-semibold text-blue-700">View all invoices</a>
         </div>
         <div class="overflow-x-auto">
             <table class="min-w-full divide-y divide-gray-200">
@@ -52,7 +52,7 @@
                 <tbody class="divide-y divide-gray-100">
                     {% for invoice in invoices %}
                     <tr class="hover:bg-gray-50">
-                        <td class="px-4 py-3 font-semibold text-gray-950">{{ invoice.invoice_number }}</td>
+                        <td class="px-4 py-3 font-semibold text-blue-700"><a href="{% url 'finance_invoice_detail' invoice.id %}">{{ invoice.invoice_number }}</a></td>
                         <td class="px-4 py-3 text-sm text-gray-600">{{ invoice.account.name }}</td>
                         <td class="px-4 py-3 text-sm text-gray-600">{{ invoice.due_date }}</td>
                         <td class="px-4 py-3 text-sm font-semibold text-gray-950">${{ invoice.total_amount }}</td>

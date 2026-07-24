@@ -94,7 +94,7 @@
                     <a href="{% url 'accounts' %}" class="nav-subitem">Accounts</a>
                     <a href="{% url 'contacts' %}" class="nav-subitem">Contacts</a>
                     <a href="{% url 'properties' %}" class="nav-subitem">Properties</a>
-                    <a href="{% url 'payment_methods' %}" class="nav-subitem">Payment Methods</a>
+                    <a href="{% url 'payment_methods' %}" class="nav-subitem">Customer Payment Methods</a>
                     <a href="{% url 'leads' %}" class="nav-subitem">Leads Pipeline</a>
                 </div>
             </div>
@@ -118,8 +118,6 @@
                 <div class="nav-submenu hidden px-2 pb-2.5" data-module-panel="dispatch">
                     <a href="{% url 'jobs' %}" class="nav-subitem">Dispatch Board</a>
                     <a href="{% url 'job_calendar' %}" class="nav-subitem">Job Calendar</a>
-                    <a href="{% url 'jobs' %}#fleet-radar" class="nav-subitem">Live Fleet</a>
-                    <a href="{% url 'jobs' %}#dispatch-board" class="nav-subitem">Crew Assignment</a>
                 </div>
             </div>
 
@@ -136,8 +134,14 @@
                 </button>
                 <div class="nav-submenu hidden px-2 pb-2.5" data-module-panel="finance">
                     <a href="{% url 'finance' %}" class="nav-subitem">Books Overview</a>
-                    <a href="{% url 'finance' %}#invoices" class="nav-subitem">Invoices</a>
-                    <a href="{% url 'payment_methods' %}" class="nav-subitem">Payment Methods</a>
+                    <a href="{% url 'finance_sales' %}?tab=estimates" class="nav-subitem">Estimates</a>
+                    <a href="{% url 'finance_sales' %}?tab=invoices" class="nav-subitem">Invoices</a>
+                    <a href="{% url 'finance_sales' %}?tab=recurring" class="nav-subitem">Recurring Invoices</a>
+                    <a href="{% url 'finance_sales' %}?tab=payments" class="nav-subitem">Payments Received</a>
+                    <a href="{% url 'finance_sales' %}?tab=credits" class="nav-subitem">Credit Notes</a>
+                    <a href="{% url 'work_activity_ledger' %}" class="nav-subitem">Timesheets</a>
+                    <a href="{% url 'finance_job_costing' %}" class="nav-subitem">Job Costing</a>
+                    <a href="{% url 'finance_payment_settings' %}" class="nav-subitem">Settings</a>
                 </div>
             </div>
 

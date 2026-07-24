@@ -490,3 +490,21 @@ class CrmArchiveTests(TestCase):
         self.assertEqual(lookup.status_code, 200)
         self.assertEqual(lookup.json()['state'], 'FL')
         self.assertTrue(lookup.json()['city'])
+
+    def test_account_configuration_returns_primary_related_records(self):
+        self.contact.is_primary = True
+        self.contact.save(update_fields=['is_primary'])
+        payment = PaymentMethod.objects.create(
+            account=self.account,
+            assigned_property=self.property,
+            card_type='Visa',
+            last_four='4242',
+            is_default=True,
+        )
+        response = self.client.get(reverse('api-account-configuration', args=[self.account.id]))
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertEqual(payload['account']['id'], self.account.id)
+        self.assertEqual(payload['contact']['id'], self.contact.id)
+        self.assertEqual(payload['property']['id'], self.property.id)
+        self.assertEqual(payload['payment_method']['id'], payment.id)

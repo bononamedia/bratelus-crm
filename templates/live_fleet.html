@@ -1,0 +1,156 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Fleet | {{ active_org.name }} | Bratelus</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <style>
+        html, body, #live-fleet-map { height: 100%; margin: 0; }
+        body { overflow: hidden; background: #e5e7eb; }
+        .leaflet-control-zoom a { display: flex; align-items: center; justify-content: center; }
+        .fleet-marker {
+            align-items: center;
+            background: #059669;
+            border: 3px solid #fff;
+            border-radius: 9999px;
+            box-shadow: 0 3px 12px rgba(15, 23, 42, .3);
+            color: #fff;
+            display: flex;
+            font: 700 12px/1 system-ui, sans-serif;
+            height: 34px;
+            justify-content: center;
+            width: 34px;
+        }
+    </style>
+</head>
+<body>
+    <main class="relative h-full w-full" aria-label="Live fleet map">
+        <div id="live-fleet-map" class="h-full w-full"></div>
+
+        <header class="pointer-events-none absolute inset-x-0 top-0 z-[1000] p-3 sm:p-4">
+            <div class="pointer-events-auto mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 rounded-lg border border-white/70 bg-white/95 px-4 py-3 shadow-lg backdrop-blur">
+                <div class="min-w-0">
+                    <div class="flex items-center gap-2">
+                        <span class="h-2.5 w-2.5 animate-pulse rounded-full bg-emerald-500"></span>
+                        <h1 class="text-base font-semibold text-slate-950 sm:text-lg">Live Fleet</h1>
+                    </div>
+                    <p class="truncate text-xs text-slate-500 sm:text-sm">{{ active_org.name }}</p>
+                </div>
+                <div class="flex items-center gap-3 sm:gap-5">
+                    <div class="text-right">
+                        <p class="text-[10px] font-medium uppercase text-slate-500">Workers online</p>
+                        <p id="fleet-count" class="text-lg font-semibold text-slate-950">0</p>
+                    </div>
+                    <div class="hidden text-right sm:block">
+                        <p class="text-[10px] font-medium uppercase text-slate-500">Last updated</p>
+                        <p id="fleet-updated" class="text-sm font-medium text-slate-700">Connecting...</p>
+                    </div>
+                    <a href="{% url 'jobs' %}" class="inline-flex h-10 items-center justify-center rounded-md border border-slate-200 bg-white px-3 text-sm font-medium text-slate-700 hover:bg-slate-50" title="Return to Dispatch Board">
+                        Dispatch Board
+                    </a>
+                </div>
+            </div>
+        </header>
+
+        <div id="fleet-empty" class="pointer-events-none absolute left-1/2 top-1/2 z-[900] hidden -translate-x-1/2 -translate-y-1/2 rounded-lg border border-slate-200 bg-white/95 px-6 py-5 text-center shadow-lg">
+            <p class="font-semibold text-slate-900">Waiting for field locations</p>
+            <p class="mt-1 text-sm text-slate-500">Workers appear after their devices send a location update.</p>
+        </div>
+    </main>
+
+    <script>
+        const map = L.map('live-fleet-map', { zoomControl: true }).setView([26.1224, -80.1373], 10);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+            maxZoom: 19,
+            attribution: '&copy; OpenStreetMap &copy; CARTO'
+        }).addTo(map);
+
+        const workerPins = new Map();
+        let fittedInitialFleet = false;
+
+        function markerIcon(workerName) {
+            const initial = (workerName || '?').trim().charAt(0).toUpperCase() || '?';
+            return L.divIcon({
+                className: '',
+                html: `<div class="fleet-marker">${initial}</div>`,
+                iconSize: [34, 34],
+                iconAnchor: [17, 17],
+                popupAnchor: [0, -18],
+            });
+        }
+
+        function popupContent(worker) {
+            const seen = worker.timestamp ? new Date(worker.timestamp).toLocaleString() : 'Unknown';
+            const accuracy = Number.isFinite(Number(worker.accuracy))
+                ? `${Math.round(Number(worker.accuracy))} m accuracy`
+                : 'Accuracy unavailable';
+            return `<strong>${worker.worker_name || 'Field worker'}</strong><br><span>Last ping: ${seen}</span><br><span>${accuracy}</span>`;
+        }
+
+        async function refreshFleet() {
+            const updated = document.getElementById('fleet-updated');
+            try {
+                const response = await fetch('{% url "api_live_fleet" %}', {
+                    headers: { 'Accept': 'application/json' },
+                    credentials: 'same-origin',
+                });
+                if (!response.ok) throw new Error(`Fleet request failed (${response.status})`);
+                const data = await response.json();
+                const fleet = Array.isArray(data.fleet) ? data.fleet : [];
+                const activeIds = new Set();
+                const bounds = [];
+
+                fleet.forEach(worker => {
+                    const latitude = Number(worker.latitude);
+                    const longitude = Number(worker.longitude);
+                    if (!Number.isFinite(latitude) || !Number.isFinite(longitude)) return;
+
+                    const workerId = String(worker.worker_id);
+                    activeIds.add(workerId);
+                    bounds.push([latitude, longitude]);
+                    const existing = workerPins.get(workerId);
+
+                    if (existing) {
+                        existing.setLatLng([latitude, longitude]);
+                        existing.setPopupContent(popupContent(worker));
+                    } else {
+                        const marker = L.marker([latitude, longitude], {
+                            icon: markerIcon(worker.worker_name),
+                            title: worker.worker_name || 'Field worker',
+                        }).addTo(map);
+                        marker.bindPopup(popupContent(worker));
+                        workerPins.set(workerId, marker);
+                    }
+                });
+
+                workerPins.forEach((marker, workerId) => {
+                    if (!activeIds.has(workerId)) {
+                        map.removeLayer(marker);
+                        workerPins.delete(workerId);
+                    }
+                });
+
+                document.getElementById('fleet-count').textContent = String(activeIds.size);
+                updated.textContent = new Date().toLocaleTimeString();
+                document.getElementById('fleet-empty').classList.toggle('hidden', activeIds.size !== 0);
+
+                if (!fittedInitialFleet && bounds.length) {
+                    map.fitBounds(bounds, { padding: [70, 70], maxZoom: 14 });
+                    fittedInitialFleet = true;
+                }
+            } catch (error) {
+                console.error('Live fleet refresh failed:', error);
+                updated.textContent = 'Connection issue';
+            }
+        }
+
+        refreshFleet();
+        setInterval(refreshFleet, 10000);
+        window.addEventListener('resize', () => map.invalidateSize());
+    </script>
+</body>
+</html>
